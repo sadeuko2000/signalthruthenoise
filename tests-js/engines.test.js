@@ -20,3 +20,33 @@ test('miks jest równomocowy w każdym punkcie', () => {
     near(blendWeights(x, y).reduce((s, w) => s + w * w, 0), 1);
   }
 });
+
+import { PARAM_SPECS, defaultParams, randomizeParams } from '../docs/js/engines.js';
+import { mulberry32 } from '../docs/js/generator.js';
+
+test('losowanie zostaje w granicach rand i w zakresie suwaka', () => {
+  for (let i = 0; i < PARAM_SPECS.length; i++) {
+    for (let seed = 0; seed < 200; seed++) {
+      const vals = randomizeParams(i, mulberry32(seed));
+      for (const sp of PARAM_SPECS[i]) {
+        const v = vals[sp.id];
+        assert.ok(v >= sp.min && v <= sp.max, `${sp.id}=${v} poza suwakiem`);
+        if (sp.choices) assert.ok(sp.choices.includes(v), `${sp.id}=${v} spoza choices`);
+        else assert.ok(v >= sp.rand[0] - sp.step && v <= sp.rand[1] + sp.step, `${sp.id}=${v} poza rand`);
+      }
+    }
+  }
+});
+
+test('losowanie daje różne wyniki dla różnych ziaren', () => {
+  const a = JSON.stringify(randomizeParams(0, mulberry32(1)));
+  const b = JSON.stringify(randomizeParams(0, mulberry32(2)));
+  assert.notEqual(a, b);
+});
+
+test('domyślne parametry mieszczą się w zakresach', () => {
+  PARAM_SPECS.forEach((specs, i) => {
+    const d = defaultParams(i);
+    for (const sp of specs) assert.ok(d[sp.id] >= sp.min && d[sp.id] <= sp.max);
+  });
+});

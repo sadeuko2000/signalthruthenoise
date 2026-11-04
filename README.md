@@ -12,7 +12,7 @@ npm test          # testy generatora (node:test)
 ## Struktura
 - `docs/` – aplikacja (vanilla ES modules, bez buildu); publikowana przez GitHub Pages
   - `js/generator.js` – rytm ważony, skale, mutacje (czysta logika)
-  - `js/engines.js` – 4 monofoniczne silniki basu (prophet, ms-20, dx/FM, wavetable) i miks równomocowy dla pada XY
+  - `js/engines.js` – 4 monofoniczne silniki basu (prophet, ms-20, dx/FM, wavetable), ich parametry, losowanie w granicach rozsądku (`PARAM_SPECS`) i miks równomocowy dla pada XY
   - `js/audio.js` – Web Audio: zegar z lookahead, rozsyłanie nut do silników, slide, ratchet
   - `js/vocoder.js` – vocoder kanałowy (16 pasm + tor szumu na spółgłoski); modulator = mikrofon, nośnik = bas
   - `js/sensors.js` – żyroskop (przechył → pad XY) i potrząśnięcie (→ mutacja)

@@ -1,6 +1,7 @@
 import { generateBass, mutate, DEFAULTS } from './generator.js';
 import { Engine } from './audio.js';
 import { Sensors } from './sensors.js';
+import { PARAM_SPECS, VOICE_NAMES } from './engines.js';
 
 const $ = (id) => document.getElementById(id);
 const engine = new Engine();
@@ -60,7 +61,7 @@ const cutoffHz = (v) => 60 * Math.pow(100, v);           // 60 Hz .. 6 kHz
 // Pad XY miksuje cztery silniki basu: narożniki prophet / ms-20 (góra), dx / wavetable (dół).
 // To jedyne źródło prawdy dla miksu; palec i żyroskop piszą w to samo miejsce.
 const pad = $('pad'), dot = $('dot');
-const corners = [...pad.querySelectorAll('.ax')];
+const corners = [...pad.querySelectorAll('.corner span')];
 const padPos = { x: 0.25, y: 0.75 };
 function setPad(x, y) {
   padPos.x = x; padPos.y = y;
@@ -77,6 +78,51 @@ function padFromEvent(e) {
          Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height)));
 }
 let padDown = false;
+
+// Karty silników: głośność, solo, parametry i losowanie „w granicach rozsądku”.
+const engHost = $('engines');
+const sliderRefs = VOICE_NAMES.map(() => ({}));
+const cards = [];
+function mkSlider(label, min, max, step, val, onInput) {
+  const l = document.createElement('label');
+  l.innerHTML = `<span>${label}</span><input type="range" min="${min}" max="${max}" step="${step}" value="${val}">`;
+  const inp = l.querySelector('input');
+  inp.addEventListener('input', () => onInput(+inp.value));
+  return [l, inp];
+}
+VOICE_NAMES.forEach((name, i) => {
+  const card = document.createElement('article');
+  card.className = 'eng';
+  card.innerHTML = `<header><b>${name}</b><button class="solo" title="solo">S</button><button class="rnd" title="losuj parametry">🎲</button></header>`;
+  const [lv, lvIn] = mkSlider('głośność', 0, 1.5, 0.01, 1, (v) => engine.setLevel(i, v));
+  card.appendChild(lv);
+  sliderRefs[i].level = lvIn;
+  for (const sp of PARAM_SPECS[i]) {
+    const [l, inp] = mkSlider(sp.label, sp.min, sp.max, sp.step, sp.def, (v) => engine.setParam(i, sp.id, v));
+    card.appendChild(l);
+    sliderRefs[i][sp.id] = inp;
+  }
+  card.querySelector('.solo').addEventListener('click', () => setSolo(engine.solo === i ? null : i));
+  card.querySelector('.rnd').addEventListener('click', () => randomizeVoice(i));
+  engHost.appendChild(card);
+  cards.push(card);
+});
+function setSolo(i) {
+  engine.setSolo(i);
+  cards.forEach((c, j) => {
+    c.querySelector('.solo').classList.toggle('on', j === i);
+    c.classList.toggle('dim', i != null && j !== i);
+  });
+}
+function randomizeVoice(i) {
+  const vals = engine.randomizeVoice(i);
+  for (const [id, v] of Object.entries(vals)) sliderRefs[i][id].value = v;
+}
+// Przyciski losowania w narożnikach pada nie mogą uruchamiać przeciągania pada.
+pad.querySelectorAll('.cdice').forEach((b) => {
+  b.addEventListener('pointerdown', (e) => e.stopPropagation());
+  b.addEventListener('click', () => randomizeVoice(+b.dataset.v));
+});
 pad.addEventListener('pointerdown', (e) => { padDown = true; pad.setPointerCapture(e.pointerId); padFromEvent(e); });
 pad.addEventListener('pointermove', (e) => { if (padDown) padFromEvent(e); });
 pad.addEventListener('pointerup', () => { padDown = false; });

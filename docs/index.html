@@ -9,45 +9,50 @@
 </head>
 <body>
 <main id="app" hidden>
-  <header>
-    <h1>signal<span>thru</span>noise</h1>
-    <div class="bpm"><button id="bpm-" aria-label="wolniej">−</button><b id="bpm">130</b><button id="bpm+" aria-label="szybciej">+</button></div>
-  </header>
+  <div class="col seq">
+    <header>
+      <h1>signal<span>thru</span>noise</h1>
+      <div class="bpm"><button id="bpm-" aria-label="wolniej">−</button><b id="bpm">130</b><button id="bpm+" aria-label="szybciej">+</button></div>
+    </header>
 
-  <section id="grid" aria-label="Sekwencer 16 kroków"></section>
+    <section id="grid" aria-label="Sekwencer 16 kroków"></section>
 
-  <section id="pad" aria-label="Pad XY: miks czterech silników basu">
-    <span class="ax c0">prophet</span>
-    <span class="ax c1">ms-20</span>
-    <span class="ax c2">dx</span>
-    <span class="ax c3">wavetable</span>
-    <i id="dot"></i>
-  </section>
+    <section class="knobs">
+      <label>gęstość<input id="density" type="range" min="0" max="1" step="0.01" value="0.6"></label>
+      <label>synkopa<input id="sync" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+      <label>filtr<input id="cutoff" type="range" min="0" max="1" step="0.001" value="0.35"></label>
+      <label>rezonans<input id="reso" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+    </section>
 
-  <section class="knobs">
-    <label>gęstość<input id="density" type="range" min="0" max="1" step="0.01" value="0.6"></label>
-    <label>synkopa<input id="sync" type="range" min="0" max="1" step="0.01" value="0.5"></label>
-    <label>filtr<input id="cutoff" type="range" min="0" max="1" step="0.001" value="0.35"></label>
-    <label>rezonans<input id="reso" type="range" min="0" max="1" step="0.01" value="0.5"></label>
-  </section>
+    <section id="voc" hidden>
+      <label>czułość głosu<input id="sens" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+      <div id="meter" aria-label="poziom mikrofonu"><i></i></div>
+      <p>Użyj słuchawek, inaczej głośnik wróci do mikrofonu. Mów lub nuć do mikrofonu.</p>
+    </section>
 
-  <section id="voc" hidden>
-    <label>czułość głosu<input id="sens" type="range" min="0" max="1" step="0.01" value="0.5"></label>
-    <div id="meter" aria-label="poziom mikrofonu"><i></i></div>
-    <p>Użyj słuchawek, inaczej głośnik wróci do mikrofonu. Mów lub nuć do mikrofonu.</p>
-  </section>
+    <section class="actions">
+      <button id="play" class="big">▶</button>
+      <button id="dice" class="big accent">🎲 losuj</button>
+      <button id="mut" class="big">✦ mutuj</button>
+    </section>
+    <section class="toggles">
+      <button id="mode" class="chip">moll</button>
+      <button id="voice" class="chip">głos</button>
+      <button id="gyro" class="chip">żyro</button>
+      <button id="zero" class="chip" hidden>zeruj</button>
+    </section>
+  </div>
 
-  <section class="actions">
-    <button id="play" class="big">▶</button>
-    <button id="dice" class="big accent">🎲 losuj</button>
-    <button id="mut" class="big">✦ mutuj</button>
-  </section>
-  <section class="toggles">
-    <button id="mode" class="chip">moll</button>
-    <button id="voice" class="chip">głos</button>
-    <button id="gyro" class="chip">żyro</button>
-    <button id="zero" class="chip" hidden>zeruj</button>
-  </section>
+  <div class="col syn">
+    <section id="pad" aria-label="Pad XY: miks czterech silników basu">
+      <div class="corner c0"><span>prophet</span><button class="cdice" data-v="0" aria-label="losuj parametry: prophet">🎲</button></div>
+      <div class="corner c1"><span>ms-20</span><button class="cdice" data-v="1" aria-label="losuj parametry: ms-20">🎲</button></div>
+      <div class="corner c2"><span>dx</span><button class="cdice" data-v="2" aria-label="losuj parametry: dx">🎲</button></div>
+      <div class="corner c3"><span>wavetable</span><button class="cdice" data-v="3" aria-label="losuj parametry: wavetable">🎲</button></div>
+      <i id="dot"></i>
+    </section>
+    <section id="engines" aria-label="Silniki basu"></section>
+  </div>
 </main>
 
 <div id="start">

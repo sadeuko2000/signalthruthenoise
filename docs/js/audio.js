@@ -1,7 +1,7 @@
 // Silnik audio: zegar z lookahead, rozsyłanie nut do silników basu, vocoder.
 import { pitch } from './generator.js';
 import { Vocoder } from './vocoder.js';
-import { VOICES, blendWeights } from './engines.js';
+import { VOICES, blendWeights, randomizeParams } from './engines.js';
 
 const midiToHz = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
@@ -12,6 +12,9 @@ export class Engine {
     // parametry wspólne dla wszystkich silników (silniki trzymają referencję do tego obiektu)
     this.p = { cutoff: 600, res: 12, envMod: 2500, decay: 0.22, bright: 0.35 };
     this.blend = [1, 0, 0, 0];
+    this.levels = [1, 1, 1, 1];   // głośność każdego silnika (niezależnie od pada)
+    this.solo = null;             // indeks silnika solo albo null
+    this.eff = [1, 0, 0, 0];      // efektywna waga = pad lub solo, razy głośność
     this.pattern = null;
     this.step = 0;
     this.nextTime = 0;
@@ -58,9 +61,20 @@ export class Engine {
   }
 
   // Pad XY: miks czterech silników (narożniki: prophet, ms-20, dx, wavetable).
-  setBlend(x, y) {
-    this.blend = blendWeights(x, y);
-    if (this.vgains) this.vgains.forEach((g, i) => g.gain.setTargetAtTime(this.blend[i], this.ctx.currentTime, 0.03));
+  setBlend(x, y) { this.blend = blendWeights(x, y); this._applyGains(); }
+  setLevel(i, v) { this.levels[i] = v; this._applyGains(); }
+  setSolo(i) { this.solo = i; this._applyGains(); }
+  _applyGains() {
+    const base = this.solo == null ? this.blend : this.blend.map((_, i) => (i === this.solo ? 1 : 0));
+    this.eff = base.map((w, i) => w * this.levels[i]);
+    if (this.vgains) this.vgains.forEach((g, i) => g.gain.setTargetAtTime(this.eff[i], this.ctx.currentTime, 0.03));
+  }
+  setParam(i, id, v) { this.voices[i].setParam(id, v); }
+  // Losuje parametry jednego silnika w „rozsądnych” granicach i zwraca nowe wartości.
+  randomizeVoice(i, rng = Math.random) {
+    const vals = randomizeParams(i, rng);
+    for (const [id, v] of Object.entries(vals)) this.voices[i].setParam(id, v);
+    return vals;
   }
 
   // Tryb głosu: bas -> vocoder (modulator: mikrofon). Rzuca wyjątek, gdy brak zgody/mikrofonu.
@@ -129,7 +143,7 @@ export class Engine {
       const len = r === 1 ? dur * s.gate : part * 0.5;
       const slide = k === 0 && this.lastTied;
       const hold = tiedOut && k === r - 1;
-      this.voices.forEach((v, vi) => { if (this.blend[vi] > 0.02) v.note(t0, freq, s.vel, accent, len, slide, hold); });
+      this.voices.forEach((v, vi) => { if (this.eff[vi] > 0.02) v.note(t0, freq, s.vel, accent, len, slide, hold); });
     }
     this.lastTied = tiedOut;
   }

@@ -1,8 +1,9 @@
 [hidden]{display:none!important}
-:root{--bg:#0b0b10;--fg:#e8e8f0;--dim:#6b6b80;--acc:#ff3d7f;--on:#39ffb0;--pad:#1a1a24}
+:root{--card:#13131b;--bg:#0b0b10;--fg:#e8e8f0;--dim:#6b6b80;--acc:#ff3d7f;--on:#39ffb0;--pad:#1a1a24}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,sans-serif;overscroll-behavior:none;user-select:none;-webkit-user-select:none}
 main{display:flex;flex-direction:column;gap:14px;max-width:560px;margin:0 auto;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+.col{display:contents}
 header{display:flex;justify-content:space-between;align-items:center}
 h1{font-size:15px;margin:0;letter-spacing:.08em;font-weight:600}
 h1 span{color:var(--acc)}
@@ -33,14 +34,40 @@ input[type=range]{width:100%;height:36px;accent-color:var(--acc)}
  linear-gradient(var(--pad),var(--pad)) padding-box;border-radius:14px;touch-action:none;overflow:hidden;
  background-image:linear-gradient(#2c2c3a 1px,transparent 1px),linear-gradient(90deg,#2c2c3a 1px,transparent 1px);background-size:25% 25%}
 #dot{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:var(--acc);box-shadow:0 0 24px var(--acc);pointer-events:none}
-.ax{position:absolute;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;pointer-events:none}
-.c0{left:10px;top:8px}
-.c1{right:10px;top:8px}
-.c2{left:10px;bottom:8px}
-.c3{right:10px;bottom:8px}
-.ax{transition:color .1s}
 .chip.on{color:var(--on)}
 #voc{display:grid;gap:8px}
 #voc p{margin:0;font-size:12px;color:var(--dim)}
 #meter{height:8px;border-radius:4px;background:var(--pad);overflow:hidden}
 #meter i{display:block;height:100%;width:0;background:var(--on);transition:width .06s linear}
+
+/* narożniki pada: nazwa silnika + losowanie parametrów */
+.corner{position:absolute;display:flex;align-items:center;gap:6px;z-index:1}
+.corner span{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);pointer-events:none}
+.cdice{padding:4px 7px;border-radius:8px;font-size:13px;line-height:1;background:rgba(10,10,16,.75)}
+.c0{left:8px;top:8px}.c1{right:8px;top:8px;flex-direction:row-reverse}
+.c2{left:8px;bottom:8px}.c3{right:8px;bottom:8px;flex-direction:row-reverse}
+
+/* karty silników */
+#engines{display:grid;grid-template-columns:1fr;gap:10px}
+.eng{background:var(--card);border-radius:14px;padding:10px 12px;display:grid;gap:2px}
+.eng header{display:flex;align-items:center;gap:8px}
+.eng header b{flex:1;font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+.eng header button{padding:5px 10px;font-size:13px;border-radius:8px;background:var(--pad)}
+.eng header .solo.on{background:var(--on);color:#04120c;font-weight:700}
+.eng label{flex-direction:row;align-items:center;gap:8px;font-size:11px}
+.eng label span{width:11ch;flex:none;white-space:nowrap}
+.eng label input{height:22px;flex:1;min-width:0}
+.eng.dim{opacity:.55}
+
+/* komputer: sekwencer po lewej, pad i silniki po prawej */
+@media (min-width:900px){
+  main{max-width:1240px;flex-direction:row;align-items:flex-start;gap:28px;padding:24px}
+  .col{display:flex;flex-direction:column;gap:14px;min-width:0}
+  .seq{flex:0 0 440px}
+  .syn{flex:1}
+  #pad{aspect-ratio:2/1;max-height:none}
+  .cdice{padding:6px 10px;font-size:15px}
+  #engines{grid-template-columns:1fr 1fr}
+  button{cursor:pointer}
+  input[type=range]{cursor:pointer}
+}
