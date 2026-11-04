@@ -17,9 +17,9 @@ def step_weight(i: int, syncopation: float) -> float:
 
 def _next_degree(prev: int, p: Params, rng: random.Random) -> int:
     if rng.random() < p.leap_prob:
-        return prev + rng.choice((-5, -4, 4, 5))
-    # ruch krokowy, preferuje powrót do prymy/kwinty
-    d = prev + rng.choice((-2, -1, -1, 0, 0, 1, 1, 2))
+        d = prev + rng.choice((-5, -4, 4, 5))
+    else:
+        d = prev + rng.choice((-2, -1, -1, 0, 0, 1, 1, 2))
     return max(-3, min(7, d))
 
 

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0b0b10">
+<title>Signal Thru the Noise</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="app" hidden>
+  <header>
+    <h1>signal<span>thru</span>noise</h1>
+    <div class="bpm"><button id="bpm-" aria-label="wolniej">−</button><b id="bpm">130</b><button id="bpm+" aria-label="szybciej">+</button></div>
+  </header>
+
+  <section id="grid" aria-label="Sekwencer 16 kroków"></section>
+
+  <section class="knobs">
+    <label>gęstość<input id="density" type="range" min="0" max="1" step="0.01" value="0.6"></label>
+    <label>synkopa<input id="sync" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+    <label>filtr<input id="cutoff" type="range" min="0" max="1" step="0.001" value="0.35"></label>
+    <label>rezonans<input id="reso" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+  </section>
+
+  <section class="actions">
+    <button id="play" class="big">▶</button>
+    <button id="dice" class="big accent">🎲 losuj</button>
+    <button id="mut" class="big">✦ mutuj</button>
+  </section>
+  <section class="toggles">
+    <button id="mode" class="chip">moll</button>
+    <button id="kick" class="chip on">kick</button>
+  </section>
+</main>
+
+<div id="start">
+  <button id="go">Start</button>
+  <p>słuchawki polecane</p>
+</div>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
