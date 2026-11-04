@@ -1,0 +1,9 @@
+[project]
+name = "signalthruthenoise"
+version = "0.1.0"
+description = "Generator MIDI do muzyki electro (start: bas acid 303)"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.setuptools]
+packages = ["generator"]
