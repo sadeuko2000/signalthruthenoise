@@ -1,5 +1,6 @@
 import { generateBass, mutate, DEFAULTS } from './generator.js';
 import { Engine } from './audio.js';
+import { Sensors } from './sensors.js';
 
 const $ = (id) => document.getElementById(id);
 const engine = new Engine();
@@ -53,10 +54,53 @@ engine.onStep = (i, t) => {
 };
 
 // Suwaki
-$('density').addEventListener('input', (e) => { state.density = +e.target.value; regen(); });
 $('sync').addEventListener('input', (e) => { state.syncopation = +e.target.value; regen(); });
 const cutoffHz = (v) => 60 * Math.pow(100, v);           // 60 Hz .. 6 kHz
-$('cutoff').addEventListener('input', (e) => engine.setCutoff(cutoffHz(+e.target.value)));
+
+// Pad XY: x = filtr, y = gęstość. To jedyne źródło prawdy dla obu parametrów;
+// palec i żyroskop piszą w to samo miejsce.
+const pad = $('pad'), dot = $('dot');
+const padPos = { x: 0.35, y: 0.6 };
+function setPad(x, y) {
+  padPos.x = x; padPos.y = y;
+  dot.style.left = `${x * 100}%`;
+  dot.style.top = `${(1 - y) * 100}%`;
+  engine.setCutoff(cutoffHz(x));
+  // regeneracja tylko przy realnej zmianie, żeby nie mielić wzoru co klatkę
+  const d = Math.round(y * 50) / 50;
+  if (d !== state.density) { state.density = d; regen(); }
+}
+function padFromEvent(e) {
+  const r = pad.getBoundingClientRect();
+  setPad(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)),
+         Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height)));
+}
+let padDown = false;
+pad.addEventListener('pointerdown', (e) => { padDown = true; pad.setPointerCapture(e.pointerId); padFromEvent(e); });
+pad.addEventListener('pointermove', (e) => { if (padDown) padFromEvent(e); });
+pad.addEventListener('pointerup', () => { padDown = false; });
+pad.addEventListener('pointercancel', () => { padDown = false; });
+
+// Żyroskop: przechył steruje padem, potrząśnięcie mutuje. Palec na padzie ma pierwszeństwo.
+const sensors = new Sensors({
+  onTilt: ({ x, y }) => { if (!padDown) setPad(x, y); },
+  onShake: () => setPattern(mutate(pattern)),
+});
+const gyroBtn = $('gyro'), zeroBtn = $('zero');
+gyroBtn.addEventListener('click', async () => {
+  if (sensors.active) {
+    sensors.disable();
+    gyroBtn.classList.remove('on'); zeroBtn.hidden = true; gyroBtn.textContent = 'żyro';
+    return;
+  }
+  gyroBtn.textContent = '…';
+  const ok = await sensors.enable();
+  gyroBtn.textContent = ok ? 'żyro' : 'brak czujnika';
+  gyroBtn.classList.toggle('on', ok);
+  zeroBtn.hidden = !ok;
+  if (!ok) setTimeout(() => { gyroBtn.textContent = 'żyro'; }, 2000);
+});
+zeroBtn.addEventListener('click', () => sensors.zero());
 $('reso').addEventListener('input', (e) => engine.setResonance(1 + e.target.value * 22));
 
 // Przyciski
@@ -80,7 +124,7 @@ $('play').addEventListener('click', (e) => {
 // Start: odblokowuje audio (wymóg iOS/Chrome: gest użytkownika)
 $('go').addEventListener('click', async () => {
   await engine.start();
-  engine.setCutoff(cutoffHz(+$('cutoff').value));
+  setPad(padPos.x, padPos.y);
   engine.setResonance(1 + $('reso').value * 22);
   $('start').hidden = true;
   $('app').hidden = false;

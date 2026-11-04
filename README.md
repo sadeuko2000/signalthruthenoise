@@ -13,7 +13,9 @@ npm test          # testy generatora (node:test)
 - `docs/` – aplikacja (vanilla ES modules, bez buildu); publikowana przez GitHub Pages
   - `js/generator.js` – rytm ważony, skale, mutacje (czysta logika)
   - `js/audio.js` – Web Audio: bas saw→lowpass z obwiednią, slide, ratchet, kick, zegar z lookahead
-  - `js/app.js` – UI
+  - `js/sensors.js` – żyroskop (przechył → pad XY) i potrząśnięcie (→ mutacja)
+  - `js/app.js` – UI, pad XY (x = filtr, y = gęstość)
+- `scripts/build-preview.mjs` – składa `docs/` w jeden plik HTML (makieta do artefaktu): `node scripts/build-preview.mjs out.html`.
 - `tools/` – pierwotny prototyp w Pythonie (eksport MIDI), referencja; nie jest rozwijany.
 - `.github/workflows/pages.yml` – testy + deploy `docs/` po wpisie do `main`.
 

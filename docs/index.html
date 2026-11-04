@@ -16,10 +16,14 @@
 
   <section id="grid" aria-label="Sekwencer 16 kroków"></section>
 
+  <section id="pad" aria-label="Pad XY: filtr i gęstość">
+    <span class="ax ax-x">filtr →</span>
+    <span class="ax ax-y">↑ gęstość</span>
+    <i id="dot"></i>
+  </section>
+
   <section class="knobs">
-    <label>gęstość<input id="density" type="range" min="0" max="1" step="0.01" value="0.6"></label>
     <label>synkopa<input id="sync" type="range" min="0" max="1" step="0.01" value="0.5"></label>
-    <label>filtr<input id="cutoff" type="range" min="0" max="1" step="0.001" value="0.35"></label>
     <label>rezonans<input id="reso" type="range" min="0" max="1" step="0.01" value="0.5"></label>
   </section>
 
@@ -31,6 +35,8 @@
   <section class="toggles">
     <button id="mode" class="chip">moll</button>
     <button id="kick" class="chip on">kick</button>
+    <button id="gyro" class="chip">żyro</button>
+    <button id="zero" class="chip" hidden>zeruj</button>
   </section>
 </main>
 

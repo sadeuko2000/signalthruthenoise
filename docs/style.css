@@ -29,3 +29,12 @@ input[type=range]{width:100%;height:36px;accent-color:var(--acc)}
 #start{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:var(--bg)}
 #go{font-size:28px;padding:28px 56px;background:var(--acc);color:#fff;border-radius:999px}
 #start p{color:var(--dim);margin:0}
+#pad{position:relative;aspect-ratio:2/1;max-height:30vh;width:100%;background:
+ linear-gradient(var(--pad),var(--pad)) padding-box;border-radius:14px;touch-action:none;overflow:hidden;
+ background-image:linear-gradient(#2c2c3a 1px,transparent 1px),linear-gradient(90deg,#2c2c3a 1px,transparent 1px);background-size:25% 25%}
+#dot{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:var(--acc);box-shadow:0 0 24px var(--acc);pointer-events:none}
+.ax{position:absolute;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;pointer-events:none}
+.ax-x{right:10px;bottom:8px}
+.ax-y{left:10px;top:8px}
+.knobs{grid-template-columns:1fr 1fr}
+.chip.on{color:var(--on)}
