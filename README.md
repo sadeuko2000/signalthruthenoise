@@ -23,3 +23,13 @@ npm test          # testy generatora (node:test)
 ## GitHub Pages
 Settings → Pages → Source: **GitHub Actions**. Po merge do `main` aplikacja pojawi się pod
 `https://<user>.github.io/signalthruthenoise/`.
+
+## Inspiracje
+Zasada: czerpiemy pomysły, nie kopiujemy cudzego kodu. Przed użyciem czegokolwiek z poniższych źródeł
+sprawdzamy licencję.
+
+- [aroum/fm1-custom-fw](https://github.com/aroum/fm1-custom-fw) – niestandardowe firmware'y do
+  MWave FM1. Zbiór różnych silników syntezy, które mogą się przydać jako pomysły na kolejne brzmienia
+  (lead, FM, perkusja). Do przejrzenia przy pracy nad leadem.
+- Wtyczka Sting 2.2 (Max for Live) – pomysły na sekwencer: tie, store/recall, kierunki odtwarzania
+  fwd/bwd/pend, poly.
