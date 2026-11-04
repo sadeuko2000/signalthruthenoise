@@ -1,5 +1,6 @@
 // Silnik audio: bas acid (saw -> lowpass z obwiednią), kick i zegar z lookahead.
 import { pitch } from './generator.js';
+import { Vocoder } from './vocoder.js';
 
 const midiToHz = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
@@ -18,6 +19,9 @@ export class Engine {
     this.timer = null;
     this.onStep = null;    // (stepIndex, time) => void
     this.lastTied = false;
+    this.octMul = 1;       // vocoder gra nośnik oktawę wyżej, żeby było co filtrować
+    this.voc = null;
+    this.voiceOn = false;
   }
 
   async start() {
@@ -45,12 +49,34 @@ export class Engine {
     this.filter.Q.value = this.resonance;
     this.amp = c.createGain();
     this.amp.gain.value = 0;
-    this.osc.connect(this.filter).connect(this.amp).connect(this.master);
+    this.dry = c.createGain();
+    this.osc.connect(this.filter).connect(this.amp).connect(this.dry).connect(this.master);
     this.osc.start();
   }
 
   setCutoff(hz) { this.cutoff = hz; if (this.filter) this.filter.frequency.setTargetAtTime(hz, this.ctx.currentTime, 0.02); }
   setResonance(q) { this.resonance = q; if (this.filter) this.filter.Q.setTargetAtTime(q, this.ctx.currentTime, 0.02); }
+
+  // Tryb głosu: bas -> vocoder (modulator: mikrofon). Rzuca wyjątek, gdy brak zgody/mikrofonu.
+  async enableVoice() {
+    if (!this.voc) this.voc = new Vocoder(this.ctx);
+    await this.voc.connectMic();
+    this.amp.connect(this.voc.input);
+    this.voc.output.connect(this.master);
+    this.dry.gain.setTargetAtTime(0, this.ctx.currentTime, 0.02);
+    this.octMul = 2;
+    this.voiceOn = true;
+  }
+
+  disableVoice() {
+    if (!this.voc || !this.voiceOn) return;
+    this.voc.disconnectMic();
+    this.amp.disconnect(this.voc.input);
+    this.voc.output.disconnect(this.master);
+    this.dry.gain.setTargetAtTime(1, this.ctx.currentTime, 0.02);
+    this.octMul = 1;
+    this.voiceOn = false;
+  }
 
   play() {
     if (this.timer || !this.ctx) return;
@@ -89,7 +115,7 @@ export class Engine {
 
     const next = pat.steps[(i + 1) % pat.steps.length];
     const tiedOut = s.tie && next.on;
-    const freq = midiToHz(pitch(pat.root, pat.mode, s.degree, s.octave) );
+    const freq = midiToHz(pitch(pat.root, pat.mode, s.degree, s.octave)) * this.octMul;
     const accent = s.vel >= 110;
     const r = Math.max(1, s.ratchet);
     const part = dur / r;

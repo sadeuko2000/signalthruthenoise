@@ -132,3 +132,32 @@ $('go').addEventListener('click', async () => {
   engine.play();
   $('play').textContent = '■';
 });
+
+// Głos: bas przechodzi przez vocoder, a modulatorem jest mikrofon.
+const voiceBtn = $('voice'), vocBox = $('voc'), meter = $('meter').firstElementChild;
+let meterRaf = 0;
+let meterLevel = 0;
+function drawMeter() {
+  meterLevel = Math.max(engine.voc.level(), meterLevel * 0.92);   // szczyt opada powoli
+  meter.style.width = `${Math.round(meterLevel * 100)}%`;
+  meterRaf = requestAnimationFrame(drawMeter);
+}
+voiceBtn.addEventListener('click', async () => {
+  if (engine.voiceOn) {
+    cancelAnimationFrame(meterRaf);
+    engine.disableVoice();
+    voiceBtn.classList.remove('on'); vocBox.hidden = true; voiceBtn.textContent = 'głos';
+    return;
+  }
+  voiceBtn.textContent = '…';
+  try {
+    await engine.enableVoice();
+    engine.voc.setSensitivity(+$('sens').value);
+    voiceBtn.classList.add('on'); vocBox.hidden = false; voiceBtn.textContent = 'głos';
+    drawMeter();
+  } catch (err) {
+    voiceBtn.textContent = err && err.name === 'NotAllowedError' ? 'brak zgody' : 'brak mikrofonu';
+    setTimeout(() => { voiceBtn.textContent = 'głos'; }, 2500);
+  }
+});
+$('sens').addEventListener('input', (e) => { if (engine.voc) engine.voc.setSensitivity(+e.target.value); });

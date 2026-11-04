@@ -27,6 +27,12 @@
     <label>rezonans<input id="reso" type="range" min="0" max="1" step="0.01" value="0.5"></label>
   </section>
 
+  <section id="voc" hidden>
+    <label>czułość głosu<input id="sens" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+    <div id="meter" aria-label="poziom mikrofonu"><i></i></div>
+    <p>Użyj słuchawek, inaczej głośnik wróci do mikrofonu. Mów lub nuć do mikrofonu.</p>
+  </section>
+
   <section class="actions">
     <button id="play" class="big">▶</button>
     <button id="dice" class="big accent">🎲 losuj</button>
@@ -35,6 +41,7 @@
   <section class="toggles">
     <button id="mode" class="chip">moll</button>
     <button id="kick" class="chip on">kick</button>
+    <button id="voice" class="chip">głos</button>
     <button id="gyro" class="chip">żyro</button>
     <button id="zero" class="chip" hidden>zeruj</button>
   </section>

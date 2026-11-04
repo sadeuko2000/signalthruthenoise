@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const read = (p) => readFileSync(new URL(`../docs/${p}`, import.meta.url), 'utf8');
 const out = process.argv[2] ?? 'preview.html';
 
-const js = ['generator', 'audio', 'sensors', 'app']
+const js = ['generator', 'vocoder', 'audio', 'sensors', 'app']
   .map((m) => read(`js/${m}.js`)
     .replace(/^import .*$/gm, '')
     .replace(/^export (async |const |function |class )/gm, '$1'))
@@ -18,7 +18,7 @@ const css = read('style.css');
 const stages = [
   ['gotowe', 'Bas acid: generator, synteza, sekwencer 16 kroków'],
   ['gotowe', 'Pad XY (filtr × gęstość) i żyroskop, potrząśnięcie = mutacja'],
-  ['dalej', 'Vocoder z mikrofonu'],
+  ['gotowe', 'Vocoder: bas "mówi" głosem z mikrofonu'],
   ['dalej', 'Perkusja i lead'],
 ];
 const progress = `

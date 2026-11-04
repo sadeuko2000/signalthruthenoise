@@ -1,7 +1,7 @@
 # signalthruthenoise
 
 Mobilna aplikacja w przeglądarce do zabawy z electro: sekwencer basu acid (303) z generatorem
-wzorów. Plan: żyroskop jako sterowanie parametrami, vocoder z mikrofonu, perkusja i lead.
+wzorów. Sterowanie padem XY i żyroskopem, vocoder z mikrofonu. Plan: perkusja i lead.
 
 ## Uruchomienie
 ```bash
@@ -13,6 +13,7 @@ npm test          # testy generatora (node:test)
 - `docs/` – aplikacja (vanilla ES modules, bez buildu); publikowana przez GitHub Pages
   - `js/generator.js` – rytm ważony, skale, mutacje (czysta logika)
   - `js/audio.js` – Web Audio: bas saw→lowpass z obwiednią, slide, ratchet, kick, zegar z lookahead
+  - `js/vocoder.js` – vocoder kanałowy (16 pasm + tor szumu na spółgłoski); modulator = mikrofon, nośnik = bas
   - `js/sensors.js` – żyroskop (przechył → pad XY) i potrząśnięcie (→ mutacja)
   - `js/app.js` – UI, pad XY (x = filtr, y = gęstość)
 - `scripts/build-preview.mjs` – składa `docs/` w jeden plik HTML (makieta do artefaktu): `node scripts/build-preview.mjs out.html`.

@@ -38,3 +38,7 @@ input[type=range]{width:100%;height:36px;accent-color:var(--acc)}
 .ax-y{left:10px;top:8px}
 .knobs{grid-template-columns:1fr 1fr}
 .chip.on{color:var(--on)}
+#voc{display:grid;gap:8px}
+#voc p{margin:0;font-size:12px;color:var(--dim)}
+#meter{height:8px;border-radius:4px;background:var(--pad);overflow:hidden}
+#meter i{display:block;height:100%;width:0;background:var(--on);transition:width .06s linear}
