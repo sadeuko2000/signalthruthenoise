@@ -71,3 +71,7 @@ input[type=range]{width:100%;height:36px;accent-color:var(--acc)}
   button{cursor:pointer}
   input[type=range]{cursor:pointer}
 }
+
+.keys{display:none;margin:0;font-size:12px;line-height:1.9;color:var(--dim)}
+kbd{font:inherit;font-size:11px;padding:1px 6px;border-radius:5px;background:var(--pad);color:var(--fg);border:1px solid #2c2c3a}
+@media (min-width:900px){.keys{display:block}}

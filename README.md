@@ -9,6 +9,10 @@ npm run serve     # http://localhost:8000 (mikrofon/czujniki na telefonie wymaga
 npm test          # testy generatora (node:test)
 ```
 
+## Skróty klawiszowe
+`spacja` play/stop · `R` losuj wzór · `M` mutuj · `T` moll/frygijska · `↑` `↓` BPM ±2 ·
+`1`–`4` solo silnika (z `shift` losuje jego parametry). Definicje są w tablicy `KEYS` w `docs/js/app.js`.
+
 ## Struktura
 - `docs/` – aplikacja (vanilla ES modules, bez buildu); publikowana przez GitHub Pages
   - `js/generator.js` – rytm ważony, skale, mutacje (czysta logika)

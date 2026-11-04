@@ -150,22 +150,61 @@ gyroBtn.addEventListener('click', async () => {
 zeroBtn.addEventListener('click', () => sensors.zero());
 $('reso').addEventListener('input', (e) => engine.setResonance(1 + e.target.value * 22));
 
-// Przyciski
-$('dice').addEventListener('click', () => { state.seed = (Math.random() * 1e9) | 0; regen(); });
-$('mut').addEventListener('click', () => setPattern(mutate(pattern)));
-$('mode').addEventListener('click', (e) => {
+// Akcje (wspólne dla przycisków i skrótów klawiszowych)
+function doDice() { state.seed = (Math.random() * 1e9) | 0; regen(); }
+function doMutate() { setPattern(mutate(pattern)); }
+function doMode() {
   state.mode = state.mode === 'minor' ? 'phrygian' : 'minor';
-  e.target.textContent = state.mode === 'minor' ? 'moll' : 'frygijska';
+  $('mode').textContent = state.mode === 'minor' ? 'moll' : 'frygijska';
   regen();
-});
+}
 const setBpm = (v) => { engine.bpm = Math.max(70, Math.min(180, v)); $('bpm').textContent = engine.bpm; };
+function togglePlay() {
+  const btn = $('play');
+  if (engine.playing) { engine.stop(); btn.textContent = '▶'; if (lastNow >= 0) cells[lastNow].classList.remove('now'); }
+  else { engine.play(); btn.textContent = '■'; }
+}
+$('dice').addEventListener('click', doDice);
+$('mut').addEventListener('click', doMutate);
+$('mode').addEventListener('click', doMode);
 $('bpm-').addEventListener('click', () => setBpm(engine.bpm - 2));
 $('bpm+').addEventListener('click', () => setBpm(engine.bpm + 2));
+$('play').addEventListener('click', togglePlay);
 
-$('play').addEventListener('click', (e) => {
-  if (engine.playing) { engine.stop(); e.target.textContent = '▶'; if (lastNow >= 0) cells[lastNow].classList.remove('now'); }
-  else { engine.play(); e.target.textContent = '■'; }
+// Skróty klawiszowe. Jedna tabela: z niej działa obsługa i powstaje podpowiedź pod sekwencerem.
+const KEYS = [
+  { code: 'Space', label: 'spacja', what: 'play / stop', run: togglePlay },
+  { code: 'KeyR', label: 'R', what: 'losuj wzór', run: doDice },
+  { code: 'KeyM', label: 'M', what: 'mutuj', run: doMutate },
+  { code: 'KeyT', label: 'T', what: 'moll / frygijska', run: doMode },
+  { code: 'ArrowUp', label: '↑ ↓', what: 'BPM ±2', run: () => setBpm(engine.bpm + 2), alt: { code: 'ArrowDown', run: () => setBpm(engine.bpm - 2) }, skipInRange: true },
+  ...VOICE_NAMES.map((n, i) => ({
+    code: `Digit${i + 1}`, label: String(i + 1), what: i === 0 ? 'solo silnika (shift = losuj parametry)' : null,
+    run: () => setSolo(engine.solo === i ? null : i), shift: () => randomizeVoice(i),
+  })),
+];
+window.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.repeat && e.code !== 'ArrowUp' && e.code !== 'ArrowDown') return;
+  if ($('app').hidden) return;
+  const t = e.target;
+  const typing = t instanceof HTMLInputElement && t.type !== 'range';
+  if (typing) return;
+  for (const k of KEYS) {
+    const hit = e.code === k.code ? k : (k.alt && e.code === k.alt.code ? k.alt : null);
+    if (!hit) continue;
+    // strzałki na zaznaczonym suwaku zostają suwakowi
+    if (k.skipInRange && t instanceof HTMLInputElement && t.type === 'range') return;
+    e.preventDefault();
+    if (e.code === 'Space' && t instanceof HTMLButtonElement) t.blur();   // spacja nie ma kliknąć też zaznaczonego przycisku
+    (e.shiftKey && k.shift ? k.shift : hit.run)();
+    return;
+  }
 });
+const help = document.createElement('p');
+help.className = 'keys';
+help.innerHTML = KEYS.filter((k) => k.what).map((k) => `<kbd>${k.label}</kbd> ${k.what}`).join(' · ')
+  .replace('<kbd>1</kbd>', '<kbd>1–4</kbd>');
+$('app').querySelector('.seq').appendChild(help);
 
 // Start: odblokowuje audio (wymóg iOS/Chrome: gest użytkownika)
 $('go').addEventListener('click', async () => {
@@ -208,3 +247,5 @@ voiceBtn.addEventListener('click', async () => {
   }
 });
 $('sens').addEventListener('input', (e) => { if (engine.voc) engine.voc.setSensitivity(+e.target.value); });
+
+$('go').focus();
