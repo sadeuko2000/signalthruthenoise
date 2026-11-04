@@ -50,3 +50,26 @@ test('domyślne parametry mieszczą się w zakresach', () => {
     for (const sp of specs) assert.ok(d[sp.id] >= sp.min && d[sp.id] <= sp.max);
   });
 });
+
+test('każdy silnik ma wszystkie obwiednie filtra i amp, losowane i sterowalne', () => {
+  const need = ['fEnv', 'fDec', 'aAtk', 'aDec', 'aSus', 'aRel'];
+  PARAM_SPECS.forEach((specs) => {
+    for (const id of need) {
+      const sp = specs.find((x) => x.id === id);
+      assert.ok(sp, `brak ${id}`);
+      assert.equal(sp.group, 'env');
+    }
+  });
+  // losowanie rusza także obwiednie
+  const a = randomizeParams(1, mulberry32(10)), b = randomizeParams(1, mulberry32(11));
+  assert.ok(need.some((id) => a[id] !== b[id]));
+});
+
+import { VOICES } from '../docs/js/engines.js';
+test('każdy silnik ma interfejs wymagany przez Engine (refresh, apply, setParam, note, silence)', () => {
+  for (const V of VOICES) {
+    for (const m of ['refresh', 'apply', 'setParam', 'note', 'silence']) {
+      assert.equal(typeof V.prototype[m], 'function', `${V.name}.${m}`);
+    }
+  }
+});

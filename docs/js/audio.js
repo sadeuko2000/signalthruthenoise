@@ -10,7 +10,7 @@ export class Engine {
     this.ctx = null;
     this.bpm = 130;
     // parametry wspólne dla wszystkich silników (silniki trzymają referencję do tego obiektu)
-    this.p = { cutoff: 600, res: 12, envMod: 2500, decay: 0.22, bright: 0.35 };
+    this.p = { cutoff: 600, res: 12, bright: 0.35 };
     this.blend = [1, 0, 0, 0];
     this.levels = [1, 1, 1, 1];   // głośność każdego silnika (niezależnie od pada)
     this.solo = null;             // indeks silnika solo albo null
@@ -37,10 +37,18 @@ export class Engine {
 
   _build() {
     const c = this.ctx;
+    // Tor wyjściowy: kompresor -> makeup -> miękki clipper -> wyjście (gęstość i głośność bez przesterowania cyfrowego)
     this.master = c.createGain();
-    this.master.gain.value = 0.8;
     const comp = c.createDynamicsCompressor();
-    this.master.connect(comp).connect(c.destination);
+    comp.threshold.value = -18; comp.knee.value = 8; comp.ratio.value = 5;
+    comp.attack.value = 0.003; comp.release.value = 0.12;
+    const makeup = c.createGain(); makeup.gain.value = 0.7;
+    const clip = c.createWaveShaper();
+    const cc = new Float32Array(2048), k = 1.3;
+    for (let i = 0; i < cc.length; i++) cc[i] = Math.tanh(k * ((i / 2047) * 2 - 1)) / Math.tanh(k);
+    clip.curve = cc;
+    const outGain = c.createGain(); outGain.gain.value = 0.9;
+    this.master.connect(comp).connect(makeup).connect(clip).connect(outGain).connect(c.destination);
 
     this.dry = c.createGain();
     this.mix = c.createGain();

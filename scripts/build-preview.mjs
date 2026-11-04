@@ -21,6 +21,7 @@ const stages = [
   ['gotowe', 'Układ na komputer: sekwencer po lewej, pad i karty silników po prawej'],
   ['gotowe', 'Karty silników: głośność, solo, parametry i losowanie w granicach electro'],
   ['gotowe', 'Skróty klawiszowe (lista pod sekwencerem)'],
+  ['gotowe', 'Obwiednie filtra i amp w każdym silniku (sterowalne i losowane), nasycenie, nowy tor wyjściowy'],
   ['później', 'Żyroskop i interfejs mobilny (kod jest, nie rozwijamy go teraz)'],
   ['gotowe', 'Vocoder: bas "mówi" głosem z mikrofonu'],
   ['dalej', 'Dostrojenie brzmienia silników i wzorów po odsłuchu'],

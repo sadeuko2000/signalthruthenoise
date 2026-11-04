@@ -97,11 +97,16 @@ VOICE_NAMES.forEach((name, i) => {
   const [lv, lvIn] = mkSlider('głośność', 0, 1.5, 0.01, 1, (v) => engine.setLevel(i, v));
   card.appendChild(lv);
   sliderRefs[i].level = lvIn;
+  // Parametry brzmienia na wierzchu, obwiednie (filtr i amp) w rozwijanej sekcji.
+  const env = document.createElement('details');
+  env.className = 'env';
+  env.innerHTML = '<summary>obwiednie</summary>';
   for (const sp of PARAM_SPECS[i]) {
     const [l, inp] = mkSlider(sp.label, sp.min, sp.max, sp.step, sp.def, (v) => engine.setParam(i, sp.id, v));
-    card.appendChild(l);
+    (sp.group === 'env' ? env : card).appendChild(l);
     sliderRefs[i][sp.id] = inp;
   }
+  card.appendChild(env);
   card.querySelector('.solo').addEventListener('click', () => setSolo(engine.solo === i ? null : i));
   card.querySelector('.rnd').addEventListener('click', () => randomizeVoice(i));
   engHost.appendChild(card);
