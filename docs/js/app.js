@@ -57,19 +57,20 @@ engine.onStep = (i, t) => {
 $('sync').addEventListener('input', (e) => { state.syncopation = +e.target.value; regen(); });
 const cutoffHz = (v) => 60 * Math.pow(100, v);           // 60 Hz .. 6 kHz
 
-// Pad XY: x = filtr, y = gęstość. To jedyne źródło prawdy dla obu parametrów;
-// palec i żyroskop piszą w to samo miejsce.
+// Pad XY miksuje cztery silniki basu: narożniki prophet / ms-20 (góra), dx / wavetable (dół).
+// To jedyne źródło prawdy dla miksu; palec i żyroskop piszą w to samo miejsce.
 const pad = $('pad'), dot = $('dot');
-const padPos = { x: 0.35, y: 0.6 };
+const corners = [...pad.querySelectorAll('.ax')];
+const padPos = { x: 0.25, y: 0.75 };
 function setPad(x, y) {
   padPos.x = x; padPos.y = y;
   dot.style.left = `${x * 100}%`;
   dot.style.top = `${(1 - y) * 100}%`;
-  engine.setCutoff(cutoffHz(x));
-  // regeneracja tylko przy realnej zmianie, żeby nie mielić wzoru co klatkę
-  const d = Math.round(y * 50) / 50;
-  if (d !== state.density) { state.density = d; regen(); }
+  engine.setBlend(x, y);
+  engine.blend.forEach((w, i) => { corners[i].style.color = `rgba(57,255,176,${0.3 + 0.7 * w})`; });
 }
+$('density').addEventListener('input', (e) => { state.density = +e.target.value; regen(); });
+$('cutoff').addEventListener('input', (e) => engine.setCutoff(cutoffHz(+e.target.value)));
 function padFromEvent(e) {
   const r = pad.getBoundingClientRect();
   setPad(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)),
@@ -124,6 +125,7 @@ $('play').addEventListener('click', (e) => {
 // Start: odblokowuje audio (wymóg iOS/Chrome: gest użytkownika)
 $('go').addEventListener('click', async () => {
   await engine.start();
+  engine.setCutoff(cutoffHz(+$('cutoff').value));
   setPad(padPos.x, padPos.y);
   engine.setResonance(1 + $('reso').value * 22);
   $('start').hidden = true;

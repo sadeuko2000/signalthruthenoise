@@ -1,6 +1,7 @@
 // Silnik audio: bas acid (saw -> lowpass z obwiednią), kick i zegar z lookahead.
 import { pitch } from './generator.js';
 import { Vocoder } from './vocoder.js';
+import { VOICES, blendWeights } from './engines.js';
 
 const midiToHz = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
@@ -9,10 +10,9 @@ export class Engine {
     this.ctx = null;
     this.bpm = 130;
     this.kickOn = true;
-    this.cutoff = 600;     // Hz
-    this.resonance = 12;   // Q
-    this.envMod = 2500;    // Hz
-    this.decay = 0.22;     // s
+    // parametry wspólne dla wszystkich silników (silniki trzymają referencję do tego obiektu)
+    this.p = { cutoff: 600, res: 12, envMod: 2500, decay: 0.22, bright: 0.35 };
+    this.blend = [1, 0, 0, 0];
     this.pattern = null;
     this.step = 0;
     this.nextTime = 0;
@@ -40,28 +40,35 @@ export class Engine {
     const comp = c.createDynamicsCompressor();
     this.master.connect(comp).connect(c.destination);
 
-    this.osc = c.createOscillator();
-    this.osc.type = 'sawtooth';
-    this.osc.frequency.value = 55;
-    this.filter = c.createBiquadFilter();
-    this.filter.type = 'lowpass';
-    this.filter.frequency.value = this.cutoff;
-    this.filter.Q.value = this.resonance;
-    this.amp = c.createGain();
-    this.amp.gain.value = 0;
     this.dry = c.createGain();
-    this.osc.connect(this.filter).connect(this.amp).connect(this.dry).connect(this.master);
-    this.osc.start();
+    this.mix = c.createGain();
+    this.mix.connect(this.dry).connect(this.master);
+    this.voices = VOICES.map((V) => new V(c, this.p));
+    this.vgains = this.voices.map((v) => { const g = c.createGain(); v.out.connect(g).connect(this.mix); return g; });
+    this.setBlend(0.25, 0.75);
   }
 
-  setCutoff(hz) { this.cutoff = hz; if (this.filter) this.filter.frequency.setTargetAtTime(hz, this.ctx.currentTime, 0.02); }
-  setResonance(q) { this.resonance = q; if (this.filter) this.filter.Q.setTargetAtTime(q, this.ctx.currentTime, 0.02); }
+  setCutoff(hz) {
+    this.p.cutoff = hz;
+    this.p.bright = Math.max(0, Math.min(1, Math.log(hz / 60) / Math.log(100)));
+    if (this.voices) this.voices.forEach((v) => v.refresh(this.ctx.currentTime));
+  }
+  setResonance(q) {
+    this.p.res = q;
+    if (this.voices) this.voices.forEach((v) => v.refresh(this.ctx.currentTime));
+  }
+
+  // Pad XY: miks czterech silników (narożniki: prophet, ms-20, dx, wavetable).
+  setBlend(x, y) {
+    this.blend = blendWeights(x, y);
+    if (this.vgains) this.vgains.forEach((g, i) => g.gain.setTargetAtTime(this.blend[i], this.ctx.currentTime, 0.03));
+  }
 
   // Tryb głosu: bas -> vocoder (modulator: mikrofon). Rzuca wyjątek, gdy brak zgody/mikrofonu.
   async enableVoice() {
     if (!this.voc) this.voc = new Vocoder(this.ctx);
     await this.voc.connectMic();
-    this.amp.connect(this.voc.input);
+    this.mix.connect(this.voc.input);
     this.voc.output.connect(this.master);
     this.dry.gain.setTargetAtTime(0, this.ctx.currentTime, 0.02);
     this.octMul = 2;
@@ -71,7 +78,7 @@ export class Engine {
   disableVoice() {
     if (!this.voc || !this.voiceOn) return;
     this.voc.disconnectMic();
-    this.amp.disconnect(this.voc.input);
+    this.mix.disconnect(this.voc.input);
     this.voc.output.disconnect(this.master);
     this.dry.gain.setTargetAtTime(1, this.ctx.currentTime, 0.02);
     this.octMul = 1;
@@ -89,7 +96,7 @@ export class Engine {
   stop() {
     clearInterval(this.timer);
     this.timer = null;
-    if (this.ctx) this.amp.gain.cancelScheduledValues(this.ctx.currentTime), this.amp.gain.setTargetAtTime(0, this.ctx.currentTime, 0.01);
+    if (this.ctx) this.voices.forEach((v) => v.silence(this.ctx.currentTime));
   }
 
   get playing() { return !!this.timer; }
@@ -123,33 +130,10 @@ export class Engine {
       const t0 = tt + k * part;
       const len = r === 1 ? dur * s.gate : part * 0.5;
       const slide = k === 0 && this.lastTied;
-      this._note(t0, freq, s.vel, accent, len, slide, tiedOut && k === r - 1, dur);
+      const hold = tiedOut && k === r - 1;
+      this.voices.forEach((v, vi) => { if (this.blend[vi] > 0.02) v.note(t0, freq, s.vel, accent, len, slide, hold); });
     }
     this.lastTied = tiedOut;
-  }
-
-  _note(t, freq, vel, accent, len, slide, holdOn, stepDur) {
-    const f = this.osc.frequency, g = this.amp.gain, fc = this.filter.frequency;
-    if (slide) {
-      f.cancelScheduledValues(t);
-      f.setValueAtTime(f.value, t);
-      f.exponentialRampToValueAtTime(freq, t + 0.05);   // glide 303
-    } else {
-      f.setValueAtTime(freq, t);
-      const peak = (vel / 127) * (accent ? 1.0 : 0.7);
-      g.cancelScheduledValues(t);
-      g.setValueAtTime(g.value, t);
-      g.linearRampToValueAtTime(peak, t + 0.004);
-      const base = this.cutoff;
-      const top = base + this.envMod * (accent ? 1.6 : 1);
-      fc.cancelScheduledValues(t);
-      fc.setValueAtTime(Math.min(top, 18000), t);
-      fc.exponentialRampToValueAtTime(Math.max(base, 30), t + this.decay * (accent ? 1.3 : 1));
-    }
-    if (!holdOn) {
-      g.setValueAtTime(g.value, t + len);
-      g.linearRampToValueAtTime(0, t + len + 0.012);
-    }
   }
 
   _kick(t) {
