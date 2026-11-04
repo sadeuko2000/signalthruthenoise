@@ -1,4 +1,4 @@
-// Silnik audio: bas acid (saw -> lowpass z obwiednią), kick i zegar z lookahead.
+// Silnik audio: zegar z lookahead, rozsyłanie nut do silników basu, vocoder.
 import { pitch } from './generator.js';
 import { Vocoder } from './vocoder.js';
 import { VOICES, blendWeights } from './engines.js';
@@ -9,7 +9,6 @@ export class Engine {
   constructor() {
     this.ctx = null;
     this.bpm = 130;
-    this.kickOn = true;
     // parametry wspólne dla wszystkich silników (silniki trzymają referencję do tego obiektu)
     this.p = { cutoff: 600, res: 12, envMod: 2500, decay: 0.22, bright: 0.35 };
     this.blend = [1, 0, 0, 0];
@@ -117,7 +116,6 @@ export class Engine {
     const s = pat.steps[i];
     const tt = t + (i % 2 === 1 ? pat.swing * dur : 0);
     if (this.onStep) this.onStep(i, t);
-    if (this.kickOn && i % 4 === 0) this._kick(t);
     if (!s.on) { this.lastTied = false; return; }
 
     const next = pat.steps[(i + 1) % pat.steps.length];
@@ -134,16 +132,5 @@ export class Engine {
       this.voices.forEach((v, vi) => { if (this.blend[vi] > 0.02) v.note(t0, freq, s.vel, accent, len, slide, hold); });
     }
     this.lastTied = tiedOut;
-  }
-
-  _kick(t) {
-    const c = this.ctx;
-    const o = c.createOscillator(), g = c.createGain();
-    o.frequency.setValueAtTime(150, t);
-    o.frequency.exponentialRampToValueAtTime(42, t + 0.12);
-    g.gain.setValueAtTime(0.9, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
-    o.connect(g).connect(this.master);
-    o.start(t); o.stop(t + 0.3);
   }
 }

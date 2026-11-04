@@ -112,7 +112,6 @@ $('mode').addEventListener('click', (e) => {
   e.target.textContent = state.mode === 'minor' ? 'moll' : 'frygijska';
   regen();
 });
-$('kick').addEventListener('click', (e) => { engine.kickOn = !engine.kickOn; e.target.classList.toggle('on', engine.kickOn); });
 const setBpm = (v) => { engine.bpm = Math.max(70, Math.min(180, v)); $('bpm').textContent = engine.bpm; };
 $('bpm-').addEventListener('click', () => setBpm(engine.bpm - 2));
 $('bpm+').addEventListener('click', () => setBpm(engine.bpm + 2));

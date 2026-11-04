@@ -20,7 +20,7 @@ const stages = [
   ['gotowe', 'Bas z 4 silników (prophet, ms-20, dx, wavetable) miksowanych padem XY'],
   ['gotowe', 'Żyroskop miksuje silniki, potrząśnięcie = mutacja'],
   ['gotowe', 'Vocoder: bas "mówi" głosem z mikrofonu'],
-  ['dalej', 'Perkusja i lead'],
+  ['dalej', 'Dostrojenie brzmienia silników i wzorów po odsłuchu'],
 ];
 const progress = `
 <aside id="progress">
