@@ -17,7 +17,7 @@ const finalize = (p) => withSlide(withAccent(p, state.accent), state.slide);
 let pattern = finalize(generateBass(state));
 engine.pattern = pattern;
 let page = 'seq';
-let fxActive = 0, fxView = true;               // aktywna sekcja FX (0 filtr, 1 efekt) i podgląd działania efektu na ekranie
+let fxActive = 0;                              // sekcja FX, której pokrętła widać (0 filtr, 1 efekt)
 const padPos = { x: 0.25, y: 0.75 };
 const cv = el('scope'), g = cv.getContext('2d');
 let lastStep = { i: 0, t: 0 }, heldPos = 0;
@@ -155,72 +155,83 @@ function drawMix() {
 }
 
 // ---------- FX na ekranie radarowym ----------
-// Dotyk ustawia dwa parametry aktywnego efektu naraz (odległość od środka i kąt). Nuty ze wzoru pokazują, jak efekt na nie działa:
-// filtr „maskuje” echa poza pasmem, delay dokłada kolejne powtórzenia, pogłos rozchodzi się falami od echa, chorus podwaja echa,
-// dystorsja spłaszcza je do pierścienia.
-const POLAR = {
-  0: [['cutoff', 'reso'], ['cutoff', 'mode'], ['lpCut', 'lpRes'], ['freq', 'feedback']],        // filtr: [odległość, kąt] dla stylów 0..3
-  1: [['feedback', 'time'], ['size', 'mix'], ['depth', 'rate'], ['drive', 'curve']],            // efekt
+// Dotyk to makro: jeden punkt (odległość od środka i kąt) ustawia naraz kilka parametrów FILTRA i EFEKTU.
+// Odległość od środka to „intensywność” (np. cutoff filtra, feedback i mix efektu rosną razem), kąt to „charakter”
+// (np. rezonans filtra i czas delaya). W środku jest sucho, na brzegu najmocniej. Nuty ze wzoru pokazują działanie obu naraz:
+// echa przechodzą przez filtr (maska pasma), a potem przez efekt (kopie delaya, fale pogłosu, podwojenie chorusa, spłaszczenie dystorsji).
+const MACRO = {
+  0: [{ r: ['cutoff'], a: ['reso'] }, { r: ['cutoff'], a: ['mode'] }, { r: ['lpCut'], a: ['lpRes'] }, { r: ['freq'], a: ['feedback'] }],            // filtr: style 0..3
+  1: [{ r: ['feedback', 'mix'], a: ['time'] }, { r: ['size', 'mix'], a: ['damping'] }, { r: ['depth', 'mix'], a: ['rate'] }, { r: ['drive', 'mix'], a: ['curve'] }],   // efekt
 };
-const polarIds = (j, si) => POLAR[j][si];
+let fxCtl = 0;                                                  // czym steruje ekran: 0 oba, 1 tylko filtr, 2 tylko efekt
+const CTL_LABEL = ['OBA', 'FILTR', 'EFEKT'];
+const driven = () => (fxCtl === 0 ? [0, 1] : fxCtl === 1 ? [0] : [1]);
+const macroOf = (j) => MACRO[j][fxSecs[j].slot.style];
+const polarIds = (j, si) => [MACRO[j][si].r[0], MACRO[j][si].a[0]];     // parametry pokazywane kursorem
+const mixFromR = (rN) => 0.08 + 0.84 * rN;                              // mix efektu rośnie od środka ku brzegowi
 
 function drawFx(ts) {
   const G = geo(), S = sweepState(), { cx, cy, R, dpr } = G, { n, pos } = S;
   drawBase(G, S);
-  const sec = fxSecs[fxActive], si = sec.slot.style, style = sec.styles[si], nv = sec.slot.values[si], m = mapValues(style, nv);
-  const mix = clamp01(m.mix ?? 1), on = fxView && !sec.slot.bypass;
   const E = echoes(pattern.steps);
-  const base = (e, mul = 1, o = {}) => drawEcho(G, e, echoAlpha(e.i, pos, n) * mul, o);
   const rp = (nn) => rFromN(nn) * R;
   const ring = (r, glow, a = 1) => { g.shadowColor = `rgba(${AMBER},.9)`; g.shadowBlur = 8 * dpr; circle(cx, cy, r, `rgba(${AMBER},${a})`, (1.5 + glow * 5) * dpr); g.shadowBlur = 0; };
+  const read = (sec) => { const si = sec.slot.style, nv = sec.slot.values[si]; return { si, nv, m: mapValues(sec.styles[si], nv), on: !sec.slot.bypass }; };
+  const F = read(fxSecs[0]), X = read(fxSecs[1]);
+  const base = (e, mul = 1, o = {}) => drawEcho(G, e, echoAlpha(e.i, pos, n) * mul, o);
 
-  if (!on) E.forEach((e) => base(e));
-  else if (fxActive === 0) {
-    // filtr: promień = częstotliwość. Echa (wysokość dźwięku = promień) poza pasmem są przytłumione.
-    const soft = 0.14 * R, blend = (k) => (1 - mix) + mix * k;
-    let pass = () => 1, rings = [], glow = 0;
-    if (si === 0) { const c = rp(nv.cutoff); pass = (r) => bandPass(r, 0, c, soft); rings = [c]; glow = nv.reso; }
-    else if (si === 1) {
-      const c = rp(nv.cutoff), md = nv.mode, lp = Math.max(0, 1 - 2 * md), bp = 1 - Math.abs(2 * md - 1), hp = Math.max(0, 2 * md - 1);
+  // 1) filtr: promień = częstotliwość. Echa (wysokość dźwięku = promień) poza pasmem są przytłumione.
+  const soft = 0.14 * R, mixF = clamp01(F.m.mix ?? 1);
+  let pass = () => 1, rings = [], glow = 0;
+  if (F.on) {
+    if (F.si === 0) { const c = rp(F.nv.cutoff); pass = (r) => bandPass(r, 0, c, soft); rings = [c]; glow = F.nv.reso; }
+    else if (F.si === 1) {
+      const c = rp(F.nv.cutoff), md = F.nv.mode, lp = Math.max(0, 1 - 2 * md), bp = 1 - Math.abs(2 * md - 1), hp = Math.max(0, 2 * md - 1);
       pass = (r) => lp * bandPass(r, 0, c, soft) + bp * bandPass(r, c - 0.1 * R, c + 0.1 * R, soft) + hp * bandPass(r, c, 2 * R, soft);
       rings = [c]; glow = 0.3;
-    } else if (si === 2) { let lo = rp(nv.hpCut), hi = rp(nv.lpCut); if (lo > hi) [lo, hi] = [hi, lo]; pass = (r) => bandPass(r, lo, hi, soft); rings = [lo, hi]; glow = nv.lpRes; }
-    else { const c = rp(nv.freq); for (let k = -2; k <= 2; k++) ring(c + k * 0.09 * R, 0, (1 - Math.abs(k) * 0.3) * (0.25 + 0.75 * nv.feedback)); }
-    E.forEach((e) => base(e, blend(pass(e.r * R))));
-    rings.forEach((r) => ring(r, glow));
-  } else if (si === 0) {                           // delay: kolejne, coraz cichsze powtórzenia echa o `time` kroków dalej
-    E.forEach((e) => base(e));
-    const copies = delayCopies(m.time, m.feedback, 4), f = 0.2 + 0.8 * mix;
-    E.forEach((e) => copies.forEach((c) => drawEcho(G, e, echoAlpha(e.i + c.shift, pos, n) * c.gain * f, { da: (c.shift / n) * TAU, noGlow: true, lw: 0.8, col: GREEN })));
-  } else if (si === 1) {                           // pogłos: fala rozchodzi się od echa po jego przemiataniu
-    E.forEach((e) => base(e));
-    const life = n * (0.25 + 0.5 * nv.size), f = 0.15 + 0.7 * mix;
-    E.forEach((e) => {
-      const delta = (((pos - e.i) % n) + n) % n;
-      if (delta > life) return;
-      const t = delta / life, a = e.a0 + e.len / 2 - Math.PI / 2;
-      circle(cx + Math.cos(a) * e.r * R, cy + Math.sin(a) * e.r * R, t * R * (0.12 + 0.5 * nv.size), `rgba(${GREEN},${((1 - t) * f).toFixed(3)})`, 1.2 * dpr);
-    });
-  } else if (si === 2) {                           // chorus: echa podwojone i lekko rozstrojone, wahające się z tempem LFO
-    const off = nv.depth * 0.07 * Math.sin((ts / 1000) * TAU * Math.min(m.rate, 4) * 0.5), f = 0.2 + 0.8 * mix;
-    E.forEach((e) => { base(e); base(e, 0.55 * f, { da: off, noGlow: true, lw: 0.85 }); base(e, 0.4 * f, { da: -off * 1.3, noGlow: true, lw: 0.85 }); });
-  } else {                                         // dystorsja: echa spłaszczone do pierścienia obcięcia (od miękkiej do „fold”)
-    const dr = nv.drive, rc = R * (R_OUT - 0.4 * dr), f = 0.25 + 0.75 * mix;
-    circle(cx, cy, rc, `rgba(${AMBER},.6)`, dpr, [4 * dpr, 4 * dpr]);
-    E.forEach((e) => {
-      base(e, 1 - 0.6 * f);
-      const r0 = e.r * R, r1 = r0 > rc ? (nv.curve > 0.5 ? rc - (r0 - rc) * 0.7 : rc) : r0;
-      base(e, f, { r: r1, lw: 1 + dr * 0.9, col: AMBER, noGlow: true });
-    });
+    } else if (F.si === 2) { let lo = rp(F.nv.hpCut), hi = rp(F.nv.lpCut); if (lo > hi) [lo, hi] = [hi, lo]; pass = (r) => bandPass(r, lo, hi, soft); rings = [lo, hi]; glow = F.nv.lpRes; }
+    else { const c = rp(F.nv.freq); for (let k = -2; k <= 2; k++) ring(c + k * 0.09 * R, 0, (1 - Math.abs(k) * 0.3) * (0.25 + 0.75 * F.nv.feedback)); }
   }
+  const through = (e) => (F.on ? (1 - mixF) + mixF * pass(e.r * R) : 1);       // ile echa przechodzi przez filtr
+  E.forEach((e) => base(e, through(e)));
 
+  // 2) efekt: działa na to, co przeszło przez filtr
+  if (X.on) {
+    const mix = clamp01(X.m.mix ?? 1);
+    if (X.si === 0) {                              // delay: kolejne, coraz cichsze powtórzenia echa o `time` kroków dalej
+      const copies = delayCopies(X.m.time, X.m.feedback, 4), f = 0.2 + 0.8 * mix;
+      E.forEach((e) => copies.forEach((c) => drawEcho(G, e, echoAlpha(e.i + c.shift, pos, n) * c.gain * f * through(e), { da: (c.shift / n) * TAU, noGlow: true, lw: 0.8, col: GREEN })));
+    } else if (X.si === 1) {                       // pogłos: fala rozchodzi się od echa po jego przemiataniu
+      const life = n * (0.25 + 0.5 * X.nv.size), f = 0.15 + 0.7 * mix;
+      E.forEach((e) => {
+        const delta = (((pos - e.i) % n) + n) % n;
+        if (delta > life) return;
+        const t = delta / life, a = e.a0 + e.len / 2 - Math.PI / 2;
+        circle(cx + Math.cos(a) * e.r * R, cy + Math.sin(a) * e.r * R, t * R * (0.12 + 0.5 * X.nv.size), `rgba(${GREEN},${((1 - t) * f * through(e)).toFixed(3)})`, 1.2 * dpr);
+      });
+    } else if (X.si === 2) {                       // chorus: echa podwojone i lekko rozstrojone, wahające się z tempem LFO
+      const off = X.nv.depth * 0.07 * Math.sin((ts / 1000) * TAU * Math.min(X.m.rate, 4) * 0.5), f = 0.2 + 0.8 * mix;
+      E.forEach((e) => { base(e, 0.55 * f * through(e), { da: off, noGlow: true, lw: 0.85 }); base(e, 0.4 * f * through(e), { da: -off * 1.3, noGlow: true, lw: 0.85 }); });
+    } else {                                       // dystorsja: echa spłaszczone do pierścienia obcięcia (od miękkiej do „fold”)
+      const dr = X.nv.drive, rc = R * (R_OUT - 0.4 * dr), f = 0.25 + 0.75 * mix;
+      circle(cx, cy, rc, `rgba(${AMBER},.6)`, dpr, [4 * dpr, 4 * dpr]);
+      E.forEach((e) => {
+        const r0 = e.r * R, r1 = r0 > rc ? (X.nv.curve > 0.5 ? rc - (r0 - rc) * 0.7 : rc) : r0;
+        base(e, f * through(e), { r: r1, lw: 1 + dr * 0.9, col: AMBER, noGlow: true });
+      });
+    }
+  }
+  rings.forEach((r) => ring(r, glow));
   drawSweepLine(G, S);
-  // kursor: pozycja = aktualne wartości dwóch sterowanych parametrów (zawsze zgodna z pokrętłami)
-  const ids = polarIds(fxActive, si), cr = rp(nv[ids[0]]), ca = thetaFromN(nv[ids[1]]);
-  const [bx, by] = polarXY(cx, cy, R * 0.94, ca), [kx, ky] = polarXY(cx, cy, cr, ca);
+
+  // kursory: pełny krzyżyk = pierwsza sterowana sekcja, pusty znacznik = druga (widać, że oba parametry „podążają” za dotykiem)
+  const cursorOf = (j) => { const sec = fxSecs[j], ids = polarIds(j, sec.slot.style), nv = sec.slot.values[sec.slot.style]; return { r: rp(nv[ids[0]]), a: thetaFromN(nv[ids[1]]) }; };
+  const ds = driven(), c0 = cursorOf(ds[0]);
+  const [bx, by] = polarXY(cx, cy, R * 0.94, c0.a), [kx, ky] = polarXY(cx, cy, c0.r, c0.a);
   g.setLineDash([4 * dpr, 4 * dpr]); g.beginPath(); g.moveTo(cx, cy); g.lineTo(bx, by); g.strokeStyle = `rgba(${AMBER},.55)`; g.lineWidth = dpr; g.stroke(); g.setLineDash([]);
   g.strokeStyle = `rgba(${AMBER},1)`; g.lineWidth = 1.6 * dpr;
   g.beginPath(); g.arc(kx, ky, R * 0.045, 0, TAU); g.moveTo(kx - R * 0.08, ky); g.lineTo(kx + R * 0.08, ky); g.moveTo(kx, ky - R * 0.08); g.lineTo(kx, ky + R * 0.08); g.stroke();
+  if (ds.length > 1) { const c1 = cursorOf(ds[1]), [hx, hy] = polarXY(cx, cy, c1.r, c1.a); g.beginPath(); g.arc(hx, hy, R * 0.03, 0, TAU); g.strokeStyle = `rgba(${AMBER},.8)`; g.lineWidth = 1.4 * dpr; g.stroke(); }
 }
 
 let raf = 0;
@@ -245,8 +256,14 @@ function mixFrom(p) { const Rp = p.R * R_OUT; setPad((p.dx / Rp + 1) / 2, (-p.dy
 // Ustawia parametr aktywnej sekcji FX i odświeża jego pokrętło.
 function setFxParam(sec, id, nn) { sec.slot.setParam(id, nn); const k = sec.refs[id]; if (k) k.value = nn; }
 function fxFrom(p) {
-  const sec = fxSecs[fxActive], ids = polarIds(fxActive, sec.slot.style);
-  setFxParam(sec, ids[0], nFromR(p.rn)); setFxParam(sec, ids[1], nFromTheta(p.theta));
+  const rN = nFromR(p.rn), aN = nFromTheta(p.theta);
+  for (const j of driven()) {
+    const sec = fxSecs[j];
+    if (sec.slot.bypass) continue;
+    const m = macroOf(j);
+    m.r.forEach((id) => setFxParam(sec, id, id === 'mix' ? mixFromR(rN) : rN));
+    m.a.forEach((id) => setFxParam(sec, id, aN));
+  }
 }
 cv.addEventListener('pointerdown', (e) => {
   const p = pointerPolar(e);
@@ -362,7 +379,7 @@ const KEYS = {
     { label: 'STYLE', value: () => fxSecs[fxActive].styles[fxSecs[fxActive].slot.style].name.toUpperCase(), act: () => cycleStyle(fxActive) },
     { label: 'STAN', value: () => (fxSecs[fxActive].slot.bypass ? 'BYPASS' : 'ON'), lit: () => !fxSecs[fxActive].slot.bypass, act: () => bypass(fxActive) },
     { label: 'RND', value: () => 'LOSUJ', act: () => fxSecs[fxActive].randomize() },
-    { label: 'WIDOK', value: () => (fxView ? 'ON' : 'OFF'), lit: () => fxView, act: () => { fxView = !fxView; } },
+    { label: 'STEROW.', value: () => CTL_LABEL[fxCtl], lit: () => fxCtl === 0, act: () => { fxCtl = (fxCtl + 1) % 3; } },
   ],
 };
 function renderKeys() {
@@ -432,9 +449,8 @@ document.querySelectorAll('#pages button').forEach((b) => b.addEventListener('cl
 
 // ---------- odczyty ----------
 function fxInfo() {
-  const sec = fxSecs[fxActive], st = sec.styles[sec.slot.style], ids = polarIds(fxActive, sec.slot.style);
-  const lab = (id) => st.params.find((x) => x.id === id).label.toUpperCase();
-  return ['FX', fxActive === 0 ? 'FILTR' : 'EFEKT', st.name.toUpperCase(), `R:${lab(ids[0])}`, `∠:${lab(ids[1])}`];
+  const nm = (j) => fxSecs[j].styles[fxSecs[j].slot.style].name.toUpperCase();
+  return ['FX', `FLT ${nm(0)}`, `FX ${nm(1)}`, `STEROW. ${CTL_LABEL[fxCtl]}`];
 }
 function updateInfo() {
   const n = pattern.steps.length, pos = curPos(), brg = Math.floor((pos / n) * 360) % 360;
