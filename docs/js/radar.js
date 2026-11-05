@@ -438,7 +438,6 @@ const KEYS = {
     { label: 'MUTATE', value: () => 'SYNTH', act: actions.mut },
   ],
   mix: [
-    ...VOICE_NAMES.map((n, i) => ({ label: SHORT[i], value: () => (engine.enabled[i] ? 'ON' : 'OFF'), lit: () => !!engine.enabled[i], act: () => { engine.setEnabled(i, !engine.enabled[i]); } })),
     { label: 'RND ENG', value: () => 'LOSUJ', act: () => { engine.enabled.forEach((on, i) => { if (on) rnd(i); }); } },
   ],
   syn: [
