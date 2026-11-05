@@ -26,11 +26,14 @@ przyciski kontekstowe jako komórki rozdzielone linią (aktywny = odwrócony). P
 
 Osobna strona `docs/radar.html` (jeden układ jak aplikacja na telefon, na komputerze wyśrodkowany, proporcje zablokowane jak na telefonie) (wersja do artefaktu: `node scripts/build-radar.mjs out.html`), ten sam silnik dźwięku, inny interfejs
 zainspirowany radarem morskim:
+- **Nagłówek:** mała ikona nutki (otwiera okienko tempa, BPM nie jest widoczny na ekranie), zakładki SEQ – MIX – SYN – FX, znaczek start/stop.
+- **SYN:** parametry silników. Przyciski: SILNIK (wybór prophet / ms-20 / dx / wavetable), WIDOK (brzmienie / obwiednie), RND (losuj parametry wybranego silnika), SOLO, STAN. Pokrętła: LEVEL, parametry silnika oraz globalne CUTOFF i RESO (widok „brzmienie”) albo sześć obwiedni filtra i amplitudy (widok „obwiednie”). Dotyk w ekran ustawia siłę (odległość od środka) i zanik (kąt) obwiedni filtra wybranego silnika; echa wzoru dostają kolec i ogon odpowiadające tym wartościom.
+- Pasek przeglądu wzoru jest tylko na stronie SEQ.
 - **SEQ:** przemiatająca linia to głowica odtwarzania (jedno okrążenie = jeden obieg wzoru), nuty to echa na obwodzie
   (kąt = krok, odległość od środka = wysokość dźwięku), które gasną jak luminofor. Dotknięcie dodaje echo, przeciągnięcie je przesuwa,
   dotknięcie istniejącego usuwa. Przyciski kontekstowe: BASE (nuta bazowa, tap = +1 półton, przytrzymanie = −1), OKTAWA (tap = w górę, przytrzymanie = w dół),
   KEY (elektro / frygijska / moll), RANDOM, MUTATE. Zmiana nuty bazowej, oktawy i tonacji nie kasuje wzoru.
-- **MIX:** cztery silniki jako cele na obwodzie, krzyżyk to punkt miksu; wzór blado w tle.
+- **MIX:** cztery silniki jako cele na obwodzie, krzyżyk to punkt miksu, wzór blado w tle; pokrętła poziomów czterech silników.
 - Wszystkie trzy strony (SEQ, MIX, FX) rysują na tym samym ekranie, w tym samym miejscu i rozmiarze, z jedną wspólną przemiatającą linią (tempo skanowania wynika z BPM i długości wzoru).
 - Tempo: mały napis „xxx BPM” w nagłówku, po dotknięciu okienko z dużą wartością i przyciskami −5 / − / + / +5.
 - **FX:** filtr i efekty (4 style po 8 parametrów), jedna sekcja naraz (przycisk SEKCJA). Dotyk w ekran to makro: jeden punkt (odległość od środka = intensywność, kąt = charakter) ustawia naraz kilka parametrów filtra i efektu (np. cutoff + rezonans oraz feedback + mix + czas delaya; mix efektu rośnie od środka ku brzegowi). Przycisk STEROW. przełącza, czym steruje ekran: oba, tylko filtr, tylko efekt. Nuty ze wzoru przechodzą przez filtr (maska pasma), a potem przez efekt (kopie delaya, fale pogłosu, podwojenie chorusa, spłaszczenie dystorsji).

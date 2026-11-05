@@ -14,15 +14,17 @@
 <body>
 <div id="radar" hidden>
   <header class="head">
-    <button id="bpm-open" class="bpmchip" aria-haspopup="dialog" aria-label="Tempo, otwórz ustawienie"><b id="bpm">130</b> BPM</button>
-    <span class="title">RADARXXX*</span>
+    <button id="bpm-open" class="tempo" aria-haspopup="dialog" aria-label="Tempo, otwórz ustawienie">
+      <svg viewBox="0 0 16 16" width="22" height="22" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path d="M9 2h2v9H9z"/><path d="M11 2h3v3h-3z"/><path d="M6 10h4v1h1v2h-1v1H6v-1H5v-2h1z"/></svg>
+    </button>
+    <nav class="tabs4" id="pages" aria-label="Strony">
+      <button data-page="seq" class="on">SEQ</button>
+      <button data-page="mix">MIX</button>
+      <button data-page="syn">SYN</button>
+      <button data-page="fx">FX</button>
+    </nav>
     <button id="play" class="play" aria-label="play / stop">▶</button>
   </header>
-  <nav class="tabs3" id="pages" aria-label="Strony">
-    <button data-page="seq" class="on">SEQ</button>
-    <button data-page="mix">MIX</button>
-    <button data-page="fx">FX</button>
-  </nav>
 
   <main class="stage">
     <section class="scopewrap" id="scopewrap"><canvas id="scope" aria-label="Ekran radarowy"></canvas></section>
@@ -36,11 +38,18 @@
         <div class="knob" id="slide" data-label="SLIDE" data-min="0" data-max="1" data-step="0.01" data-value="0.1" data-fmt="pct"></div>
       </section>
       <section class="knobrow" id="knobs-mix" hidden>
-        <div class="knob" id="cutoff" data-label="CUTOFF" data-min="0" data-max="1" data-step="0.001" data-value="0.5" data-fmt="pct"></div>
-        <div class="knob" id="reso" data-label="RESO" data-min="0" data-max="1" data-step="0.01" data-value="0.5" data-fmt="pct"></div>
+        <div class="knob" id="lv0" data-label="PROPHET" data-min="0" data-max="1.5" data-step="0.01" data-value="1" data-fmt="pct"></div>
+        <div class="knob" id="lv1" data-label="MS-20" data-min="0" data-max="1.5" data-step="0.01" data-value="1" data-fmt="pct"></div>
+        <div class="knob" id="lv2" data-label="DX" data-min="0" data-max="1.5" data-step="0.01" data-value="1" data-fmt="pct"></div>
+        <div class="knob" id="lv3" data-label="WAVETBL" data-min="0" data-max="1.5" data-step="0.01" data-value="1" data-fmt="pct"></div>
       </section>
     </aside>
+    <section id="synpage" hidden><div class="kgrid" id="syngrid"></div></section>
     <section id="fxpage" hidden></section>
+    <div id="synstatic" hidden>
+      <div class="knob" id="cutoff" data-label="CUTOFF" data-min="0" data-max="1" data-step="0.001" data-value="0.5" data-fmt="pct"></div>
+      <div class="knob" id="reso" data-label="RESO" data-min="0" data-max="1" data-step="0.01" data-value="0.5" data-fmt="pct"></div>
+    </div>
   </main>
 
   <nav class="softkeys" id="softkeys" aria-label="Przyciski kontekstowe"></nav>

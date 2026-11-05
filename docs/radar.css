@@ -13,15 +13,13 @@ button:active{opacity:.6}
 button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 
 #radar{position:relative;display:flex;flex-direction:column;height:100dvh;max-width:430px;margin:0 auto;background:var(--paper)}
-.head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:calc(env(safe-area-inset-top,0px) + 10px) max(16px,env(safe-area-inset-right,0px)) 6px max(16px,env(safe-area-inset-left,0px))}
-.bpmchip{justify-self:start;min-width:64px;min-height:44px;text-align:left;letter-spacing:.1em;white-space:nowrap}
-.bpmchip b{font-weight:400}
-.title{letter-spacing:.14em;text-align:center}
-.play{justify-self:end;width:44px;height:44px;display:grid;place-items:center;background:var(--acc);color:var(--ink);font-size:20px}
-.tabs3{display:grid;grid-template-columns:repeat(3,1fr);margin:0 max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px));border-top:1px solid var(--ink);border-bottom:1px solid var(--ink)}
-.tabs3 button{min-height:44px;font-size:22px;letter-spacing:.14em;border-right:1px solid var(--ink)}
-.tabs3 button:last-child{border-right:0}
-.tabs3 button.on{background:var(--ink);color:var(--paper)}
+.head{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top,0px) + 10px) max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px))}
+.tempo{width:44px;height:44px;display:grid;place-items:center}
+.tabs4{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--ink);border-bottom:1px solid var(--ink)}
+.tabs4 button{min-height:44px;font-size:20px;letter-spacing:.1em;border-right:1px solid var(--ink)}
+.tabs4 button:last-child{border-right:0}
+.tabs4 button.on{background:var(--ink);color:var(--paper)}
+.play{width:44px;height:44px;display:grid;place-items:center;background:var(--acc);color:var(--ink);font-size:20px}
 
 .stage{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:8px max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:6px}
 .scopewrap{display:grid;place-items:center}
@@ -44,7 +42,9 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .knob.drag .kl::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--acc);border:1px solid var(--ink);margin-right:4px;vertical-align:middle}
 
 /* strona FX: same pokrętła (nazwa + pokrętło), jedna sekcja naraz */
-#fxpage{display:grid}
+#fxpage,#synpage{display:grid}
+#synpage{border-top:1px solid var(--ink);padding-top:8px;margin-top:2px}
+#synpage .knob{--ks:40px}
 .fxsec{border:0;padding:0;background:none;border-top:1px solid var(--ink);padding-top:8px;margin-top:2px}
 .fxsec h2{display:none}
 #fxpage .knob{--ks:40px}

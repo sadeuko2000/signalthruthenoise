@@ -2,7 +2,7 @@
 // Przemiatająca linia = głowica odtwarzania (jedno okrążenie = jeden obieg wzoru), nuty = echa z poświatą.
 import { generateBass, mutate, DEFAULTS, withAccent, withSlide } from './generator.js';
 import { Engine } from './audio.js';
-import { VOICE_NAMES, clampToDisc } from './engines.js';
+import { VOICE_NAMES, PARAM_SPECS, clampToDisc } from './engines.js';
 import { FILTER_STYLES, FX_STYLES, mapValues } from './fx.js';
 import { makeKnob, initKnobs } from './knob.js';
 import { TAU, DEG_MIN, DEG_MAX, R_OUT, degToR, rToDeg, angleOfStep, polar, stepFromAngle, sweepPos, echoAlpha, echoes, placeNote, clearNote, moveNote, resizeSteps, nFromR, rFromN, nFromTheta, thetaFromN, delayCopies, bandPass } from './radargeo.js';
@@ -17,6 +17,7 @@ const finalize = (p) => withSlide(withAccent(p, state.accent), state.slide);
 let pattern = finalize(generateBass(state));
 engine.pattern = pattern;
 let page = 'seq';
+let synSel = 0, synView = 0;                    // strona SYN: wybrany silnik (0..3) i widok (0 brzmienie, 1 obwiednie)
 let fxActive = 0;                              // sekcja FX, której pokrętła widać (0 filtr, 1 efekt)
 const padPos = { x: 0.25, y: 0.75 };
 const cv = el('scope'), g = cv.getContext('2d');
@@ -249,9 +250,40 @@ function drawStrip() {
   sg.fillStyle = `rgb(${INK})`; sg.fillRect(Math.round(S.pos * cw), 0, Math.max(1, d), H);                                           // linia odtwarzania
 }
 
+// ---------- SYN: parametry silników na ekranie radarowym ----------
+// Dotyk ustawia „kształt dźwięku” wybranego silnika: odległość od środka = siła obwiedni filtra (zryw na początku nuty),
+// kąt = jej zanik. Na ekranie echa dostają kolec (siła) i ogon (zanik) odpowiadające tym wartościom.
+const specOf = (i, id) => PARAM_SPECS[i].find((x) => x.id === id);
+const normParam = (i, id) => { const sp = specOf(i, id); return clamp01((engine.voices[i].params[id] - sp.min) / (sp.max - sp.min)); };
+function setEngParam(i, id, nn) {
+  const sp = specOf(i, id), raw = sp.min + clamp01(nn) * (sp.max - sp.min), v = Math.round(raw / sp.step) * sp.step;
+  engine.setParam(i, id, v);
+  if (i === synSel && synRefs[id]) synRefs[id].value = v;
+}
+function synFrom(p) { setEngParam(synSel, 'fEnv', nFromR(p.rn)); setEngParam(synSel, 'fDec', nFromTheta(p.theta)); }
+
+function drawSyn() {
+  const G = geo(), S = sweepState(), { cx, cy, R, dpr } = G, { n, pos } = S;
+  drawBase(G, S);
+  const fE = normParam(synSel, 'fEnv'), fD = normParam(synSel, 'fDec'), live = engine.enabled[synSel] ? 1 : 0.4;
+  for (const e of echoes(pattern.steps)) {
+    const al = echoAlpha(e.i, pos, n) * live, r0 = e.r * R;
+    drawEcho(G, e, al);
+    const [x0, y0] = polarXY(cx, cy, r0, e.a0), [x1, y1] = polarXY(cx, cy, r0 + (0.03 + fE * 0.15) * R, e.a0);     // kolec: siła obwiedni filtra
+    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.strokeStyle = `rgba(${INK},${(0.35 + 0.5 * al).toFixed(3)})`; g.lineWidth = 1.4 * dpr; g.stroke();
+    const tail = fD * 3 * (TAU / n), start = e.a0 + e.len - Math.PI / 2;                                              // ogon: zanik
+    for (let k = 0; k < 6; k++) { g.beginPath(); g.arc(cx, cy, r0, start + (k * tail) / 6, start + ((k + 1) * tail) / 6); g.strokeStyle = `rgba(${INK},${((1 - k / 6) * 0.5 * al).toFixed(3)})`; g.lineWidth = Math.max(dpr, e.w * 0.5 * dpr); g.stroke(); }
+  }
+  drawSweepLine(G, S);
+  const kr = rFromN(fE) * R, ka = thetaFromN(fD), [bx, by] = polarXY(cx, cy, R * 0.94, ka), [kx, ky] = polarXY(cx, cy, kr, ka);
+  g.setLineDash([4 * dpr, 4 * dpr]); g.beginPath(); g.moveTo(cx, cy); g.lineTo(bx, by); g.strokeStyle = `rgba(${ACC},.55)`; g.lineWidth = dpr; g.stroke(); g.setLineDash([]);
+  g.strokeStyle = `rgba(${ACC},1)`; g.lineWidth = 1.6 * dpr;
+  g.beginPath(); g.arc(kx, ky, R * 0.045, 0, TAU); g.moveTo(kx - R * 0.08, ky); g.lineTo(kx + R * 0.08, ky); g.moveTo(kx, ky - R * 0.08); g.lineTo(kx, ky + R * 0.08); g.stroke();
+}
+
 let raf = 0;
 function loop(ts) {
-  if (!el('radar').hidden) { if (page === 'mix') drawMix(); else if (page === 'fx') drawFx(ts); else drawSeq(); drawStrip(); }
+  if (!el('radar').hidden) { if (page === 'mix') drawMix(); else if (page === 'fx') drawFx(ts); else if (page === 'syn') drawSyn(); else { drawSeq(); drawStrip(); } }
   raf = requestAnimationFrame(loop);
 }
 
@@ -285,6 +317,7 @@ cv.addEventListener('pointerdown', (e) => {
   cv.setPointerCapture(e.pointerId);
   if (page === 'mix') { drag = { mode: 'mix' }; mixFrom(p); return; }
   if (page === 'fx') { drag = { mode: 'fx' }; fxFrom(p); return; }
+  if (page === 'syn') { drag = { mode: 'syn' }; synFrom(p); return; }
   if (p.rn < 0.09 || p.rn > 0.98) return;
   const n = pattern.steps.length, i = stepFromAngle(p.theta, n), deg = rToDeg(p.rn);
   const st = pattern.steps[i];
@@ -299,6 +332,7 @@ cv.addEventListener('pointermove', (e) => {
   const p = pointerPolar(e);
   if (drag.mode === 'mix') { mixFrom(p); return; }
   if (drag.mode === 'fx') { fxFrom(p); return; }
+  if (drag.mode === 'syn') { synFrom(p); return; }
   if (p.rn < 0.09) return;
   const n = pattern.steps.length, i = stepFromAngle(p.theta, n), deg = rToDeg(Math.min(p.rn, 0.96));
   touch = { i, deg };
@@ -356,7 +390,7 @@ function togglePlay() {
   el('play').textContent = engine.playing ? '■' : '▶';
   el('play').classList.toggle('on', engine.playing);
 }
-const setBpm = (v) => { engine.setBpm(Math.max(70, Math.min(180, Math.round(v)))); el('bpm').textContent = engine.bpm; el('bpm-v').textContent = engine.bpm; };
+const setBpm = (v) => { engine.setBpm(Math.max(70, Math.min(180, Math.round(v)))); el('bpm-v').textContent = engine.bpm; };
 // Tempo: na ekranie mały napis „xxx BPM”, po dotknięciu okienko z dużą wartością i przyciskami − / + (przytrzymanie powtarza).
 const bpmPop = el('bpm-pop');
 const showBpm = (on) => { bpmPop.hidden = !on; if (on) el('bpm-ok').focus(); };
@@ -390,6 +424,13 @@ const KEYS = {
     ...VOICE_NAMES.map((n, i) => ({ label: SHORT[i], value: () => (engine.enabled[i] ? 'ON' : 'OFF'), lit: () => !!engine.enabled[i], act: () => { engine.setEnabled(i, !engine.enabled[i]); } })),
     { label: 'RND ENG', value: () => 'LOSUJ', act: () => { engine.enabled.forEach((on, i) => { if (on) rnd(i); }); } },
   ],
+  syn: [
+    { label: 'SILNIK', value: () => SHORT[synSel], act: () => { synSel = (synSel + 1) % 4; renderSyn(); } },
+    { label: 'WIDOK', value: () => (synView === 0 ? 'SOUND' : 'ENV'), lit: () => synView === 1, act: () => { synView = 1 - synView; renderSyn(); } },
+    { label: 'RND', value: () => 'LOSUJ', act: randomizeSyn },
+    { label: 'SOLO', value: () => (engine.solo === synSel ? 'ON' : 'OFF'), lit: () => engine.solo === synSel, act: () => { engine.setSolo(engine.solo === synSel ? null : synSel); } },
+    { label: 'STAN', value: () => (engine.enabled[synSel] ? 'ON' : 'OFF'), lit: () => !!engine.enabled[synSel], act: () => { engine.setEnabled(synSel, !engine.enabled[synSel]); } },
+  ],
   fx: [
     { label: 'SEKCJA', value: () => (fxActive === 0 ? 'FILTR' : 'EFEKT'), act: () => { fxActive = 1 - fxActive; showFxSection(); } },
     { label: 'STYLE', value: () => short8(fxSecs[fxActive].styles[fxSecs[fxActive].slot.style].name.toUpperCase()), act: () => cycleStyle(fxActive) },
@@ -415,6 +456,34 @@ function renderKeys() {
     host.appendChild(b);
   }
 }
+
+// ---------- strona SYN: pokrętła wybranego silnika ----------
+const synRefs = {};
+function synKnob(label, min, max, step, value, def, onInput) {
+  const k = document.createElement('div');
+  makeKnob(k, { label, min, max, step, value, def, fmt: 'num' });
+  k.addEventListener('input', () => onInput(k.value));
+  return k;
+}
+function renderSyn() {
+  const grid = el('syngrid'), holder = el('synstatic');
+  [el('cutoff'), el('reso')].forEach((k) => holder.appendChild(k));            // wyjmij globalne pokrętła, zanim wyczyścimy siatkę
+  grid.innerHTML = ''; Object.keys(synRefs).forEach((k) => delete synRefs[k]);
+  const i = synSel, pv = engine.voices[i].params, specs = PARAM_SPECS[i];
+  const add = (sp) => { const k = synKnob(sp.label.toUpperCase(), sp.min, sp.max, sp.step, pv[sp.id], sp.def, (v) => engine.setParam(i, sp.id, v)); synRefs[sp.id] = k; grid.appendChild(k); };
+  if (synView === 0) {
+    const lv = synKnob('LEVEL', 0, 1.5, 0.01, engine.levels[i], 1, (v) => { engine.setLevel(i, v); el(`lv${i}`).value = v; });
+    grid.appendChild(lv); synRefs.level = lv;
+    specs.filter((x) => x.group !== 'env').forEach(add);
+    grid.appendChild(el('cutoff')); grid.appendChild(el('reso'));               // globalne: wspólne dla silników
+  } else specs.filter((x) => x.group === 'env').forEach(add);
+}
+function randomizeSyn() {
+  const vals = engine.randomizeVoice(synSel);
+  for (const [id, v] of Object.entries(vals)) if (synRefs[id]) synRefs[id].value = v;
+}
+// poziomy silników na stronie MIX
+VOICE_NAMES.forEach((n, i) => el(`lv${i}`).addEventListener('input', (e) => engine.setLevel(i, +e.target.value)));
 
 // ---------- strona FX ----------
 const fxSecs = [];
@@ -454,10 +523,13 @@ function setPage(p) {
   page = p;
   document.querySelectorAll('#pages button').forEach((b) => b.classList.toggle('on', b.dataset.page === p));
   el('scopewrap').hidden = false;
-  el('side').hidden = p === 'fx';
+  el('strip').hidden = p !== 'seq';                    // pasek przeglądu wzoru tylko na stronie sekwencera
+  el('side').hidden = p === 'fx' || p === 'syn';
   el('knobs-seq').hidden = p !== 'seq';
   el('knobs-mix').hidden = p !== 'mix';
+  el('synpage').hidden = p !== 'syn';
   el('fxpage').hidden = p !== 'fx';
+  if (p === 'syn') renderSyn();
   if (p === 'fx') showFxSection();
   fit(); renderKeys(); updateInfo();
 }
@@ -489,7 +561,7 @@ window.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || el('radar').hidden || (e.target instanceof HTMLElement && e.target.classList.contains('knob'))) return;
   if (!bpmPop.hidden) { if (e.code === 'Escape') { e.preventDefault(); showBpm(false); } else if (e.code === 'ArrowUp') { e.preventDefault(); setBpm(engine.bpm + 1); } else if (e.code === 'ArrowDown') { e.preventDefault(); setBpm(engine.bpm - 1); } return; }
   const map = { Space: togglePlay, KeyR: () => { actions.random(); renderKeys(); }, KeyM: () => { actions.mut(); },
-    Digit1: () => setPage('seq'), Digit2: () => setPage('mix'), Digit3: () => setPage('fx'),
+    Digit1: () => setPage('seq'), Digit2: () => setPage('mix'), Digit3: () => setPage('syn'), Digit4: () => setPage('fx'),
     ArrowUp: () => setBpm(engine.bpm + 2), ArrowDown: () => setBpm(engine.bpm - 2) };
   if (map[e.code]) { e.preventDefault(); if (e.target instanceof HTMLButtonElement) e.target.blur(); map[e.code](); }
 });
