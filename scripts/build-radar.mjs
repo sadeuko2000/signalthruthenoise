@@ -13,7 +13,9 @@ const js = RADAR_MODULES
 const html = read('radar.html');
 const body = html.slice(html.indexOf('<body>') + 6, html.indexOf('<script type="module"')).trim();
 // W artefakcie strona jest jednym ekranem: wysokość z rodzica zamiast jednostek dvh.
-const css = read('radar.css').replace('#radar{display:flex;flex-direction:column;height:100dvh;', '#radar{display:flex;flex-direction:column;height:100%;');
+const css = read('radar.css')
+  .replace('#radar{display:flex;flex-direction:column;height:100dvh;', '#radar{display:flex;flex-direction:column;height:100%;')
+  .replace('height:min(100dvh,900px)', 'height:min(100%,900px)');
 
 const page = `<title>radarxxx</title>
 <meta name="claude:viewport-fit-sides" content="cover">

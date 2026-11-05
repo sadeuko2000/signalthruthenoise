@@ -72,8 +72,10 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--g);outline-offs
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.sweepdemo{animation:none}}
 
-/* Na komputerze strona wygląda dokładnie jak aplikacja na telefon: wąska kolumna na środku, bez osobnego układu. */
+/* Na komputerze strona wygląda jak aplikacja na telefon: stała szerokość, wysokość ograniczona do proporcji telefonu
+   (nie rozciąga się na wysokich monitorach), wyśrodkowana w poziomie i pionie jak urządzenie. */
 @media (min-width:600px){
   html{background:#010402}
-  #radar{border-left:1px solid var(--line);border-right:1px solid var(--line);background:var(--bg)}
+  body{display:grid;place-items:center}
+  #radar{width:430px;height:min(100dvh,900px);margin:0;border:1px solid var(--line);border-radius:24px;overflow:hidden;background:var(--bg)}
 }
