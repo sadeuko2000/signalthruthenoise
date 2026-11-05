@@ -212,7 +212,7 @@ function drawFx(ts) {
   const rp = (nn) => rFromN(nn) * R;
   const ring = (r, glow, a = 1) => circle(cx, cy, r, `rgba(${ACC},${a})`, (1.5 + glow * 5) * dpr);
   const read = (sec) => { const si = sec.slot.style, nv = sec.slot.values[si]; return { si, nv, m: mapValues(sec.styles[si], nv), on: !sec.slot.bypass }; };
-  const F = read(fxSecs[0]), X = read(fxSecs[1]);
+  const F = read(fxSecs[0]), X = read(fxSecs[1]), X2 = read(fxSecs[2]);
   const base = (e, mul = 1, o = {}) => drawEcho(G, e, echoAlpha(e.i, pos, n) * mul, o);
 
   // 1) filtr: promień = częstotliwość. Echa (wysokość dźwięku = promień) poza pasmem są przytłumione.
@@ -230,14 +230,16 @@ function drawFx(ts) {
   const through = (e) => (F.on ? (1 - mixF) + mixF * pass(e.r * R) : 1);       // ile echa przechodzi przez filtr
   E.forEach((e) => base(e, through(e)));
 
-  // 2) efekt: działa na to, co przeszło przez filtr
-  if (X.on) {
+  // 2) efekty (FX1, potem FX2): każdy działa na to, co przeszło przez filtr; drugi rysowany nieco słabiej i cieniej
+  const stage = (X, k) => {
+    if (!X.on) return;
     const mix = clamp01(X.m.mix ?? 1);
+    if (mix < 0.02) return;                        // bez miksu efekt jest niesłyszalny, więc nic nie rysujemy
     if (X.si === 0) {                              // delay: kolejne, coraz cichsze powtórzenia echa o `time` kroków dalej
-      const copies = delayCopies(X.m.time, X.m.feedback, 4), f = 0.2 + 0.8 * mix;
+      const copies = delayCopies(X.m.time, X.m.feedback, 4), f = (0.2 + 0.8 * mix) * k;
       E.forEach((e) => copies.forEach((c) => drawEcho(G, e, echoAlpha(e.i + c.shift, pos, n) * c.gain * f * through(e), { da: (c.shift / n) * TAU, raw: true, lw: 0.8, col: INK })));
     } else if (X.si === 1) {                       // pogłos: fala rozchodzi się od echa po jego przemiataniu
-      const life = n * (0.25 + 0.5 * X.nv.size), f = 0.15 + 0.7 * mix;
+      const life = n * (0.25 + 0.5 * X.nv.size), f = (0.15 + 0.7 * mix) * k;
       E.forEach((e) => {
         const delta = (((pos - e.i) % n) + n) % n;
         if (delta > life) return;
@@ -245,17 +247,18 @@ function drawFx(ts) {
         circle(cx + Math.cos(a) * e.r * R, cy + Math.sin(a) * e.r * R, t * R * (0.12 + 0.5 * X.nv.size), `rgba(${INK},${((1 - t) * f * through(e)).toFixed(3)})`, 1.2 * dpr);
       });
     } else if (X.si === 2) {                       // chorus: echa podwojone i lekko rozstrojone, wahające się z tempem LFO
-      const off = X.nv.depth * 0.07 * Math.sin((ts / 1000) * TAU * Math.min(X.m.rate, 4) * 0.5), f = 0.2 + 0.8 * mix;
+      const off = X.nv.depth * 0.07 * Math.sin((ts / 1000) * TAU * Math.min(X.m.rate, 4) * 0.5), f = (0.2 + 0.8 * mix) * k;
       E.forEach((e) => { base(e, 0.55 * f * through(e), { da: off, raw: true, lw: 0.85 }); base(e, 0.4 * f * through(e), { da: -off * 1.3, raw: true, lw: 0.85 }); });
     } else {                                       // dystorsja: echa spłaszczone do pierścienia obcięcia (od miękkiej do „fold”)
-      const dr = X.nv.drive, rc = R * (R_OUT - 0.4 * dr), f = 0.25 + 0.75 * mix;
+      const dr = X.nv.drive, rc = R * (R_OUT - 0.4 * dr), f = (0.25 + 0.75 * mix) * k;
       circle(cx, cy, rc, `rgba(${ACC},.6)`, dpr, [4 * dpr, 4 * dpr]);
       E.forEach((e) => {
         const r0 = e.r * R, r1 = r0 > rc ? (X.nv.curve > 0.5 ? rc - (r0 - rc) * 0.7 : rc) : r0;
         base(e, f * through(e), { r: r1, lw: 1 + dr * 0.9, col: ACC, noGlow: true });
       });
     }
-  }
+    };
+  stage(X, 1); stage(X2, 0.7);
   rings.forEach((r) => ring(r, glow));
   drawSweepLine(G, S);
 
