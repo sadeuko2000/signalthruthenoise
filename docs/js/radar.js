@@ -496,8 +496,6 @@ function renderSyn() {
   const i = synSel, pv = engine.voices[i].params, specs = PARAM_SPECS[i];
   const add = (sp) => { const k = synKnob(sp.label.toUpperCase(), sp.min, sp.max, sp.step, pv[sp.id], sp.def, (v) => engine.setParam(i, sp.id, v)); synRefs[sp.id] = k; grid.appendChild(k); };
   if (synView === 0) {
-    const lv = synKnob('LEVEL', 0, 1.5, 0.01, engine.levels[i], 1, (v) => { engine.setLevel(i, v); el(`lv${i}`).value = v; });
-    grid.appendChild(lv); synRefs.level = lv;
     specs.filter((x) => x.group !== 'env').forEach(add);
     grid.appendChild(el('cutoff')); grid.appendChild(el('reso'));               // globalne: wspólne dla silników
   } else specs.filter((x) => x.group === 'env').forEach(add);
@@ -550,7 +548,7 @@ function setPage(p) {
   el('strip').hidden = p !== 'seq';                    // pasek przeglądu wzoru tylko na stronie sekwencera
   el('side').hidden = p === 'fx' || p === 'syn';
   el('knobs-seq').hidden = p !== 'seq';
-  el('knobs-mix').hidden = p !== 'mix';
+  el('knobs-mix').hidden = true;                    // poziomy silników nie są potrzebne: zostają na 100%, bez pokręteł
   el('synpage').hidden = p !== 'syn';
   el('fxpage').hidden = p !== 'fx';
   if (p === 'syn') renderSyn();
