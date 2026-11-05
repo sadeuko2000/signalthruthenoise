@@ -69,3 +69,10 @@ export function moveNote(steps, from, to, degree) {
   next[to] = { ...note, on: true, degree };
   return next;
 }
+
+// Zmiana długości wzoru bez kasowania nut: skrócenie ucina koniec, wydłużenie powtarza wzór od początku.
+export function resizeSteps(steps, n) {
+  if (n === steps.length) return steps.slice();
+  if (n < steps.length) return steps.slice(0, n);
+  return Array.from({ length: n }, (_, i) => ({ ...steps[i % steps.length] }));
+}

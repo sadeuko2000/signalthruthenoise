@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TAU, degToR, rToDeg, polar, stepFromAngle, sweepPos, echoAlpha, echoes, placeNote, clearNote, moveNote, R_IN, R_OUT, DEG_MIN, DEG_MAX } from '../docs/js/radargeo.js';
+import { TAU, degToR, rToDeg, polar, stepFromAngle, sweepPos, echoAlpha, echoes, placeNote, clearNote, moveNote, resizeSteps, R_IN, R_OUT, DEG_MIN, DEG_MAX } from '../docs/js/radargeo.js';
 
 const near = (a, b, e = 1e-9) => assert.ok(Math.abs(a - b) < e, `${a} != ${b}`);
 
@@ -65,4 +65,15 @@ test('edycja nie mutuje wzoru: dodanie, usunięcie i przesunięcie nuty', () => 
   assert.equal(c[3].on, false); assert.equal(c[6].on, true); assert.equal(c[6].degree, 2);
   const d = moveNote(a, 3, 3, 1);
   assert.equal(d[3].degree, 1); assert.equal(d[3].on, true);
+});
+
+test('zmiana długości wzoru zachowuje nuty: skrócenie ucina, wydłużenie powtarza', () => {
+  const steps = Array.from({ length: 8 }, (_, i) => ({ on: i % 3 === 0, degree: i, vel: 90, gate: 0.6 }));
+  const short = resizeSteps(steps, 4);
+  assert.equal(short.length, 4); assert.deepEqual(short, steps.slice(0, 4));
+  const long = resizeSteps(steps, 16);
+  assert.equal(long.length, 16);
+  assert.deepEqual(long.slice(0, 8), steps); assert.deepEqual(long.slice(8), steps);
+  assert.notEqual(long[0], long[8]);                    // kopie, nie te same obiekty
+  assert.deepEqual(resizeSteps(steps, 8), steps);
 });

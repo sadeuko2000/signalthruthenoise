@@ -5,7 +5,7 @@ import { Engine } from './audio.js';
 import { VOICE_NAMES, clampToDisc } from './engines.js';
 import { FILTER_STYLES, FX_STYLES } from './fx.js';
 import { makeKnob, initKnobs } from './knob.js';
-import { TAU, DEG_MIN, DEG_MAX, R_OUT, degToR, rToDeg, angleOfStep, polar, stepFromAngle, sweepPos, echoAlpha, echoes, placeNote, clearNote, moveNote } from './radargeo.js';
+import { TAU, DEG_MIN, DEG_MAX, R_OUT, degToR, rToDeg, angleOfStep, polar, stepFromAngle, sweepPos, echoAlpha, echoes, placeNote, clearNote, moveNote, resizeSteps } from './radargeo.js';
 
 const el = (id) => document.getElementById(id);
 initKnobs();
@@ -220,20 +220,25 @@ function mixFrom(p) {
 }
 
 // ---------- pokrętła ----------
-el('density').addEventListener('input', (e) => { state.density = +e.target.value; regen(); });
-el('sync').addEventListener('input', (e) => { state.syncopation = +e.target.value; regen(); });
 el('gate').addEventListener('input', (e) => { engine.gateMul = +e.target.value; });
-el('swing').addEventListener('input', (e) => { state.swing = +e.target.value; regen(); });
+// Swing zmienia tylko rytm (opóźnienie parzystych kroków), nuty zostają: wzór nie jest generowany od nowa.
+el('swing').addEventListener('input', (e) => { state.swing = +e.target.value; pattern = { ...pattern, swing: state.swing }; engine.pattern = pattern; });
 el('cutoff').addEventListener('input', (e) => engine.setCutoff(cutoffHz(+e.target.value)));
 el('reso').addEventListener('input', (e) => engine.setResonance(1 + e.target.value * 22));
 
 // ---------- akcje ----------
 const RANGES = [8, 12, 16];
+const between = (a, b) => a + Math.random() * (b - a);
 const actions = {
   hdg: () => { hup = !hup; },
-  range: () => { state.length = RANGES[(RANGES.indexOf(state.length) + 1) % RANGES.length]; regen(); },
-  key: () => { state.mode = state.mode === 'minor' ? 'phrygian' : 'minor'; regen(); },
-  gen: () => { state.seed = (Math.random() * 1e9) | 0; regen(); },
+  // Zmiana długości i tonacji zachowuje nuty (nie generuje wzoru od nowa).
+  range: () => {
+    state.length = RANGES[(RANGES.indexOf(state.length) + 1) % RANGES.length];
+    pattern = { ...pattern, steps: resizeSteps(pattern.steps, state.length) }; engine.pattern = pattern;
+  },
+  key: () => { state.mode = state.mode === 'minor' ? 'phrygian' : 'minor'; pattern = { ...pattern, mode: state.mode }; engine.pattern = pattern; },
+  // RANDOM: nowy wzór z losową gęstością i synkopą w rozsądnych granicach (swing zostaje).
+  random: () => { state.seed = (Math.random() * 1e9) | 0; state.density = between(0.35, 0.8); state.syncopation = between(0.2, 0.7); regen(); },
   mut: () => { pattern = mutate(pattern); engine.pattern = pattern; },
 };
 let wake = null;
@@ -257,7 +262,7 @@ const KEYS = {
     { label: 'HDG MODE', value: () => (hup ? 'H-UP' : 'N-UP'), lit: () => hup, act: actions.hdg },
     { label: 'RANGE', value: () => `${state.length} ST`, act: actions.range },
     { label: 'KEY', value: () => (state.mode === 'minor' ? 'MOLL' : 'FRYG'), act: actions.key },
-    { label: 'GEN', value: () => 'NOWY', act: actions.gen },
+    { label: 'RANDOM', value: () => 'LOSUJ', act: actions.random },
     { label: 'MUTATE', value: () => '1 KROK', act: actions.mut },
   ],
   mix: [
@@ -343,8 +348,8 @@ function updateInfo() {
     `KEY     ${state.mode === 'minor' ? 'MOLL' : 'FRYGIJSKA'}`,
     `STEPS   ${String(on.length).padStart(2, '0')}/${n}`,
     `ACCENT  ${String(acc).padStart(2, '0')}`,
-    `DENS    ${Math.round(state.density * 100)}%`,
-    `SYNC    ${Math.round(state.syncopation * 100)}%`,
+    `GATE    ${engine.gateMul.toFixed(2)}×`,
+    `SWING   ${Math.round(state.swing * 100)}%`,
     `BRG     ${String(brg).padStart(3, '0')}°`,
     `STEP    ${String(Math.floor(pos) + 1).padStart(2, '0')}`,
     `ENG     ${engine.enabled.map((e, i) => (e ? SHORT[i][0] : '-')).join(' ')}`,
@@ -355,7 +360,7 @@ setInterval(() => { if (!el('radar').hidden) updateInfo(); }, 120);
 // ---------- skróty (komputer) ----------
 window.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || el('radar').hidden || (e.target instanceof HTMLElement && e.target.classList.contains('knob'))) return;
-  const map = { Space: togglePlay, KeyR: () => { actions.gen(); renderKeys(); }, KeyM: () => { actions.mut(); }, KeyH: () => { actions.hdg(); renderKeys(); },
+  const map = { Space: togglePlay, KeyR: () => { actions.random(); renderKeys(); }, KeyM: () => { actions.mut(); }, KeyH: () => { actions.hdg(); renderKeys(); },
     Digit1: () => setPage('seq'), Digit2: () => setPage('mix'), Digit3: () => setPage('fx'),
     ArrowUp: () => setBpm(engine.bpm + 2), ArrowDown: () => setBpm(engine.bpm - 2) };
   if (map[e.code]) { e.preventDefault(); if (e.target instanceof HTMLButtonElement) e.target.blur(); map[e.code](); }

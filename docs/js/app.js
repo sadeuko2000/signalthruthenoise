@@ -103,7 +103,8 @@ function setPad(x0, y0) {
 }
 $('density').addEventListener('input', (e) => { state.density = +e.target.value; regen(); });
 $('gate').addEventListener('input', (e) => { engine.gateMul = +e.target.value; });
-$('swing').addEventListener('input', (e) => { state.swing = +e.target.value; regen(); });
+// Swing zmienia tylko timing: wzór zostaje (nie generujemy go od nowa).
+$('swing').addEventListener('input', (e) => { state.swing = +e.target.value; setPattern({ ...pattern, swing: state.swing }); });
 $('cutoff').addEventListener('input', (e) => engine.setCutoff(cutoffHz(+e.target.value)));
 function padFromEvent(e) {
   const r = pad.getBoundingClientRect();
@@ -212,7 +213,7 @@ function doMutate() { setPattern(mutate(pattern)); }
 function doMode() {
   state.mode = state.mode === 'minor' ? 'phrygian' : 'minor';
   $('mode').textContent = state.mode === 'minor' ? 'moll' : 'frygijska';
-  regen();
+  setPattern({ ...pattern, mode: state.mode });                      // tonacja nie kasuje nut
 }
 const setBpm = (v) => { engine.setBpm(Math.max(70, Math.min(180, v))); $('bpm').textContent = engine.bpm; };
 // Ekran nie gaśnie podczas grania (telefon). Brak API albo odmowa nie szkodzi.

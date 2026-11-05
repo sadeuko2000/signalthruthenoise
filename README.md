@@ -26,6 +26,7 @@ zainspirowany radarem morskim:
   dotknięcie istniejącego usuwa. Przycisk HDG MODE przełącza N-UP (linia się obraca) i H-UP (linia stoi, obraca się wzór).
 - **MIX:** cztery silniki jako cele na obwodzie, krzyżyk to punkt miksu.
 - **FX:** filtr i efekty (4 style po 8 parametrów).
+- Wzór generuje przycisk RANDOM (losowa gęstość i synkopa w rozsądnych granicach). SWING, KEY i RANGE zmieniają tylko rytm, tonację i długość, nie kasują nut.
 - Dolny rząd przycisków kontekstowych zmienia się zależnie od strony. Geometria jest w `docs/js/radargeo.js` (testowana).
 
 ## Skróty klawiszowe
