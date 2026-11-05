@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const read = (p) => readFileSync(new URL(`../docs/${p}`, import.meta.url), 'utf8');
 const out = process.argv[2] ?? 'preview.html';
 
-const js = ['generator', 'vocoder', 'engines', 'audio', 'sensors', 'app']
+const js = ['generator', 'vocoder', 'engines', 'fx', 'audio', 'sensors', 'app']
   .map((m) => read(`js/${m}.js`)
     .replace(/^import .*$/gm, '')
     .replace(/^export (async |const |function |class )/gm, '$1'))
@@ -23,7 +23,7 @@ const stages = [
   ['gotowe', 'Skróty klawiszowe (lista pod sekwencerem)'],
   ['gotowe', 'Okrągły pad XY i włączanie od 1 do 4 silników'],
   ['dalej', 'Sekwencery: 2–3 rodzaje, jeden globalny albo do czterech przypisywanych (notatki w repo)'],
-  ['dalej', 'Globalny filtr i efekty: 4 style, po 8 parametrów (notatki w repo)'],
+  ['gotowe', 'Globalny filtr (4 style) i efekty (4 style), po 8 parametrów, bypass i losowanie'],
   ['gotowe', 'Dłuższe nuty (60–85% kroku zamiast 35–50%), suwaki długości nut i swingu, oversampling saturacji'],
   ['gotowe', 'Obwiednie filtra i amp w każdym silniku (sterowalne i losowane), nasycenie, nowy tor wyjściowy'],
   ['później', 'Żyroskop i interfejs mobilny (kod jest, nie rozwijamy go teraz)'],

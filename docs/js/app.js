@@ -2,6 +2,7 @@ import { generateBass, mutate, DEFAULTS } from './generator.js';
 import { Engine } from './audio.js';
 import { Sensors } from './sensors.js';
 import { PARAM_SPECS, VOICE_NAMES, clampToDisc } from './engines.js';
+import { FILTER_STYLES, FX_STYLES } from './fx.js';
 
 const $ = (id) => document.getElementById(id);
 const engine = new Engine();
@@ -173,7 +174,7 @@ function doMode() {
   $('mode').textContent = state.mode === 'minor' ? 'moll' : 'frygijska';
   regen();
 }
-const setBpm = (v) => { engine.bpm = Math.max(70, Math.min(180, v)); $('bpm').textContent = engine.bpm; };
+const setBpm = (v) => { engine.setBpm(Math.max(70, Math.min(180, v))); $('bpm').textContent = engine.bpm; };
 function togglePlay() {
   const btn = $('play');
   if (engine.playing) { engine.stop(); btn.textContent = '▶'; if (lastNow >= 0) cells[lastNow].classList.remove('now'); }
@@ -221,12 +222,58 @@ help.innerHTML = KEYS.filter((k) => k.what).map((k) => `<kbd>${k.label}</kbd> ${
   .replace('<kbd>1</kbd>', '<kbd>1–4</kbd>');
 $('app').querySelector('.seq').appendChild(help);
 
+// Globalny filtr i efekty: karta ze stylami (zakładki), 8 suwakami, bypassem i losowaniem.
+function buildFxCard(host, title, slot, styles) {
+  const card = document.createElement('article');
+  card.className = 'eng fxcard';
+  card.innerHTML = `<header><b>${title}</b><button class="pwr on" title="włącz / wyłącz">⏻</button><button class="rnd" title="losuj parametry w granicach rozsądku">🎲</button></header><div class="tabs"></div><div class="fxgrid"></div>`;
+  const tabs = card.querySelector('.tabs'), grid = card.querySelector('.fxgrid');
+  let refs = {};
+  function renderParams() {
+    grid.innerHTML = ''; refs = {};
+    const st = styles[slot.style], vals = slot.values[slot.style];
+    for (const sp of st.params) {
+      const l = document.createElement('label');
+      l.innerHTML = `<span>${sp.label}</span><input type="range" min="0" max="1" step="0.001" value="${vals[sp.id]}"><output></output>`;
+      const inp = l.querySelector('input'), out = l.querySelector('output');
+      const show = () => { out.textContent = sp.show(sp.map(+inp.value)); };
+      inp.addEventListener('input', () => { slot.setParam(sp.id, +inp.value); show(); });
+      show(); grid.appendChild(l); refs[sp.id] = { inp, show };
+    }
+  }
+  styles.forEach((st, i) => {
+    const b = document.createElement('button');
+    b.className = 'tab'; b.textContent = st.name;
+    b.addEventListener('click', () => { slot.setStyle(i); tabs.querySelectorAll('.tab').forEach((t, j) => t.classList.toggle('on', j === i)); renderParams(); });
+    tabs.appendChild(b);
+  });
+  tabs.firstElementChild.classList.add('on');
+  card.querySelector('.pwr').addEventListener('click', (e) => {
+    const on = !e.currentTarget.classList.contains('on');
+    e.currentTarget.classList.toggle('on', on); card.classList.toggle('off', !on); slot.setBypass(!on);
+  });
+  card.querySelector('.rnd').addEventListener('click', () => {
+    const vals = slot.randomize();
+    for (const [id, n] of Object.entries(vals)) { refs[id].inp.value = n; refs[id].show(); }
+  });
+  renderParams();
+  host.appendChild(card);
+}
+let fxBuilt = false;
+function buildFxUi() {
+  if (fxBuilt) return; fxBuilt = true;
+  const host = $('globalfx');
+  buildFxCard(host, 'globalny filtr', engine.fx.filter, FILTER_STYLES);
+  buildFxCard(host, 'efekty', engine.fx.fx, FX_STYLES);
+}
+
 // Start: odblokowuje audio (wymóg iOS/Chrome: gest użytkownika)
 $('go').addEventListener('click', async () => {
   await engine.start();
   engine.setCutoff(cutoffHz(+$('cutoff').value));
   setPad(padPos.x, padPos.y);
   engine.setResonance(1 + $('reso').value * 22);
+  buildFxUi();
   $('start').hidden = true;
   $('app').hidden = false;
   render();

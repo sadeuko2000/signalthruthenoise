@@ -83,7 +83,7 @@ export function randomizeParams(i, rng = Math.random) {
   return out;
 }
 
-const satCurve = (k) => {
+export const satCurve = (k) => {
   const n = 2048, c = new Float32Array(n), norm = Math.tanh(k);
   for (let i = 0; i < n; i++) c[i] = Math.tanh(k * ((i / (n - 1)) * 2 - 1)) / norm;
   return c;

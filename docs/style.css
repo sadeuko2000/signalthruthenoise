@@ -91,3 +91,15 @@ kbd{font:inherit;font-size:11px;padding:1px 6px;border-radius:5px;background:var
 .pwr.on{color:var(--on)}
 .eng.off{opacity:.45}
 @media (min-width:900px){#pad{aspect-ratio:1;width:min(100%,380px)}}
+
+/* globalny filtr i efekty */
+#globalfx{display:grid;grid-template-columns:1fr;gap:10px}
+.fxcard .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 6px}
+.tab{padding:4px 9px;border-radius:999px;font-size:11px;color:var(--dim);background:var(--pad)}
+.tab.on{color:#04120c;background:var(--on);font-weight:600}
+.fxgrid{display:grid;grid-template-columns:1fr;gap:2px 20px}
+.fxcard label{flex-direction:row;align-items:center;gap:8px;font-size:11px}
+.fxcard label span{width:15ch;flex:none;white-space:nowrap}
+.fxcard label input{height:22px;flex:1;min-width:0}
+.fxcard label output{width:8ch;flex:none;text-align:right;color:var(--fg);font-variant-numeric:tabular-nums;font-size:11px;text-transform:none;letter-spacing:0}
+@media (min-width:900px){#globalfx{grid-template-columns:1fr 1fr}.fxgrid{grid-template-columns:1fr}}

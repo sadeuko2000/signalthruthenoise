@@ -22,13 +22,15 @@ Nazwy jako punkt odniesienia, bez kopiowania działania:
 - Stan: **do zrobienia**. Wymaga przerobienia silnika audio tak, żeby nuty trafiały do wybranych silników, a nie do wszystkich naraz.
 
 ## 4. Globalne efekty i filtr
-- Sekcja globalna na wyjściu po miksie silników.
-- Globalny filtr w **4 stylach**, każdy z **8 podstawowymi parametrami**.
-- Efekty w **4 stylach**, także po 8 parametrów. Do ustalenia: czy to cztery style filtra i osobno cztery style efektu, czy jeden wspólny wybór.
-- Stan: **do zrobienia**.
+- Sekcja globalna na wyjściu po miksie silników: **filtr -> efekt -> wyjście**. Każda z dwóch kart ma bypass, 4 style (zakładki), 8 parametrów (z odczytem wartości) i losowanie w granicach rozsądku.
+- Przyjęta interpretacja: cztery style filtra i, osobno, cztery style efektu (jeden aktywny w każdej karcie, ustawienia zapamiętane per styl). Wybór stylów to robocza propozycja do zmiany.
+- **Filtr:** drabinkowy (24 dB, lfo), wielomodowy (LP→BP→HP), ms-20 (HP+LP, ostry drive), grzebień (feedback, lfo na czasie).
+- **Efekt:** delay (ping-pong, zsynchronizowany z BPM), pogłos (generowana odpowiedź impulsowa), chorus/flanger, dystorsja (od miękkiej do fold, bitcrush).
+- Efekty domyślnie mają mix = 0, a filtry są prawie otwarte i neutralne głośnościowo, więc po włączeniu nic nie zmieniają, dopóki się ich nie ruszy.
+- Stan: **zrobione** (`docs/js/fx.js`). Do zrobienia: presety, podpięcie żyroskopu/pada do parametrów filtra.
 
 ## Otwarte pytania
-1. Które style filtra (propozycje robocze: drabinkowy, state-variable, rezonansowy typu MS-20, grzebieniowy/formantowy) i efektów (np. delay, pogłos, chorus, dystorsja).
+1. Czy wybrane style filtra i efektów (patrz punkt 4) są właściwe, czy zmienić któryś.
 2. Czy wszystkie sekwencery mają tę samą siatkę 16 kroków, czy każdy własną długość.
 3. Co dzieje się z żyroskopem i interfejsem mobilnym (odłożone na później).
 4. Perkusja i lead (odłożone na później).

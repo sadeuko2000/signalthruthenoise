@@ -2,6 +2,7 @@
 import { pitch } from './generator.js';
 import { Vocoder } from './vocoder.js';
 import { VOICES, blendWeights, randomizeParams } from './engines.js';
+import { GlobalFx } from './fx.js';
 
 const midiToHz = (m) => 440 * Math.pow(2, (m - 69) / 12);
 
@@ -55,7 +56,10 @@ export class Engine {
 
     this.dry = c.createGain();
     this.mix = c.createGain();
-    this.mix.connect(this.dry).connect(this.master);
+    // po miksie silników: globalny filtr -> globalny efekt -> wyjście
+    this.fx = new GlobalFx(c, () => this.bpm);
+    this.mix.connect(this.dry).connect(this.fx.input);
+    this.fx.output.connect(this.master);
     this.voices = VOICES.map((V) => new V(c, this.p));
     this.vgains = this.voices.map((v) => { const g = c.createGain(); v.out.connect(g).connect(this.mix); return g; });
     this.setBlend(0.25, 0.75);
@@ -95,7 +99,7 @@ export class Engine {
     if (!this.voc) this.voc = new Vocoder(this.ctx);
     await this.voc.connectMic();
     this.mix.connect(this.voc.input);
-    this.voc.output.connect(this.master);
+    this.voc.output.connect(this.fx.input);
     this.dry.gain.setTargetAtTime(0, this.ctx.currentTime, 0.02);
     this.octMul = 2;
     this.voiceOn = true;
@@ -105,11 +109,13 @@ export class Engine {
     if (!this.voc || !this.voiceOn) return;
     this.voc.disconnectMic();
     this.mix.disconnect(this.voc.input);
-    this.voc.output.disconnect(this.master);
+    this.voc.output.disconnect(this.fx.input);
     this.dry.gain.setTargetAtTime(1, this.ctx.currentTime, 0.02);
     this.octMul = 1;
     this.voiceOn = false;
   }
+
+  setBpm(v) { this.bpm = v; if (this.fx) this.fx.refresh(); }   // delay zsynchronizowany z tempem
 
   play() {
     if (this.timer || !this.ctx) return;
