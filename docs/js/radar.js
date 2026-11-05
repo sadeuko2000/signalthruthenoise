@@ -625,8 +625,8 @@ function stepRow(parent, name, value, minus, plus) {
 // Każdy z dwóch boksów to jeden z typów: XY PAD (oś X steruje dwoma parametrami, oś Y dwoma innymi), 4 PRZYCISKI, 4 SUWAKI albo PITCH + MOD.
 // Co steruje czym, wybiera się w okienku EDIT.
 // ============================================================================
-const modeSel = { seq: 'enc', mix: 'enc', syn: 'enc', fx: 'enc' };
-const hasMode = () => page !== 'fx' && (tabSel[page] === 0 || page === 'mix' || page === 'syn');
+// Kontrolery to ostatnia zakładka każdej strony (CTRL).
+const isCtl = () => tabSel[page] === tabNames(page).length - 1;
 const lin2 = (n, a, b) => a + n * (b - a);
 const envAll = (id) => (n) => { const sp = specOfType(engine.types[0], id); const v = Math.round(lin2(n, sp.min, sp.max) / sp.step) * sp.step; VOICE_NAMES.forEach((_, i) => engine.setParam(i, id, v)); };
 const fxIdx = (j, idx) => (n) => { const sec = fxSecs[j], sp = sec.styles[sec.slot.style].params[idx]; if (sp) setFxParam(sec, sp.id, n); };
@@ -730,17 +730,19 @@ const FX_NAMES = ['FLT', 'FX1', 'FX2'];
 const PERMS = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
 const routeText = () => `ROUTING:${engine.fx.order.map((i) => FX_NAMES[i]).join('-')}`;
 function moderow() {
-  const r = document.createElement('div'), fxp = page === 'fx', on = fxp || hasMode(); r.className = `moderow${on ? '' : ' off'}`;
+  const ctl = isCtl(), fxp = page === 'fx', on = fxp || ctl;
+  const r = document.createElement('div'); r.className = `moderow${on ? '' : ' off'}`;
   const m = document.createElement('button'), e = document.createElement('button');
   e.textContent = 'EDIT';
-  if (fxp) {
+  if (fxp && !ctl) {
     // strona FX: kolejność sekcji w łańcuchu; dotknięcie napisu przełącza kolejne układy, EDIT otwiera okienko
     m.textContent = routeText(); m.setAttribute('aria-label', 'Zmień kolejność efektów');
     m.addEventListener('click', () => { const k = PERMS.findIndex((p) => p.join() === engine.fx.order.join()); engine.fx.route(PERMS[(k + 1) % PERMS.length]); m.textContent = routeText(); commitSoon(); });
     e.addEventListener('click', () => showCtl(true, 'route'));
   } else {
-    m.textContent = `MODE:${modeSel[page] === 'ctl' ? 'CONTROLLER' : 'ENCODER'}`;
-    m.addEventListener('click', () => { modeSel[page] = modeSel[page] === 'ctl' ? 'enc' : 'ctl'; renderPanel(); });
+    // zakładka CTRL: napis MODE:CONTROLLER (dotknięcie wraca na MAIN), EDIT otwiera przypisania kontrolerów
+    m.textContent = 'MODE:CONTROLLER'; m.setAttribute('aria-label', 'Wróć do pokręteł');
+    m.addEventListener('click', () => { tabSel[page] = 0; renderSub(); renderPanel(); });
     e.addEventListener('click', () => showCtl(true));
   }
   if (!on) { m.tabIndex = -1; e.tabIndex = -1; }
@@ -786,17 +788,17 @@ ctlPop.addEventListener('pointerdown', (e) => { if (e.target === ctlPop) showCtl
 // ---------- zawartość zakładek ----------
 const panelEl = el('panel');
 const tabNames = (p) => ({
-  seq: ['MAIN', 'SEQ', 'SCALE', 'EXTRA'],
-  mix: ['MAIN', ...VOICE_NAMES.map((_, i) => TAB_SHORT[engine.types[i]])],
-  syn: ['MAIN', ...VOICE_NAMES.map((_, i) => TAB_SHORT[engine.types[i]])],
-  fx: ['MAIN', 'FLT', 'FX1', 'FX2', 'MSTR'],
+  seq: ['MAIN', 'SEQ', 'SCALE', 'EXTRA', 'CTRL'],
+  mix: ['MAIN', ...VOICE_NAMES.map((_, i) => TAB_SHORT[engine.types[i]]), 'CTRL'],
+  syn: ['MAIN', ...VOICE_NAMES.map((_, i) => TAB_SHORT[engine.types[i]]), 'CTRL'],
+  fx: ['MAIN', 'FLT', 'FX1', 'FX2', 'MSTR', 'CTRL'],
 })[p];
 function renderSub() {
   const host = el('subtabs'), names = tabNames(page);
   host.innerHTML = ''; host.classList.toggle('five', names.length > 4);
   names.forEach((n, i) => {
     const b = document.createElement('button'); b.textContent = n; b.className = i === tabSel[page] ? 'on' : '';
-    b.addEventListener('click', () => { tabSel[page] = i; if (page === 'syn' && i > 0) synSel = i - 1; renderSub(); renderPanel(); });
+    b.addEventListener('click', () => { tabSel[page] = i; if (page === 'syn' && i > 0 && i < names.length - 1) synSel = i - 1; renderSub(); renderPanel(); });
     host.appendChild(b);
   });
 }
@@ -808,7 +810,7 @@ function renderPanel() {
   panelEl.replaceChildren();
   Object.keys(synRefs).forEach((k) => delete synRefs[k]); Object.keys(macroRefs).forEach((k) => delete macroRefs[k]); Object.keys(fxMainRefs).forEach((k) => delete fxMainRefs[k]);
   panelEl.appendChild(moderow());                                         // wiersz MODE:ENCODER / EDIT (zajmuje stałe miejsce, na zakładkach bez trybu jest niewidoczny)
-  if (hasMode() && modeSel[page] === 'ctl') { renderControllers(); return; }
+  if (isCtl()) { renderControllers(); return; }
   const grid = document.createElement('div'); grid.className = 'pgrid';
   const tab = tabSel[page], B = (o) => cellButton(grid, o), Kn = (...a) => grid.appendChild(synKnob(...a)), Sp = () => spacer(grid);
 
@@ -963,7 +965,7 @@ let glideMs = 50;
 function setPage(p) {
   page = p;
   document.querySelectorAll('#pages button').forEach((b) => b.classList.toggle('on', b.dataset.page === p));
-  if (p === 'syn' && tabSel.syn > 0) synSel = tabSel.syn - 1;
+  if (p === 'syn' && tabSel.syn > 0 && tabSel.syn < tabNames('syn').length - 1) synSel = tabSel.syn - 1;
   renderSub(); renderPanel();
   fit(); updateInfo();
 }
