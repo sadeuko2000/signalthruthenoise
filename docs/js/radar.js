@@ -11,7 +11,7 @@ const el = (id) => document.getElementById(id);
 initKnobs();
 
 const engine = new Engine();
-const state = { ...DEFAULTS, seed: (Math.random() * 1e9) | 0, length: 16, accent: 0.5, slide: 0.1, oct: 0, latch: false };
+const state = { ...DEFAULTS, seed: (Math.random() * 1e9) | 0, length: 16, accent: 0.5, slide: 0.1, oct: 0, latch: false, mixMode: 'solo' };
 // Akcenty i ślizgi są ustawiane pokrętłami i nakładane na każdy wzór (nowy, edytowany, zmutowany), bez generowania go od nowa.
 const effRoot = () => Math.max(12, Math.min(83, state.root + 12 * (state.oct || 0)));   // tonika + przesunięcie oktawowe z pokrętła OKTAWA (−2..+2)
 const finalize = (p) => withSlide(withAccent({ ...p, root: effRoot() }, state.accent), state.slide);
@@ -168,7 +168,7 @@ function drawSeq() {
   drawCorners(G, dotDefs());
 }
 
-const PAD_R = 0.68;      // promień pada MIX (ułamek promienia radaru): diamenty silników stoją wewnątrz napisów w rogach
+const PAD_R = 0.85;      // promień pada MIX (ułamek promienia radaru)
 const PAD_ANCHORS = [[-1, 1], [1, 1], [-1, -1], [1, -1]].map(([a, b]) => [a * Math.SQRT1_2, b * Math.SQRT1_2]);
 const SHORT = ['PROPHET', 'MS20', 'DX', 'WAVE'];                     // nazwy rodzajów silnika
 const TAB_SHORT = ['PRO', 'MS20', 'DX', 'WAVE'];                     // krótkie nazwy na zakładkach
@@ -179,14 +179,13 @@ function drawMix() {
   drawSweepLine(G, S);
   const mx = cx + (2 * padPos.x - 1) * Rp, my = cy - (2 * padPos.y - 1) * Rp;
   g.font = FONT(R * 0.085); g.textBaseline = 'middle';
+  // linie od kursora w stronę czterech rogów (napisy w rogach mówią, który to silnik); grubość i jasność = udział silnika
   PAD_ANCHORS.forEach(([ax, ay], i) => {
-    const x = cx + ax * Rp, y = cy - ay * Rp, w = engine.blend[i] || 0, on = engine.enabled[i];
-    if (on) { g.beginPath(); g.moveTo(mx, my); g.lineTo(x, y); g.strokeStyle = `rgba(${ACC},${(0.15 + 0.7 * w).toFixed(3)})`; g.lineWidth = (1 + 2 * w) * dpr; g.setLineDash([5 * dpr, 4 * dpr]); g.stroke(); g.setLineDash([]); }
-    const sz = R * (0.04 + 0.03 * w);
-    g.save(); g.translate(x, y); g.rotate(Math.PI / 4);
-    g.strokeStyle = on ? `rgba(${INK},1)` : `rgba(${INK},.35)`; g.lineWidth = 1.6 * dpr; g.strokeRect(-sz, -sz, 2 * sz, 2 * sz);
-    if (on) { g.fillStyle = w === Math.max(...engine.blend) ? `rgb(${ACC})` : `rgba(${INK},${(0.25 + 0.6 * w).toFixed(3)})`; g.fillRect(-sz, -sz, 2 * sz, 2 * sz); }   // najsilniejszy silnik na pomarańczowo
-    g.restore();
+    const x = cx + (ax / Math.SQRT1_2) * R * 0.93 * Math.SQRT1_2, y = cy - (ay / Math.SQRT1_2) * R * 0.93 * Math.SQRT1_2, w = engine.blend[i] || 0, on = engine.enabled[i];
+    if (!on) return;
+    const lead = w === Math.max(...engine.blend);
+    g.beginPath(); g.moveTo(mx, my); g.lineTo(x, y); g.strokeStyle = lead ? `rgba(${ACC},${(0.35 + 0.6 * w).toFixed(3)})` : `rgba(${INK},${(0.12 + 0.5 * w).toFixed(3)})`;
+    g.lineWidth = (1 + 2.5 * w) * dpr; g.setLineDash([5 * dpr, 4 * dpr]); g.stroke(); g.setLineDash([]);
   });
   g.strokeStyle = `rgba(${ACC},1)`; g.lineWidth = 1.6 * dpr;
   g.beginPath(); g.arc(mx, my, R * 0.05, 0, TAU); g.moveTo(mx - R * 0.09, my); g.lineTo(mx + R * 0.09, my); g.moveTo(mx, my - R * 0.09); g.lineTo(mx, my + R * 0.09); g.stroke();
@@ -392,7 +391,7 @@ function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('on'); cl
 // ---------- historia (cofnij / ponów) i presety ----------
 const snapshot = () => JSON.parse(JSON.stringify({
   pattern,
-  state: { root: state.root, mode: state.mode, accent: state.accent, slide: state.slide, oct: state.oct, swing: state.swing, seed: state.seed, density: state.density, syncopation: state.syncopation, latch: state.latch },
+  state: { root: state.root, mode: state.mode, accent: state.accent, slide: state.slide, oct: state.oct, swing: state.swing, seed: state.seed, density: state.density, syncopation: state.syncopation, latch: state.latch, mixMode: state.mixMode },
   audio: { bpm: engine.bpm, gate: engine.gateMul, human: engine.human, ghost: engine.ghost, velo: engine.velo, types: engine.types, enabled: engine.enabled, levels: engine.levels, solo: engine.solo, xy: engine.xy, eq: engine.eq, vOct: engine.vOct, vTune: engine.vTune, vEq: engine.vEq, params: engine.voices.map((v) => v.params) },
   globals, ctl: fxCtl, warp: warpIdx,
   fx: [engine.fx.filter, engine.fx.fx, engine.fx.fx2].map((x) => ({ style: x.style, values: x.values, bypass: x.bypass })),
@@ -660,7 +659,8 @@ function renderPanel() {
       Kn('SEND', 0, 1, 0.01, sec.slot.values[sec.slot.style].mix, 0, (v) => setFxParam(sec, 'mix', v));
       B({ kind: 'tog', label: () => 'FILTR', on: () => !fxSecs[0].slot.bypass, act: () => bypass(0) });
       Kn('MASTER', 0, 1.2, 0.01, globals.master, 1, (v) => { globals.master = v; engine.setMaster(v); });
-      Sp(); Sp(); Sp(); B({ kind: 'act', label: () => 'RANDOM', act: () => { engine.enabled.forEach((on, i) => { if (on) engine.randomizeVoice(i); }); } });
+      B({ kind: 'act', label: () => state.mixMode.toUpperCase(), act: () => { state.mixMode = state.mixMode === 'solo' ? 'mute' : 'solo'; } });
+      Sp(); Sp(); B({ kind: 'act', label: () => 'RANDOM', act: () => { engine.enabled.forEach((on, i) => { if (on) engine.randomizeVoice(i); }); } });
     } else {
       const i = tab - 1;
       Kn('LEVEL', 0, 1.5, 0.01, engine.levels[i], 1, (v) => engine.setLevel(i, v));
@@ -724,8 +724,11 @@ function dotList() {
     { label: 'LATCH', lit: state.latch, act: actions.latch }, { label: 'WARP', sub: `› ${WARP_OPS[warpIdx % WARP_OPS.length][0]}`, act: actions.warp },
   ];
   if (page === 'mix') {
-    const top = Math.max(...engine.blend);
-    return VOICE_NAMES.map((_, i) => ({ label: typeName(i), lit: !!engine.enabled[i] && engine.blend[i] === top, dim: !engine.enabled[i], act: () => setPad(i % 2 === 0 ? 0 : 1, i < 2 ? 1 : 0) }));
+    // kropki na MIX działają jako SOLO albo MUTE (przełącznik na zakładce MAIN)
+    const solo = state.mixMode === 'solo';
+    return VOICE_NAMES.map((_, i) => solo
+      ? { label: typeName(i), lit: engine.solo == null ? !!engine.enabled[i] : engine.solo === i, dim: engine.solo != null && engine.solo !== i, act: () => engine.setSolo(engine.solo === i ? null : i) }
+      : { label: typeName(i), lit: !!engine.enabled[i], dim: !engine.enabled[i], act: () => engine.setEnabled(i, !engine.enabled[i]) });
   }
   if (page === 'syn') {
     const eff = engine.eff.map((v, i) => (engine.enabled[i] ? v : 0)), top = Math.max(...eff, 1e-6), lead = eff.indexOf(Math.max(...eff));
