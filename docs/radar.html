@@ -42,13 +42,10 @@
   </main>
 
   <nav class="bar" id="bar" aria-label="Pasek narzędzi">
-    <button id="undo" aria-label="Cofnij">←</button>
-    <button id="redo" aria-label="Ponów">→</button>
+    <div class="grp"><button id="undo" aria-label="Cofnij">←</button><button id="redo" aria-label="Ponów">→</button></div>
     <button id="rec" class="rec" aria-label="Nagrywanie (w przygotowaniu)"></button>
-    <button id="save" aria-label="Zapisz preset">SAVE</button>
-    <button id="menu-open" aria-label="Menu">MENU</button>
+    <div class="grp"><button id="save" aria-label="Zapisz preset">SAVE</button><button id="menu-open" aria-label="Menu">MENU</button></div>
   </nav>
-  <span class="cornerl" aria-hidden="true">RDX R 001</span><span class="cornerr" aria-hidden="true">PIXEL RADAR</span>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <div id="bpm-pop" class="pop" hidden role="dialog" aria-label="Tempo">

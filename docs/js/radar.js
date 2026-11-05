@@ -114,24 +114,39 @@ function drawSweepLine(G, S) {
   circle(cx, cy, R * 0.035, `rgba(${INK},1)`, 1.5 * dpr);
 }
 
-// Cztery kropki w rogach ekranu (przyciski o funkcji zależnej od strony). defs[i]: { label, sub, lit, bar, dim }.
-// lit === false = pusta kropka (przełącznik wyłączony), w pozostałych przypadkach pełna pomarańczowa.
+// Napis wzdłuż okręgu. ang: środek napisu (rad od góry, zgodnie z ruchem wskazówek), cw: czytany zgodnie z ruchem wskazówek
+// (górne rogi) albo przeciwnie (dolne rogi, żeby czytało się od lewej do prawej). r: promień linii bazowej.
+function arcText(txt, cx, cy, r, ang, cw, size, color) {
+  g.font = FONT(size); g.fillStyle = color; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+  const chars = [...txt], ws = chars.map((ch) => g.measureText(ch).width + size * 0.06), total = ws.reduce((x, y) => x + y, 0), dir = cw ? 1 : -1;
+  let a = ang - dir * (total / r) / 2;
+  chars.forEach((ch, i) => {
+    const half = ws[i] / r / 2; a += dir * half;
+    g.save(); g.translate(cx + Math.sin(a) * r, cy - Math.cos(a) * r); g.rotate(cw ? a : a + Math.PI); g.fillText(ch, 0, 0); g.restore();
+    a += dir * half;
+  });
+}
+// Cztery kropki w rogach ekranu (przyciski o funkcji zależnej od strony), z napisami wygiętymi wzdłuż obrzeża radaru jak w szkicu.
+// defs[i]: { label, sub, lit, bar, barHot, dim }. lit === false = pusta kropka (przełącznik wyłączony), w pozostałych przypadkach pełna.
 function drawCorners(G, defs) {
-  const { W, R, dpr } = G, m = W * 0.075, rd = W * 0.034;
-  g.textBaseline = 'middle';
+  const { W, cx, cy, R, dpr } = G, rd = W * 0.044, size = W * 0.047, sz2 = W * 0.036;
+  const ang = [-Math.PI / 4, Math.PI / 4, (5 * Math.PI) / 4, (3 * Math.PI) / 4];
   defs.forEach((d, i) => {
     if (!d) return;
-    const left = i % 2 === 0, top = i < 2, x = left ? m : W - m, y = top ? m : W - m, a = d.dim ? 0.4 : 1;
+    const top = i < 2, left = i % 2 === 0, x = left ? rd : W - rd, y = top ? rd : W - rd, a = d.dim ? 0.4 : 1;
     g.beginPath(); g.arc(x, y, rd, 0, TAU);
     if (d.lit === false) { g.strokeStyle = `rgba(${ACC},${a})`; g.lineWidth = 2 * dpr; g.stroke(); }
     else { g.fillStyle = `rgba(${ACC},${a})`; g.fill(); }
-    const tx = x + (left ? 1 : -1) * (rd + W * 0.025), sy = y + (top ? 1 : -1) * R * 0.1;
-    g.textAlign = left ? 'left' : 'right'; g.fillStyle = `rgba(${INK},${a})`; g.font = FONT(R * 0.085); g.fillText(d.label, tx, y);
+    const rMain = R * (top ? 0.79 : 0.9), rSub = R * (top ? 0.68 : 0.79);
+    arcText(d.label, cx, cy, rMain, ang[i], top, size, `rgba(${INK},${a})`);
     if (d.bar != null) {
-      const bw = R * 0.5, bh = R * 0.04, bx = left ? tx : tx - bw, by = sy - bh / 2 + (top ? 0 : 0);
-      g.strokeStyle = `rgba(${INK},.35)`; g.lineWidth = dpr; g.strokeRect(bx, by, bw, bh);
-      g.fillStyle = d.barHot ? `rgb(${ACC})` : `rgba(${INK},.8)`; const fw = bw * d.bar; g.fillRect(left ? bx : bx + bw - fw, by, fw, bh);
-    } else if (d.sub) { g.font = FONT(R * 0.066); g.fillStyle = `rgba(${INK},${0.65 * a})`; g.fillText(d.sub, tx, sy); }
+      const span = 0.5, a0 = ang[i] - span / 2, a1 = ang[i] + span / 2, st = (v) => v - Math.PI / 2;
+      g.lineCap = 'butt'; g.lineWidth = W * 0.012;
+      g.beginPath(); g.arc(cx, cy, rSub, st(a0), st(a1)); g.strokeStyle = `rgba(${INK},.3)`; g.stroke();
+      g.beginPath();
+      if (top) g.arc(cx, cy, rSub, st(a0), st(a0 + span * d.bar)); else g.arc(cx, cy, rSub, st(a1 - span * d.bar), st(a1));
+      g.strokeStyle = d.barHot ? `rgb(${ACC})` : `rgba(${INK},.8)`; g.stroke();
+    } else if (d.sub) arcText(d.sub, cx, cy, rSub, ang[i], top, sz2, `rgba(${INK},${0.65 * a})`);
   });
 }
 
@@ -582,7 +597,7 @@ const tabNames = (p) => ({
 })[p];
 function renderSub() {
   const host = el('subtabs'), names = tabNames(page);
-  host.innerHTML = '';
+  host.innerHTML = ''; host.classList.toggle('five', names.length > 4);
   names.forEach((n, i) => {
     const b = document.createElement('button'); b.textContent = n; b.className = i === tabSel[page] ? 'on' : '';
     b.addEventListener('click', () => { tabSel[page] = i; if (page === 'syn' && i > 0) synSel = i - 1; renderSub(); renderPanel(); });

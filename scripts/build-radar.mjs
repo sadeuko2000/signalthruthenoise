@@ -15,7 +15,7 @@ const body = html.slice(html.indexOf('<body>') + 6, html.indexOf('<script type="
 // W artefakcie strona jest jednym ekranem: wysokość z rodzica zamiast jednostek dvh.
 const css = read('radar.css')
   .replace('height:100dvh;max-width:430px', 'height:100%;max-width:430px')
-  .replace('height:clamp(680px,100dvh,745px)', 'height:clamp(680px,100%,745px)');
+  .replace('height:min(780px,100dvh)', 'height:min(780px,100%)');
 
 const page = `<title>radarxxx</title>
 <meta name="claude:viewport-fit-sides" content="cover">

@@ -12,19 +12,20 @@ button{font:inherit;color:inherit;background:transparent;border:0;border-radius:
 button:active{opacity:.6}
 button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 
-#radar{position:relative;display:flex;flex-direction:column;height:100dvh;max-width:430px;margin:0 auto;background:var(--paper)}
+#radar{position:relative;container-type:size;display:flex;flex-direction:column;height:100dvh;max-width:430px;margin:0 auto;background:var(--paper)}
 .head{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top,0px) + 10px) max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px))}
 .tempo{width:44px;height:44px;display:grid;place-items:center}
 .tabs4{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--ink);border-bottom:1px solid var(--ink)}
-.tabs4 button{min-height:44px;font-size:20px;letter-spacing:.1em;border-right:1px solid var(--ink)}
+.tabs4 button{min-height:27px;font-size:20px;letter-spacing:.1em;border-right:1px solid var(--ink)}
 .tabs4 button:last-child{border-right:0}
 .tabs4 button.on{background:var(--ink);color:var(--paper)}
-.play{width:44px;height:44px;display:grid;place-items:center;background:var(--acc);color:var(--ink);font-size:20px}
+.play{width:34px;height:30px;display:grid;place-items:center;background:var(--acc);color:var(--ink);font-size:16px}
 
-.stage{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:8px max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:6px}
+.stage{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:21px max(16px,env(safe-area-inset-right,0px)) 37px max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;justify-content:space-between;gap:12px}
 .scopewrap{display:grid;place-items:center}
 #scope{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
-.scopebox{position:relative;width:min(100%,300px);min-width:240px;aspect-ratio:1}
+.scopebox{position:relative;width:min(100%,340px);min-width:240px;aspect-ratio:1}
+@supports (width:1cqh){.scopebox{width:min(100%,340px,max(240px,calc(100cqh - 440px)))}}
 .side{display:flex;flex-direction:column;gap:8px}
 #readout{margin:0;font:inherit;font-size:14px;line-height:1.3;white-space:pre;display:none}
 
@@ -51,12 +52,12 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.sweepdemo{animation:none}}
 
-/* Na komputerze strona wygląda jak aplikacja na telefon: proporcje boków zablokowane (920:1594, jak na telefonie),
-   wysokość dopasowana do okna (680-745 px), szerokość wynika z proporcji. Wyśrodkowana w poziomie i pionie. */
+/* Na komputerze strona wygląda jak aplikacja na telefon: proporcje boków zablokowane (390:780, jak ramka w Figmie),
+   wysokość dopasowana do okna (najwyżej 780 px), szerokość wynika z proporcji. Wyśrodkowana w poziomie i pionie. */
 @media (min-width:600px){
   html{background:var(--board)}
   body{display:grid;place-items:center;background:var(--board)}
-  #radar{height:clamp(680px,100dvh,745px);aspect-ratio:920/1594;width:auto;max-width:none;margin:0;border-radius:22px;overflow:hidden}
+  #radar{height:min(780px,100dvh);aspect-ratio:390/780;width:auto;max-width:none;margin:0;border-radius:22px;overflow:hidden}
 }
 
 /* okienko tempa */
@@ -80,19 +81,20 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 
 /* ---- nowy układ: kropki w rogach, pod-zakładki, siatka 5x2, dolny pasek ---- */
 .dots{position:absolute;inset:0;pointer-events:none}
-.dot{position:absolute;width:38%;height:13%;pointer-events:auto;background:transparent}
+.dot{position:absolute;width:24%;height:14%;pointer-events:auto;background:transparent}
 .dot:nth-child(1){left:0;top:0}.dot:nth-child(2){right:0;top:0}.dot:nth-child(3){left:0;bottom:0}.dot:nth-child(4){right:0;bottom:0}
 .dot:active{opacity:1;background:rgba(11,11,11,.06)}
 .subtabs{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);border-block:1px solid var(--ink)}
-.subtabs button{min-height:34px;font-size:17px;letter-spacing:.08em;border-right:1px solid var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
+.subtabs button{min-height:28px;font-size:20px;letter-spacing:.08em;border-right:1px solid var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
 .subtabs button:last-child{border-right:0}
 .subtabs button.on{background:var(--ink);color:var(--paper)}
-.panel{display:grid;gap:4px;padding-top:4px}
-.pgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));row-gap:6px}
-.pgrid .knob{--ks:38px}
+.panel{display:grid;gap:4px;padding-top:8px}
+.subtabs.five button{font-size:17px;letter-spacing:.04em}
+.pgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-auto-rows:63px;row-gap:4px}
+.pgrid .knob{--ks:40px}
 .cellbtn{display:grid;justify-items:center;align-content:start;gap:3px;padding:2px;min-width:0}
 .cellbtn .cl{order:-1;font-size:16px;letter-spacing:.08em;line-height:1;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
-.cellbtn button{width:38px;height:38px;border-radius:50%;border:2px solid var(--ink);background:transparent}
+.cellbtn button{width:40px;height:40px;border-radius:50%;border:2px solid var(--ink);background:transparent}
 .cellbtn.act button{background:var(--acc);border-color:var(--acc)}
 .cellbtn.tog.on button{background:var(--acc);border-color:var(--acc)}
 .cellbtn.tog button{box-shadow:inset 0 0 0 5px var(--paper)}
@@ -100,14 +102,15 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .cellbtn.tog.on button{background:var(--acc);box-shadow:none}
 .cellbtn button:active{transform:scale(.94)}
 .spacer{min-height:1px}
-.steprow{grid-column:1/-1;display:grid;grid-template-columns:64px 52px 1fr 52px;align-items:center;border:1px solid var(--ink);margin-bottom:6px}
+.steprow{grid-column:1/-1;grid-row:span 1;align-self:center;display:grid;grid-template-columns:64px 52px 1fr 52px;align-items:center;border:1px solid var(--ink);margin-bottom:6px}
 .steprow span{padding-left:8px;font-size:16px;letter-spacing:.14em}
 .steprow b{font-weight:400;font-size:30px;text-align:center;line-height:1}
 .steprow button{min-height:50px;font-size:26px;border-left:1px solid var(--ink)}
-.bar{display:grid;grid-template-columns:44px 44px 1fr 56px 56px;align-items:center;gap:4px;margin:6px max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 26px) max(16px,env(safe-area-inset-left,0px));padding-top:8px;border-top:1px solid var(--ink)}
-.bar button{min-height:44px;font-size:20px;letter-spacing:.08em}
+.bar{display:grid;grid-template-columns:145px 53px 140px;justify-content:space-between;align-items:center;margin:0 max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 31px) max(16px,env(safe-area-inset-left,0px));min-height:52px}
+.bar .grp{display:grid;grid-template-columns:1fr 1fr}
+.bar button{min-height:44px;font-size:20px;letter-spacing:.1em}
 .bar button:disabled{opacity:.3;cursor:default}
-.bar .rec{justify-self:center;width:56px;height:56px;border-radius:50%;background:var(--acc);border:2px solid var(--ink);padding:0}
+.bar .rec{justify-self:center;width:53px;height:52px;border-radius:50%;background:var(--acc);border:0;padding:0}
 .bar .rec.on{box-shadow:0 0 0 4px rgba(255,75,31,.35)}
 .toast{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 86px);transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:6px 12px;font-size:17px;letter-spacing:.08em;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .18s;z-index:40}
 .toast.on{opacity:1}
@@ -119,5 +122,3 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .menubody .mrow button.x{width:44px;min-height:44px;border-left:1px solid var(--ink);font-size:22px}
 .menubody .msub{font-size:15px;opacity:.75;padding:2px 2px 4px;letter-spacing:.05em}
 .menubody .mrow.dim{opacity:.55}
-.cornerl,.cornerr{position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);font-size:13px;letter-spacing:.12em;pointer-events:none}
-.cornerl{left:max(16px,env(safe-area-inset-left,0px))}.cornerr{right:max(16px,env(safe-area-inset-right,0px))}
