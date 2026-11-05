@@ -407,7 +407,7 @@ function restore(sn) {
   setPad(a.xy[0], a.xy[1]);
   Object.assign(globals, sn.globals); applyGlobals();
   fxCtl = sn.ctl; warpIdx = sn.warp || 0;
-  if (sn.ctrl) { ctrl = { ...ctrlDefault(), ...sn.ctrl }; saveCtrl(); }
+  if (sn.ctrl) { ctrl = mergeCtrl(ctrlDefault(), sn.ctrl); saveCtrl(); }
   if (sn.route) engine.fx.route(sn.route);
   sn.fx.forEach((x, j) => {
     const sec = fxSecs[j]; if (!sec) return;
@@ -634,7 +634,8 @@ const offsetT = (key) => (n) => { engine.p[key] = n * 2 - 1; };
 const CONT = {
   cutoff: ['CUTOFF', (n) => { globals.cutoff = n; engine.setCutoff(cutoffHz(n)); }],
   reso: ['RESO', (n) => { globals.reso = n; engine.setResonance(1 + n * 22); }],
-  fenv: ['F.ENV', envAll('fEnv')], fdec: ['F.ZAN.', envAll('fDec')], adec: ['A.ZAN.', envAll('aDec')], asus: ['A.SUST.', envAll('aSus')],
+  fenv: ['F.ENV', envAll('fEnv')], fdec: ['F.ZAN.', envAll('fDec')], adec: ['A.ZAN.', envAll('aDec')], asus: ['A.SUST.', envAll('aSus')], aatk: ['A.ATAK', envAll('aAtk')], arel: ['A.REL.', envAll('aRel')],
+  tune1: ['TUNE 1', (n) => { engine.vTune[0] = lin2(n, -100, 100); }], tune2: ['TUNE 2', (n) => { engine.vTune[1] = lin2(n, -100, 100); }], tune3: ['TUNE 3', (n) => { engine.vTune[2] = lin2(n, -100, 100); }], tune4: ['TUNE 4', (n) => { engine.vTune[3] = lin2(n, -100, 100); }],
   offfatk: ['F.ATK', offsetT('offFAtk')], offfrel: ['F.REL', offsetT('offFRel')], offaatk: ['A.ATK', offsetT('offAAtk')], offarel: ['A.REL', offsetT('offARel')],
   gate: ['GATE', (n) => { engine.gateMul = lin2(n, 0.4, 1.6); }],
   accent: ['ACCENT', (n) => { state.accent = n; refin(); }],
@@ -659,16 +660,39 @@ const SW = {
   mute3: ['MUTE 3', () => !engine.enabled[2], () => engine.setEnabled(2, !engine.enabled[2])], mute4: ['MUTE 4', () => !engine.enabled[3], () => engine.setEnabled(3, !engine.enabled[3])],
   solo1: ['SOLO 1', () => engine.solo === 0, () => engine.setSolo(engine.solo === 0 ? null : 0)], solo2: ['SOLO 2', () => engine.solo === 1, () => engine.setSolo(engine.solo === 1 ? null : 1)],
   solo3: ['SOLO 3', () => engine.solo === 2, () => engine.setSolo(engine.solo === 2 ? null : 2)], solo4: ['SOLO 4', () => engine.solo === 3, () => engine.setSolo(engine.solo === 3 ? null : 3)],
+  rndeng: ['RND ENG', () => false, () => engine.enabled.forEach((on, i) => { if (on) engine.randomizeVoice(i); })], rndsyn: ['RND SYN', () => false, () => engine.enabled.forEach((on, i) => { if (on) engine.randomizeVoice(i); })],
+  rndfx: ['RND FX', () => false, () => fxSecs.slice(0, 2).forEach((x) => x.randomize())],
+  route: ['ROUTING', () => false, () => { const k = PERMS.findIndex((p) => p.join() === engine.fx.order.join()); engine.fx.route(PERMS[(k + 1) % PERMS.length]); toast(routeText()); }],
   random: ['RANDOM', () => false, actions.random], mutate: ['MUTATE', () => false, actions.mut], warp: ['WARP', () => false, actions.warp],
   reverse: ['REVERSE', () => false, actions.steps(reverseSteps)], invert: ['INVERT', () => false, actions.steps(invertSteps)],
   rotl: ['ROT ←', () => false, actions.steps((st) => rotateSteps(st, -1))], rotr: ['ROT →', () => false, actions.steps((st) => rotateSteps(st, 1))],
 };
 const CTL_TYPES = { xy: 'XY PAD', pads: '4 PRZYCISKI', faders: '4 SUWAKI', wheels: 'PITCH + MOD' };
-const CTL_KEY = 'radarxxx.ctrl.v1';
-const ctrlDefault = () => ({ left: 'xy', right: 'pads', xy: ['cutoff', 'fx1mix', 'reso', 'fx1p1'], pads: ['fbyp', 'f1byp', 'latch', 'warp'], faders: ['cutoff', 'reso', 'send', 'master'].map((x) => (x === 'send' ? 'fx1mix' : x)), mod: 'cutoff' });
+const CTL_KEY = 'radarxxx.ctrl.v2';
+// Kontrolery (zakładka CTRL) sterują tylko tym, co jest w danej sekcji: każda strona ma własną listę parametrów, własne przełączniki i własne ustawienia.
+const SECTION_CONT = {
+  seq: ['cutoff', 'reso', 'offfatk', 'offfrel', 'offaatk', 'offarel', 'gate', 'accent', 'slide', 'swing', 'human', 'ghost', 'velo', 'glide', 'tempo'],
+  mix: ['eqlow', 'eqmid', 'eqhigh', 'fx1mix', 'master', 'lv1', 'lv2', 'lv3', 'lv4', 'tune1', 'tune2', 'tune3', 'tune4', 'padx', 'pady'],
+  syn: ['cutoff', 'reso', 'fenv', 'fdec', 'aatk', 'adec', 'asus', 'arel', 'lv1', 'lv2', 'lv3', 'lv4'],
+  fx: ['flt1', 'flt2', 'fx1p1', 'fx1p2', 'fx2p1', 'fx2p2', 'fmix', 'fx1mix', 'fx2mix', 'djf', 'tape', 'wow', 'chorusm', 'master', 'comp', 'mdrive'],
+};
+const SECTION_SW = {
+  seq: ['latch', 'random', 'mutate', 'warp', 'reverse', 'invert', 'rotl', 'rotr'],
+  mix: ['fbyp', 'mute1', 'mute2', 'mute3', 'mute4', 'solo1', 'solo2', 'solo3', 'solo4', 'rndeng'],
+  syn: ['rndsyn', 'mute1', 'mute2', 'mute3', 'mute4', 'solo1', 'solo2', 'solo3', 'solo4'],
+  fx: ['fbyp', 'f1byp', 'f2byp', 'route', 'rndfx'],
+};
+const ctrlDefault = () => ({
+  seq: { left: 'xy', right: 'pads', xy: ['cutoff', 'offfrel', 'reso', 'offarel'], pads: ['latch', 'warp', 'mutate', 'random'], faders: ['cutoff', 'reso', 'gate', 'accent'], mod: 'cutoff' },
+  mix: { left: 'xy', right: 'faders', xy: ['eqlow', 'eqmid', 'eqhigh', 'fx1mix'], pads: ['solo1', 'solo2', 'solo3', 'solo4'], faders: ['lv1', 'lv2', 'lv3', 'lv4'], mod: 'eqhigh' },
+  syn: { left: 'xy', right: 'faders', xy: ['cutoff', 'fenv', 'reso', 'fdec'], pads: ['rndsyn', 'mute1', 'mute2', 'solo1'], faders: ['cutoff', 'reso', 'fenv', 'fdec'], mod: 'cutoff' },
+  fx: { left: 'xy', right: 'pads', xy: ['fmix', 'fx1mix', 'flt1', 'fx1p1'], pads: ['fbyp', 'f1byp', 'f2byp', 'route'], faders: ['djf', 'tape', 'wow', 'chorusm'], mod: 'djf' },
+});
+const mergeCtrl = (base, sv) => { const out = {}; for (const p of Object.keys(base)) out[p] = { ...base[p], ...((sv && sv[p]) || {}) }; return out; };
 let ctrl = ctrlDefault();
-try { const sv = JSON.parse(localStorage.getItem(CTL_KEY) || 'null'); if (sv && sv.left && sv.right) ctrl = { ...ctrl, ...sv }; } catch { /* brak zapisu */ }
+try { const sv = JSON.parse(localStorage.getItem(CTL_KEY) || 'null'); if (sv) ctrl = mergeCtrl(ctrl, sv); } catch { /* brak zapisu */ }
 const saveCtrl = () => { try { localStorage.setItem(CTL_KEY, JSON.stringify(ctrl)); } catch { /* brak pamięci */ } };
+const C = () => ctrl[page];
 const ctrlVals = { x: 0.5, y: 0.5, faders: [0.5, 0.5, 0.5, 0.5], pitch: 0.5, mod: 0 };
 
 // pionowy suwak: value 0..1 od dołu; spring = wraca na środek po puszczeniu (pitch bend); bipolar = bez wypełnienia
@@ -692,11 +716,11 @@ function buildXY(box) {
   box.classList.add('xy');
   box.innerHTML = '<div class="hx"></div><div class="hy"></div><div class="puck"></div><span class="cname"></span>';
   const puck = box.querySelector('.puck'), hx = box.querySelector('.hx'), hy = box.querySelector('.hy');
-  box.querySelector('.cname').innerHTML = `X ${nameOfC(ctrl.xy[0])}·${nameOfC(ctrl.xy[1])}<br>Y ${nameOfC(ctrl.xy[2])}·${nameOfC(ctrl.xy[3])}`;   // dwie linie: oś X i oś Y
+  box.querySelector('.cname').innerHTML = `X ${nameOfC(C().xy[0])}·${nameOfC(C().xy[1])}<br>Y ${nameOfC(C().xy[2])}·${nameOfC(C().xy[3])}`;   // dwie linie: oś X i oś Y
   const paint = () => { puck.style.left = `${ctrlVals.x * 100}%`; puck.style.top = `${(1 - ctrlVals.y) * 100}%`; hx.style.top = `${(1 - ctrlVals.y) * 100}%`; hy.style.left = `${ctrlVals.x * 100}%`; }; paint();
   const apply = (e) => {
     const r = box.getBoundingClientRect(); ctrlVals.x = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)); ctrlVals.y = Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height)); paint();
-    [ctrl.xy[0], ctrl.xy[1]].forEach((id) => CONT[id] && CONT[id][1](ctrlVals.x)); [ctrl.xy[2], ctrl.xy[3]].forEach((id) => CONT[id] && CONT[id][1](ctrlVals.y));
+    [C().xy[0], C().xy[1]].forEach((id) => CONT[id] && CONT[id][1](ctrlVals.x)); [C().xy[2], C().xy[3]].forEach((id) => CONT[id] && CONT[id][1](ctrlVals.y));
   };
   let on = false;
   box.addEventListener('pointerdown', (e) => { on = true; box.setPointerCapture(e.pointerId); apply(e); });
@@ -705,7 +729,7 @@ function buildXY(box) {
 }
 function buildPads(box) {
   box.classList.add('pads');
-  ctrl.pads.forEach((id) => {
+  C().pads.forEach((id) => {
     const d = SW[id], b = document.createElement('button'); if (!d) return;
     b.textContent = d[0]; const upd = () => b.classList.toggle('lit', !!d[1]());
     b.addEventListener('click', () => { d[2](); upd(); commitSoon(); }); upd(); box.appendChild(b);
@@ -713,17 +737,17 @@ function buildPads(box) {
 }
 function buildFaders(box) {
   box.classList.add('sliders');
-  ctrl.faders.forEach((id, i) => box.appendChild(vSlider({ label: nameOfC(id), value: ctrlVals.faders[i], onInput: (v) => { ctrlVals.faders[i] = v; CONT[id] && CONT[id][1](v); } })));
+  C().faders.forEach((id, i) => box.appendChild(vSlider({ label: nameOfC(id), value: ctrlVals.faders[i], onInput: (v) => { ctrlVals.faders[i] = v; CONT[id] && CONT[id][1](v); } })));
 }
 function buildWheels(box) {
   box.classList.add('sliders');
   box.appendChild(vSlider({ label: 'PITCH', value: 0.5, spring: true, onInput: (v) => engine.setBend((v - 0.5) * 400) }));      // ±200 cent
-  box.appendChild(vSlider({ label: nameOfC(ctrl.mod), value: ctrlVals.mod, onInput: (v) => { ctrlVals.mod = v; CONT[ctrl.mod] && CONT[ctrl.mod][1](v); } }));
+  box.appendChild(vSlider({ label: nameOfC(C().mod), value: ctrlVals.mod, onInput: (v) => { ctrlVals.mod = v; CONT[C().mod] && CONT[C().mod][1](v); } }));
 }
 const CTL_BUILD = { xy: buildXY, pads: buildPads, faders: buildFaders, wheels: buildWheels };
 function renderControllers() {
   const wrap = document.createElement('div'); wrap.className = 'ctlwrap';
-  ['left', 'right'].forEach((side) => { const box = document.createElement('div'); box.className = 'cbox'; CTL_BUILD[ctrl[side]](box); wrap.appendChild(box); });
+  ['left', 'right'].forEach((side) => { const box = document.createElement('div'); box.className = 'cbox'; CTL_BUILD[C()[side]](box); wrap.appendChild(box); });
   panelEl.appendChild(wrap);
 }
 const FX_NAMES = ['FLT', 'FX1', 'FX2'];
@@ -773,13 +797,14 @@ function renderCtlEdit() {
     r.appendChild(sp); r.appendChild(sel); body.appendChild(r);
   };
   const sec = (t) => { const d = document.createElement('div'); d.className = 'csec'; d.textContent = t; body.appendChild(d); };
-  const types = Object.entries(CTL_TYPES), cont = Object.entries(CONT).map(([k, v]) => [k, v[0]]), sw = Object.entries(SW).map(([k, v]) => [k, v[0]]);
-  row('LEWY', types, ctrl.left, (v) => { ctrl.left = v; }); row('PRAWY', types, ctrl.right, (v) => { ctrl.right = v; });
-  const used = new Set([ctrl.left, ctrl.right]);
-  if (used.has('xy')) { sec('XY PAD: OŚ X (2 PARAMETRY), OŚ Y (2 PARAMETRY)'); ['X1', 'X2', 'Y1', 'Y2'].forEach((n, i) => row(n, cont, ctrl.xy[i], (v) => { ctrl.xy[i] = v; })); }
-  if (used.has('pads')) { sec('4 PRZYCISKI'); [1, 2, 3, 4].forEach((n, i) => row(`P${n}`, sw, ctrl.pads[i], (v) => { ctrl.pads[i] = v; })); }
-  if (used.has('faders')) { sec('4 SUWAKI'); [1, 2, 3, 4].forEach((n, i) => row(`S${n}`, cont, ctrl.faders[i], (v) => { ctrl.faders[i] = v; })); }
-  if (used.has('wheels')) { sec('PITCH BEND (±2 PÓŁTONY) I MODULATION'); row('MOD', cont, ctrl.mod, (v) => { ctrl.mod = v; }); }
+  const types = Object.entries(CTL_TYPES), cont = SECTION_CONT[page].map((k) => [k, CONT[k][0]]), sw = SECTION_SW[page].map((k) => [k, SW[k][0]]);   // tylko parametry tej sekcji
+  el('ctl-title').textContent = `KONTROLERY: ${page.toUpperCase()}`;
+  row('LEWY', types, C().left, (v) => { C().left = v; }); row('PRAWY', types, C().right, (v) => { C().right = v; });
+  const used = new Set([C().left, C().right]);
+  if (used.has('xy')) { sec('XY PAD: OŚ X (2 PARAMETRY), OŚ Y (2 PARAMETRY)'); ['X1', 'X2', 'Y1', 'Y2'].forEach((n, i) => row(n, cont, C().xy[i], (v) => { C().xy[i] = v; })); }
+  if (used.has('pads')) { sec('4 PRZYCISKI'); [1, 2, 3, 4].forEach((n, i) => row(`P${n}`, sw, C().pads[i], (v) => { C().pads[i] = v; })); }
+  if (used.has('faders')) { sec('4 SUWAKI'); [1, 2, 3, 4].forEach((n, i) => row(`S${n}`, cont, C().faders[i], (v) => { C().faders[i] = v; })); }
+  if (used.has('wheels')) { sec('PITCH BEND (±2 PÓŁTONY) I MODULATION'); row('MOD', cont, C().mod, (v) => { C().mod = v; }); }
 }
 const showCtl = (on, view = 'ctl') => { ctlPop.hidden = !on; if (on) { ctlView = view; renderCtlEdit(); el('ctl-ok').focus(); } };
 el('ctl-ok').addEventListener('click', () => showCtl(false));
