@@ -61,7 +61,8 @@ const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
 let touch = null;   // aktywny dotyk na SEQ: { i, deg } do rysowania linii namiaru (EBL)
 
-const geo = () => { const W = cv.width; return { W, cx: W / 2, cy: W / 2, R: W / 2, dpr: W / Math.max(1, cv.clientWidth) }; };
+const RADAR_K = 0.91;      // średnica radaru jako ułamek pola ekranu: w rogach zostaje miejsce na kropki i napisy pod kątem 45°
+const geo = () => { const W = cv.width; return { W, cx: W / 2, cy: W / 2, R: (W / 2) * RADAR_K, dpr: W / Math.max(1, cv.clientWidth) }; };
 function sweepState() { const n = pattern.steps.length, pos = curPos(); return { n, pos, sw: (pos / n) * TAU }; }
 
 function drawBase(G, S) {
@@ -129,18 +130,19 @@ function arcText(txt, cx, cy, r, ang, cw, size, color) {
 // Cztery kropki w rogach ekranu (przyciski o funkcji zależnej od strony), z napisami wygiętymi wzdłuż obrzeża radaru jak w szkicu.
 // defs[i]: { label, sub, lit, bar, barHot, dim }. lit === false = pusta kropka (przełącznik wyłączony), w pozostałych przypadkach pełna.
 function drawCorners(G, defs) {
-  const { W, cx, cy, R, dpr } = G, rd = W * 0.044, size = W * 0.047, sz2 = W * 0.036;
+  const { W, cx, cy, R, dpr } = G, rd = W * 0.04, m = W * 0.088, size = W * 0.047, sz2 = W * 0.036;
   const ang = [-Math.PI / 4, Math.PI / 4, (5 * Math.PI) / 4, (3 * Math.PI) / 4];
   defs.forEach((d, i) => {
     if (!d) return;
-    const top = i < 2, left = i % 2 === 0, x = left ? rd : W - rd, y = top ? rd : W - rd, a = d.dim ? 0.4 : 1;
+    const top = i < 2, left = i % 2 === 0, x = left ? m : W - m, y = top ? m : W - m, a = d.dim ? 0.4 : 1;
     g.beginPath(); g.arc(x, y, rd, 0, TAU);
     if (d.lit === false) { g.strokeStyle = `rgba(${ACC},${a})`; g.lineWidth = 2 * dpr; g.stroke(); }
     else { g.fillStyle = `rgba(${ACC},${a})`; g.fill(); }
+    // główny napis: tuż za obrzeżem radaru, na przekątnej, obrócony o 45° (styczny do okręgu), między radarem a kropką
+    const sx = left ? -1 : 1, sy = top ? -1 : 1, dist = R * 1.089;
+    g.save(); g.translate(cx + sx * dist * Math.SQRT1_2, cy + sy * dist * Math.SQRT1_2); g.rotate(sx * sy > 0 ? -Math.PI / 4 : Math.PI / 4);
+    g.font = FONT(size); g.fillStyle = `rgba(${INK},${a})`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(d.label, 0, 0); g.restore();
     const rSub = R * (top ? 0.79 : 0.9);
-    // główny napis stoi poza okręgiem, obok kropki (w wolnym rogu ekranu)
-    g.font = FONT(size); g.fillStyle = `rgba(${INK},${a})`; g.textBaseline = 'middle'; g.textAlign = left ? 'left' : 'right';
-    g.fillText(d.label, left ? x + rd + W * 0.025 : x - rd - W * 0.025, y);
     if (d.bar != null) {
       const span = 0.5, a0 = ang[i] - span / 2, a1 = ang[i] + span / 2, st = (v) => v - Math.PI / 2;
       g.lineCap = 'butt'; g.lineWidth = W * 0.012;
@@ -321,7 +323,7 @@ function loop(ts) {
 // ---------- dotyk na ekranie ----------
 let drag = null;
 function pointerPolar(e) {
-  const r = cv.getBoundingClientRect(), R = Math.min(r.width, r.height) / 2;
+  const r = cv.getBoundingClientRect(), R = (Math.min(r.width, r.height) / 2) * RADAR_K;
   const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
   return { ...polar(dx, dy), rn: Math.hypot(dx, dy) / R, dx, dy, R };
 }
