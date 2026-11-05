@@ -23,8 +23,8 @@ const cv = el('scope'), g = cv.getContext('2d');
 let lastStep = { i: 0, t: 0 }, heldPos = 0;
 engine.onStep = (i, t) => { lastStep = { i, t }; };
 
-const GREEN = '125,255,90', AMBER = '255,207,74', WHITE = '230,255,220';
-const FONT = (px) => `${Math.round(px)}px 'Share Tech Mono', ui-monospace, Menlo, monospace`;
+const INK = '11,11,11', ACC = '255,75,31', PAPER = '#a6abad';      // wariant „Specimen”: czarna kreska na szarym papierze, pomarańczowy akcent
+const FONT = (px) => `${Math.round(px)}px 'VT323', ui-monospace, Menlo, monospace`;
 const cutoffHz = (v) => 60 * Math.pow(100, v);
 
 // ---------- wzór ----------
@@ -63,57 +63,52 @@ function sweepState() { const n = pattern.steps.length, pos = curPos(); return {
 
 function drawBase(G, S) {
   const { W, cx, cy, R, dpr } = G;
-  const bg = g.createRadialGradient(cx, cy, 0, cx, cy, R);
-  bg.addColorStop(0, '#07210f'); bg.addColorStop(1, '#020604');
-  g.fillStyle = bg; g.fillRect(0, 0, W, W);
+  g.fillStyle = PAPER; g.fillRect(0, 0, W, W);
   // pierścienie zakresu (bez opisów liczbowych): co drugi stopień skali, oktawa i tonika mocniej
   for (let d = DEG_MIN; d <= DEG_MAX - 1; d++) {
     if (d % 2 !== 0 && d !== 7) continue;
-    circle(cx, cy, degToR(d) * R, d === 0 || d === 7 ? 'rgba(125,255,90,.4)' : 'rgba(125,255,90,.14)', dpr);
+    circle(cx, cy, degToR(d) * R, d === 0 || d === 7 ? `rgba(${INK},.75)` : `rgba(${INK},.22)`, dpr);
   }
-  circle(cx, cy, R * (R_OUT + 0.075), 'rgba(125,255,90,.28)', dpr, [3 * dpr, 5 * dpr]);
+  circle(cx, cy, R * (R_OUT + 0.075), `rgba(${INK},.3)`, dpr, [3 * dpr, 5 * dpr]);
   // obrzeże: kreski kroków i bieżący krok
-  circle(cx, cy, R * 0.985, 'rgba(125,255,90,.55)', 1.5 * dpr);
+  circle(cx, cy, R * 0.985, `rgba(${INK},1)`, dpr);
   const { n, pos } = S, hot = Math.floor(pos) % n;
   for (let k = 0; k < n * 4; k++) {
     const a = (k / (n * 4)) * TAU, major = k % 4 === 0;
     const [x0, y0] = polarXY(cx, cy, R * (major ? 0.935 : 0.96), a), [x1, y1] = polarXY(cx, cy, R * 0.985, a);
     g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1);
-    g.strokeStyle = major ? 'rgba(125,255,90,.8)' : 'rgba(125,255,90,.35)'; g.lineWidth = dpr; g.stroke();
+    g.strokeStyle = major ? `rgba(${INK},1)` : `rgba(${INK},.35)`; g.lineWidth = dpr; g.stroke();
   }
   { const a = angleOfStep(hot, n), [x0, y0] = polarXY(cx, cy, R * 0.9, a), [x1, y1] = polarXY(cx, cy, R * 0.985, a);
-    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.strokeStyle = `rgba(${AMBER},1)`; g.lineWidth = 3 * dpr; g.stroke(); }
+    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.strokeStyle = `rgba(${ACC},1)`; g.lineWidth = 3 * dpr; g.stroke(); }
   { const [x, y] = polarXY(cx, cy, R * 0.985, 0), [x2, y2] = polarXY(cx, cy, R * 0.94, -0.045), [x3, y3] = polarXY(cx, cy, R * 0.94, 0.045);
-    g.beginPath(); g.moveTo(x, y); g.lineTo(x2, y2); g.lineTo(x3, y3); g.closePath(); g.fillStyle = `rgba(${AMBER},1)`; g.fill(); }
-  // poświata za linią (luminofor)
-  for (let k = 0; k < 30; k++) {
-    const a = S.sw - k * (TAU / 240) - Math.PI / 2;
-    g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, R * 0.93, a - TAU / 240, a); g.closePath();
-    g.fillStyle = `rgba(${GREEN},${(0.2 * Math.pow(1 - k / 30, 2)).toFixed(3)})`; g.fill();
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x2, y2); g.lineTo(x3, y3); g.closePath(); g.fillStyle = `rgba(${ACC},1)`; g.fill(); }
+  // ślad za linią: cienkie kreski, coraz słabsze (jak kreskowanie w druku)
+  for (let k = 0; k < 14; k++) {
+    const a = S.sw - k * (TAU / 90), [x0, y0] = polarXY(cx, cy, R * 0.12, a), [x1, y1] = polarXY(cx, cy, R * 0.93, a);
+    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1);
+    g.strokeStyle = `rgba(${INK},${(0.22 * (1 - k / 14)).toFixed(3)})`; g.lineWidth = dpr; g.stroke();
   }
 }
 
 // Jedno echo. o: r (promień w px zamiast wzorowego), da (przesunięcie kąta), lw (mnożnik grubości), col, noGlow.
 function drawEcho(G, e, alpha, o = {}) {
-  const { cx, cy, R, dpr } = G, a = clamp01(alpha);
+  const { cx, cy, R, dpr } = G;
+  const a = clamp01(o.raw ? alpha : 0.3 + 0.7 * alpha);        // na papierze echo nigdy nie znika zupełnie (wzór ma być zawsze czytelny)
+  if (alpha < 0.01 && !o.raw) return;
   if (a < 0.01) return;
-  const col = o.col || (e.accent ? AMBER : GREEN);
+  const col = o.col || (e.accent ? ACC : INK);
   const a0 = e.a0 + (o.da || 0) - Math.PI / 2, rad = o.r ?? e.r * R, lw = e.w * dpr * (R / (170 * dpr)) * 0.9 * (o.lw || 1);
-  const fresh = a > 0.9 && !o.noGlow;
   g.lineCap = 'round';
-  g.shadowColor = `rgba(${col},.9)`; g.shadowBlur = o.noGlow ? 0 : fresh ? 14 * dpr : a > 0.5 ? 6 * dpr : 0;
   g.beginPath(); g.arc(cx, cy, rad, a0, a0 + e.len);
   g.strokeStyle = `rgba(${col},${a.toFixed(3)})`; g.lineWidth = lw; g.stroke();
-  if (fresh) { g.shadowBlur = 0; g.beginPath(); g.arc(cx, cy, rad, a0, a0 + e.len); g.strokeStyle = `rgba(${WHITE},${((a - 0.9) * 8).toFixed(3)})`; g.lineWidth = lw * 0.45; g.stroke(); }
-  g.shadowBlur = 0; g.lineCap = 'butt';
+  g.lineCap = 'butt';
 }
 
 function drawSweepLine(G, S) {
   const { cx, cy, R, dpr } = G, [lx, ly] = polarXY(cx, cy, R * 0.94, S.sw);
-  g.shadowColor = `rgba(${GREEN},1)`; g.shadowBlur = 10 * dpr;
-  g.beginPath(); g.moveTo(cx, cy); g.lineTo(lx, ly); g.strokeStyle = 'rgba(200,255,180,.95)'; g.lineWidth = 2 * dpr; g.stroke();
-  g.shadowBlur = 0;
-  circle(cx, cy, R * 0.035, 'rgba(200,255,180,.9)', 1.5 * dpr);
+  g.beginPath(); g.moveTo(cx, cy); g.lineTo(lx, ly); g.strokeStyle = `rgba(${INK},1)`; g.lineWidth = 1.6 * dpr; g.stroke();
+  circle(cx, cy, R * 0.035, `rgba(${INK},1)`, 1.5 * dpr);
 }
 
 function drawSeq() {
@@ -124,8 +119,8 @@ function drawSeq() {
   // namiar dotyku (EBL): linia od środka i znacznik w punkcie dotyku
   if (touch) {
     const a = angleOfStep(touch.i, S.n), [tx, ty] = polarXY(cx, cy, R * 0.94, a), [mx, my] = polarXY(cx, cy, degToR(touch.deg) * R, a);
-    g.setLineDash([4 * dpr, 4 * dpr]); g.beginPath(); g.moveTo(cx, cy); g.lineTo(tx, ty); g.strokeStyle = `rgba(${AMBER},.7)`; g.lineWidth = dpr; g.stroke(); g.setLineDash([]);
-    g.beginPath(); g.arc(mx, my, 9 * dpr, 0, TAU); g.strokeStyle = `rgba(${AMBER},.95)`; g.lineWidth = 1.5 * dpr; g.stroke();
+    g.setLineDash([4 * dpr, 4 * dpr]); g.beginPath(); g.moveTo(cx, cy); g.lineTo(tx, ty); g.strokeStyle = `rgba(${ACC},.7)`; g.lineWidth = dpr; g.stroke(); g.setLineDash([]);
+    g.beginPath(); g.arc(mx, my, 9 * dpr, 0, TAU); g.strokeStyle = `rgba(${ACC},.95)`; g.lineWidth = 1.5 * dpr; g.stroke();
   }
 }
 
@@ -134,23 +129,23 @@ const SHORT = ['PROPHET', 'MS-20', 'DX', 'WAVETBL'];
 function drawMix() {
   const G = geo(), S = sweepState(), { cx, cy, R, dpr } = G, Rp = R * R_OUT;
   drawBase(G, S);
-  for (const e of echoes(pattern.steps)) drawEcho(G, e, echoAlpha(e.i, S.pos, S.n) * 0.3, { noGlow: true });   // wzór blado w tle
+  for (const e of echoes(pattern.steps)) drawEcho(G, e, echoAlpha(e.i, S.pos, S.n) * 0.3, { raw: true });   // wzór blado w tle
   drawSweepLine(G, S);
   const mx = cx + (2 * padPos.x - 1) * Rp, my = cy - (2 * padPos.y - 1) * Rp;
-  g.font = FONT(R * 0.055); g.textBaseline = 'middle';
+  g.font = FONT(R * 0.085); g.textBaseline = 'middle';
   PAD_ANCHORS.forEach(([ax, ay], i) => {
     const x = cx + ax * Rp, y = cy - ay * Rp, w = engine.blend[i] || 0, on = engine.enabled[i];
-    if (on) { g.beginPath(); g.moveTo(mx, my); g.lineTo(x, y); g.strokeStyle = `rgba(${AMBER},${(0.15 + 0.7 * w).toFixed(3)})`; g.lineWidth = (1 + 2 * w) * dpr; g.setLineDash([5 * dpr, 4 * dpr]); g.stroke(); g.setLineDash([]); }
+    if (on) { g.beginPath(); g.moveTo(mx, my); g.lineTo(x, y); g.strokeStyle = `rgba(${ACC},${(0.15 + 0.7 * w).toFixed(3)})`; g.lineWidth = (1 + 2 * w) * dpr; g.setLineDash([5 * dpr, 4 * dpr]); g.stroke(); g.setLineDash([]); }
     const sz = R * (0.04 + 0.03 * w);
     g.save(); g.translate(x, y); g.rotate(Math.PI / 4);
-    g.strokeStyle = on ? `rgba(${GREEN},1)` : 'rgba(79,122,72,.8)'; g.lineWidth = 1.6 * dpr; g.strokeRect(-sz, -sz, 2 * sz, 2 * sz);
-    if (on) { g.fillStyle = `rgba(${GREEN},${(0.25 + 0.6 * w).toFixed(3)})`; g.fillRect(-sz, -sz, 2 * sz, 2 * sz); }
+    g.strokeStyle = on ? `rgba(${INK},1)` : `rgba(${INK},.35)`; g.lineWidth = 1.6 * dpr; g.strokeRect(-sz, -sz, 2 * sz, 2 * sz);
+    if (on) { g.fillStyle = w === Math.max(...engine.blend) ? `rgb(${ACC})` : `rgba(${INK},${(0.25 + 0.6 * w).toFixed(3)})`; g.fillRect(-sz, -sz, 2 * sz, 2 * sz); }   // najsilniejszy silnik na pomarańczowo
     g.restore();
     g.textAlign = ax < 0 ? 'left' : 'right';
-    g.fillStyle = on ? `rgba(${GREEN},.95)` : 'rgba(79,122,72,.9)';
+    g.fillStyle = on ? `rgba(${INK},1)` : `rgba(${INK},.4)`;
     g.fillText(SHORT[i], ax < 0 ? cx - R * 0.97 : cx + R * 0.97, ay > 0 ? cy - R * 0.9 : cy + R * 0.9);
   });
-  g.strokeStyle = `rgba(${AMBER},1)`; g.lineWidth = 1.6 * dpr;
+  g.strokeStyle = `rgba(${ACC},1)`; g.lineWidth = 1.6 * dpr;
   g.beginPath(); g.arc(mx, my, R * 0.05, 0, TAU); g.moveTo(mx - R * 0.09, my); g.lineTo(mx + R * 0.09, my); g.moveTo(mx, my - R * 0.09); g.lineTo(mx, my + R * 0.09); g.stroke();
 }
 
@@ -175,7 +170,7 @@ function drawFx(ts) {
   drawBase(G, S);
   const E = echoes(pattern.steps);
   const rp = (nn) => rFromN(nn) * R;
-  const ring = (r, glow, a = 1) => { g.shadowColor = `rgba(${AMBER},.9)`; g.shadowBlur = 8 * dpr; circle(cx, cy, r, `rgba(${AMBER},${a})`, (1.5 + glow * 5) * dpr); g.shadowBlur = 0; };
+  const ring = (r, glow, a = 1) => circle(cx, cy, r, `rgba(${ACC},${a})`, (1.5 + glow * 5) * dpr);
   const read = (sec) => { const si = sec.slot.style, nv = sec.slot.values[si]; return { si, nv, m: mapValues(sec.styles[si], nv), on: !sec.slot.bypass }; };
   const F = read(fxSecs[0]), X = read(fxSecs[1]);
   const base = (e, mul = 1, o = {}) => drawEcho(G, e, echoAlpha(e.i, pos, n) * mul, o);
@@ -200,24 +195,24 @@ function drawFx(ts) {
     const mix = clamp01(X.m.mix ?? 1);
     if (X.si === 0) {                              // delay: kolejne, coraz cichsze powtórzenia echa o `time` kroków dalej
       const copies = delayCopies(X.m.time, X.m.feedback, 4), f = 0.2 + 0.8 * mix;
-      E.forEach((e) => copies.forEach((c) => drawEcho(G, e, echoAlpha(e.i + c.shift, pos, n) * c.gain * f * through(e), { da: (c.shift / n) * TAU, noGlow: true, lw: 0.8, col: GREEN })));
+      E.forEach((e) => copies.forEach((c) => drawEcho(G, e, echoAlpha(e.i + c.shift, pos, n) * c.gain * f * through(e), { da: (c.shift / n) * TAU, raw: true, lw: 0.8, col: INK })));
     } else if (X.si === 1) {                       // pogłos: fala rozchodzi się od echa po jego przemiataniu
       const life = n * (0.25 + 0.5 * X.nv.size), f = 0.15 + 0.7 * mix;
       E.forEach((e) => {
         const delta = (((pos - e.i) % n) + n) % n;
         if (delta > life) return;
         const t = delta / life, a = e.a0 + e.len / 2 - Math.PI / 2;
-        circle(cx + Math.cos(a) * e.r * R, cy + Math.sin(a) * e.r * R, t * R * (0.12 + 0.5 * X.nv.size), `rgba(${GREEN},${((1 - t) * f * through(e)).toFixed(3)})`, 1.2 * dpr);
+        circle(cx + Math.cos(a) * e.r * R, cy + Math.sin(a) * e.r * R, t * R * (0.12 + 0.5 * X.nv.size), `rgba(${INK},${((1 - t) * f * through(e)).toFixed(3)})`, 1.2 * dpr);
       });
     } else if (X.si === 2) {                       // chorus: echa podwojone i lekko rozstrojone, wahające się z tempem LFO
       const off = X.nv.depth * 0.07 * Math.sin((ts / 1000) * TAU * Math.min(X.m.rate, 4) * 0.5), f = 0.2 + 0.8 * mix;
-      E.forEach((e) => { base(e, 0.55 * f * through(e), { da: off, noGlow: true, lw: 0.85 }); base(e, 0.4 * f * through(e), { da: -off * 1.3, noGlow: true, lw: 0.85 }); });
+      E.forEach((e) => { base(e, 0.55 * f * through(e), { da: off, raw: true, lw: 0.85 }); base(e, 0.4 * f * through(e), { da: -off * 1.3, raw: true, lw: 0.85 }); });
     } else {                                       // dystorsja: echa spłaszczone do pierścienia obcięcia (od miękkiej do „fold”)
       const dr = X.nv.drive, rc = R * (R_OUT - 0.4 * dr), f = 0.25 + 0.75 * mix;
-      circle(cx, cy, rc, `rgba(${AMBER},.6)`, dpr, [4 * dpr, 4 * dpr]);
+      circle(cx, cy, rc, `rgba(${ACC},.6)`, dpr, [4 * dpr, 4 * dpr]);
       E.forEach((e) => {
         const r0 = e.r * R, r1 = r0 > rc ? (X.nv.curve > 0.5 ? rc - (r0 - rc) * 0.7 : rc) : r0;
-        base(e, f * through(e), { r: r1, lw: 1 + dr * 0.9, col: AMBER, noGlow: true });
+        base(e, f * through(e), { r: r1, lw: 1 + dr * 0.9, col: ACC, noGlow: true });
       });
     }
   }
@@ -228,15 +223,35 @@ function drawFx(ts) {
   const cursorOf = (j) => { const sec = fxSecs[j], ids = polarIds(j, sec.slot.style), nv = sec.slot.values[sec.slot.style]; return { r: rp(nv[ids[0]]), a: thetaFromN(nv[ids[1]]) }; };
   const ds = driven(), c0 = cursorOf(ds[0]);
   const [bx, by] = polarXY(cx, cy, R * 0.94, c0.a), [kx, ky] = polarXY(cx, cy, c0.r, c0.a);
-  g.setLineDash([4 * dpr, 4 * dpr]); g.beginPath(); g.moveTo(cx, cy); g.lineTo(bx, by); g.strokeStyle = `rgba(${AMBER},.55)`; g.lineWidth = dpr; g.stroke(); g.setLineDash([]);
-  g.strokeStyle = `rgba(${AMBER},1)`; g.lineWidth = 1.6 * dpr;
+  g.setLineDash([4 * dpr, 4 * dpr]); g.beginPath(); g.moveTo(cx, cy); g.lineTo(bx, by); g.strokeStyle = `rgba(${ACC},.55)`; g.lineWidth = dpr; g.stroke(); g.setLineDash([]);
+  g.strokeStyle = `rgba(${ACC},1)`; g.lineWidth = 1.6 * dpr;
   g.beginPath(); g.arc(kx, ky, R * 0.045, 0, TAU); g.moveTo(kx - R * 0.08, ky); g.lineTo(kx + R * 0.08, ky); g.moveTo(kx, ky - R * 0.08); g.lineTo(kx, ky + R * 0.08); g.stroke();
-  if (ds.length > 1) { const c1 = cursorOf(ds[1]), [hx, hy] = polarXY(cx, cy, c1.r, c1.a); g.beginPath(); g.arc(hx, hy, R * 0.03, 0, TAU); g.strokeStyle = `rgba(${AMBER},.8)`; g.lineWidth = 1.4 * dpr; g.stroke(); }
+  if (ds.length > 1) { const c1 = cursorOf(ds[1]), [hx, hy] = polarXY(cx, cy, c1.r, c1.a); g.beginPath(); g.arc(hx, hy, R * 0.03, 0, TAU); g.strokeStyle = `rgba(${ACC},.8)`; g.lineWidth = 1.4 * dpr; g.stroke(); }
+}
+
+// ---------- pasek przeglądu wzoru ----------
+const strip = el('strip'), sg = strip.getContext('2d');
+function drawStrip() {
+  const d = Math.min(devicePixelRatio || 1, 2), W = Math.max(40, Math.round(strip.clientWidth * d)), H = Math.max(12, Math.round(strip.clientHeight * d));
+  if (strip.width !== W || strip.height !== H) { strip.width = W; strip.height = H; }
+  const S = sweepState(), n = S.n, cw = W / n, rows = DEG_MAX - DEG_MIN + 1, rh = (H - 2) / rows;
+  sg.clearRect(0, 0, W, H);
+  sg.fillStyle = PAPER; sg.fillRect(0, 0, W, H);
+  sg.strokeStyle = `rgba(${INK},.28)`; sg.lineWidth = Math.max(1, d); sg.strokeRect(0.5, 0.5, W - 1, H - 1);
+  for (let i = 4; i < n; i += 4) { sg.fillStyle = `rgba(${INK},.14)`; sg.fillRect(Math.round(i * cw), 0, Math.max(1, d), H); }
+  sg.fillStyle = `rgba(${INK},.12)`; sg.fillRect(Math.round((Math.floor(S.pos) % n) * cw), 0, Math.max(1, Math.round(cw)), H);   // bieżący krok
+  pattern.steps.forEach((s, i) => {
+    if (!s.on) return;
+    const y = H - 1 - ((Math.max(DEG_MIN, Math.min(DEG_MAX, s.degree)) - DEG_MIN) / (rows - 1)) * (H - 2 - rh) - rh;
+    sg.fillStyle = `rgb(${s.vel >= 110 ? ACC : INK})`;
+    sg.fillRect(Math.round(i * cw), Math.max(0, Math.round(y)), Math.max(1, Math.round(Math.min(4, s.gate) * cw - 1)), Math.max(2, Math.round(rh)));
+  });
+  sg.fillStyle = `rgb(${INK})`; sg.fillRect(Math.round(S.pos * cw), 0, Math.max(1, d), H);                                           // linia odtwarzania
 }
 
 let raf = 0;
 function loop(ts) {
-  if (!el('radar').hidden) { if (page === 'mix') drawMix(); else if (page === 'fx') drawFx(ts); else drawSeq(); }
+  if (!el('radar').hidden) { if (page === 'mix') drawMix(); else if (page === 'fx') drawFx(ts); else drawSeq(); drawStrip(); }
   raf = requestAnimationFrame(loop);
 }
 
@@ -362,6 +377,7 @@ el('play').addEventListener('click', togglePlay);
 
 // ---------- przyciski kontekstowe (zależne od strony) ----------
 const rnd = (i) => { const vals = engine.randomizeVoice(i); return vals; };
+const short8 = (t) => (t.length > 8 ? `${t.slice(0, 7)}.` : t);       // napis w przycisku mieści się w komórce (np. DRABINK.)
 const KEYS = {
   seq: [
     { label: 'BASE', value: () => baseLabel(), act: () => actions.base(1), alt: () => actions.base(-1) },
@@ -376,7 +392,7 @@ const KEYS = {
   ],
   fx: [
     { label: 'SEKCJA', value: () => (fxActive === 0 ? 'FILTR' : 'EFEKT'), act: () => { fxActive = 1 - fxActive; showFxSection(); } },
-    { label: 'STYLE', value: () => fxSecs[fxActive].styles[fxSecs[fxActive].slot.style].name.toUpperCase(), act: () => cycleStyle(fxActive) },
+    { label: 'STYLE', value: () => short8(fxSecs[fxActive].styles[fxSecs[fxActive].slot.style].name.toUpperCase()), act: () => cycleStyle(fxActive) },
     { label: 'STAN', value: () => (fxSecs[fxActive].slot.bypass ? 'BYPASS' : 'ON'), lit: () => !fxSecs[fxActive].slot.bypass, act: () => bypass(fxActive) },
     { label: 'RND', value: () => 'LOSUJ', act: () => fxSecs[fxActive].randomize() },
     { label: 'STEROW.', value: () => CTL_LABEL[fxCtl], lit: () => fxCtl === 0, act: () => { fxCtl = (fxCtl + 1) % 3; } },

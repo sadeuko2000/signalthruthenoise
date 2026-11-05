@@ -14,12 +14,12 @@ const html = read('radar.html');
 const body = html.slice(html.indexOf('<body>') + 6, html.indexOf('<script type="module"')).trim();
 // W artefakcie strona jest jednym ekranem: wysokość z rodzica zamiast jednostek dvh.
 const css = read('radar.css')
-  .replace('#radar{display:flex;flex-direction:column;height:100dvh;', '#radar{display:flex;flex-direction:column;height:100%;')
+  .replace('height:100dvh;max-width:430px', 'height:100%;max-width:430px')
   .replace('height:clamp(680px,100dvh,745px)', 'height:clamp(680px,100%,745px)');
 
 const page = `<title>radarxxx</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
 <style>
 ${css}
 </style>

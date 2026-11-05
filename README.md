@@ -19,6 +19,11 @@ Przycisk „widok” w nagłówku przełącza układ (wybór jest zapamiętywany
 - **Desktop:** sekwencer po lewej, pad, silniki, filtr i efekty po prawej; skróty klawiszowe.
 
 ## radarxxx: interfejs radarowy
+**Wygląd: wariant „Specimen”** (wybrany spośród czterech propozycji): szary papier `#a6abad`, czarny druk `#0b0b0b`, pomarańczowy akcent `#ff4b1f`,
+pikselowy krój VT323 (Google Fonts). Struktura ekranu wzorowana na Ableton Note: tytuł, pasek zakładek SEQ / MIX / FX na całą szerokość,
+ekran radarowy, cienki pasek przeglądu wzoru (kroki w poziomie, wysokość w pionie), pokrętła z **samą nazwą nad pokrętłem, bez liczb**,
+przyciski kontekstowe jako komórki rozdzielone linią (aktywny = odwrócony). Pomarańcz tylko na grafice i akcentach (na szarości ma kontrast ok. 2:1, więc nie na małym tekście).
+
 Osobna strona `docs/radar.html` (jeden układ jak aplikacja na telefon, na komputerze wyśrodkowany, proporcje zablokowane jak na telefonie) (wersja do artefaktu: `node scripts/build-radar.mjs out.html`), ten sam silnik dźwięku, inny interfejs
 zainspirowany radarem morskim:
 - **SEQ:** przemiatająca linia to głowica odtwarzania (jedno okrążenie = jeden obieg wzoru), nuty to echa na obwodzie
