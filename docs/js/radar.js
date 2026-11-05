@@ -454,7 +454,6 @@ const KEYS = {
   fx: [
     { label: 'SEKCJA', value: () => (fxActive === 0 ? 'FILTR' : 'EFEKT'), act: () => { fxActive = 1 - fxActive; showFxSection(); } },
     { label: 'STYLE', value: () => short8(fxSecs[fxActive].styles[fxSecs[fxActive].slot.style].name.toUpperCase()), act: () => cycleStyle(fxActive) },
-    { label: 'STAN', value: () => (fxSecs[fxActive].slot.bypass ? 'BYPASS' : 'ON'), lit: () => !fxSecs[fxActive].slot.bypass, act: () => bypass(fxActive) },
     { label: 'RND', value: () => 'LOSUJ', act: () => fxSecs[fxActive].randomize() },
     { label: 'STEROW.', value: () => CTL_LABEL[fxCtl], lit: () => fxCtl === 0, act: () => { fxCtl = (fxCtl + 1) % 3; } },
   ],
