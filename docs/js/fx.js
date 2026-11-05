@@ -36,10 +36,11 @@ const SHAPES = ['sine', 'triangle', 'square', 'sawtooth'];
 // Wspólny kształt: wejście -> (dry) + (tor mokry) -> poziom -> wyjście
 function wetDry(ctx) {
   const input = gain(ctx), dry = gain(ctx, 0), wet = gain(ctx, 1), lvl = gain(ctx), output = gain(ctx);
-  input.connect(dry).connect(lvl); wet.connect(lvl); lvl.connect(output);
-  return { input, dry, wet, lvl, output };
+  const tone = bq(ctx, 'highshelf'); tone.frequency.value = 3000;
+  input.connect(dry).connect(lvl); wet.connect(lvl); lvl.connect(tone).connect(output);
+  return { input, dry, wet, lvl, tone, output };
 }
-function setMix(w, m, level, now) { T(w.dry.gain, 1 - m, now); T(w.wet.gain, m, now); T(w.lvl.gain, level, now); }
+function setMix(w, m, level, now, tone = 0) { T(w.dry.gain, 1 - m, now); T(w.wet.gain, m, now); T(w.lvl.gain, level, now); T(w.tone.gain, tone, now); }
 
 function buildLadder(ctx) {
   const w = wetDry(ctx);
@@ -53,7 +54,7 @@ function buildLadder(ctx) {
       T(f1.Q, v.reso * 0.5, now); T(f2.Q, v.reso * 0.5, now);
       T(pre.gain, 1 + v.drive * 5, now);
       l.osc.type = v.lfoShape; T(l.osc.frequency, v.lfoRate, now); T(l.gain.gain, v.lfoDepth, now);
-      setMix(w, v.mix, 0.78 * v.level / (1 + v.drive * 5), now);   // kompensacja: domyślnie poziom bez zmian
+      setMix(w, v.mix, 0.78 / (1 + v.drive * 5), now, v.tone);   // kompensacja: domyślnie poziom bez zmian
     },
     stop() { l.osc.stop(); },
   };
@@ -75,7 +76,7 @@ function buildSvf(ctx) {
       T(gl.gain, Math.max(0, 1 - 2 * m), now); T(gb.gain, 1 - Math.abs(2 * m - 1), now); T(gh.gain, Math.max(0, 2 * m - 1), now);
       T(pre.gain, 1 + v.drive * 4, now);
       T(l.osc.frequency, v.lfoRate, now); T(l.gain.gain, v.lfoDepth, now);
-      setMix(w, v.mix, 0.74 * v.level / (1 + v.drive * 4), now);
+      setMix(w, v.mix, 0.74 / (1 + v.drive * 4), now, v.tone);
     },
     stop() { l.osc.stop(); },
   };
@@ -114,7 +115,7 @@ function buildComb(ctx) {
       T(pre.gain, 1 + v.drive * 3, now);
       T(l.osc.frequency, v.lfoRate, now); T(l.gain.gain, v.lfoDepth * t * 0.4, now);
       T(out.gain, 1 - v.feedback * 0.55, now);
-      setMix(w, v.mix, v.level / (1 + v.drive * 0.9), now);
+      setMix(w, v.mix, 1 / (1 + v.drive * 0.9), now, v.tone);
     },
     stop() { l.osc.stop(); },
   };
@@ -128,7 +129,8 @@ export const FILTER_STYLES = [
     P('lfoRate', 'lfo tempo', 0.3, [0.15, 0.55], expm(0.1, 12), (v) => `${v.toFixed(1)} Hz`),
     P('lfoDepth', 'lfo głębia', 0, [0, 0.4], lin(0, 2400), (v) => `${Math.round(v)} ct`),
     P('lfoShape', 'lfo kszt.', 0, [0, 0.99], choice(SHAPES), (v) => v),
-    MIX(1, [0.8, 1]), LEVEL(),
+    MIX(1, [0.8, 1]), 
+    P('tone', 'jasność', 0.5, [0.35, 0.65], lin(-9, 9), (v) => `${v > 0 ? '+' : ''}${v.toFixed(0)} dB`),
   ], build: buildLadder },
   { name: 'wielomodowy', params: [
     P('cutoff', 'cutoff', 0.9, [0.4, 0.95], expm(40, 8000), hz),
@@ -137,7 +139,8 @@ export const FILTER_STYLES = [
     P('drive', 'drive', 0.15, [0.05, 0.4], lin(0, 1), pc),
     P('lfoRate', 'lfo tempo', 0.3, [0.15, 0.55], expm(0.1, 12), (v) => `${v.toFixed(1)} Hz`),
     P('lfoDepth', 'lfo głębia', 0, [0, 0.4], lin(0, 2400), (v) => `${Math.round(v)} ct`),
-    MIX(1, [0.8, 1]), LEVEL(),
+    MIX(1, [0.8, 1]), 
+    P('tone', 'jasność', 0.5, [0.35, 0.65], lin(-9, 9), (v) => `${v > 0 ? '+' : ''}${v.toFixed(0)} dB`),
   ], build: buildSvf },
   { name: 'ms-20', params: [
     P('hpCut', 'hp częst.', 0.1, [0.05, 0.4], expm(30, 3000), hz),
@@ -156,7 +159,8 @@ export const FILTER_STYLES = [
     P('lfoRate', 'lfo tempo', 0.3, [0.15, 0.55], expm(0.1, 12), (v) => `${v.toFixed(1)} Hz`),
     P('lfoDepth', 'lfo głębia', 0, [0, 0.4], lin(0, 1), pc),
     P('drive', 'drive', 0.1, [0.05, 0.4], lin(0, 1), pc),
-    MIX(0, [0.2, 0.6]), LEVEL(),
+    MIX(0, [0.2, 0.6]), 
+    P('tone', 'jasność', 0.5, [0.35, 0.65], lin(-9, 9), (v) => `${v > 0 ? '+' : ''}${v.toFixed(0)} dB`),
   ], build: buildComb },
 ];
 
