@@ -227,6 +227,16 @@ function drawFx(ts) {
   g.setLineDash([4 * dpr, 4 * dpr]); g.beginPath(); g.moveTo(cx, cy); g.lineTo(bx, by); g.strokeStyle = `rgba(${ACC},.55)`; g.lineWidth = dpr; g.stroke(); g.setLineDash([]);
   g.strokeStyle = `rgba(${ACC},1)`; g.lineWidth = 1.6 * dpr;
   g.beginPath(); g.arc(kx, ky, R * 0.045, 0, TAU); g.moveTo(kx - R * 0.08, ky); g.lineTo(kx + R * 0.08, ky); g.moveTo(kx, ky - R * 0.08); g.lineTo(kx, ky + R * 0.08); g.stroke();
+  // rogi: parametry modulowane dotykiem (r = odległość od środka, kąt = obrót). Sekcja niesterowana jest przygaszona.
+  g.font = FONT(R * 0.085); g.textBaseline = 'middle';
+  const nameOf = (j, id) => (fxSecs[j].styles[fxSecs[j].slot.style].params.find((sp) => sp.id === id)?.label || id).toUpperCase();
+  const W = g.canvas.width, H = g.canvas.height, pad = 6 * dpr;
+  [[0, 0], [1, 1]].forEach(([j]) => {
+    const m = macroOf(j), on = ds.includes(j) ? 1 : 0.3, y = j === 0 ? pad + R * 0.05 : H - pad - R * 0.05;
+    g.fillStyle = `rgba(${INK},${on})`;
+    g.textAlign = 'left';  g.fillText(`${j === 0 ? 'F' : 'E'} r ${m.r.map((id) => nameOf(j, id)).join('+')}`, pad, y);
+    g.textAlign = 'right'; g.fillText(`${j === 0 ? 'F' : 'E'} ∠ ${m.a.map((id) => nameOf(j, id)).join('+')}`, W - pad, y);
+  });
   if (ds.length > 1) { const c1 = cursorOf(ds[1]), [hx, hy] = polarXY(cx, cy, c1.r, c1.a); g.beginPath(); g.arc(hx, hy, R * 0.03, 0, TAU); g.strokeStyle = `rgba(${ACC},.8)`; g.lineWidth = 1.4 * dpr; g.stroke(); }
 }
 
