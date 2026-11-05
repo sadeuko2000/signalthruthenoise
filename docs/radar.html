@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#030805">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>radarxxx</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap">
+<link rel="stylesheet" href="radar.css">
+</head>
+<body>
+<div id="radar" hidden>
+  <header class="bar">
+    <nav class="pages" id="pages" aria-label="Strony">
+      <button data-page="seq" class="on">SEQ</button>
+      <button data-page="mix">MIX</button>
+      <button data-page="fx">FX</button>
+    </nav>
+    <div class="bpm"><button id="bpm-" aria-label="wolniej">−</button><b id="bpm">130</b><button id="bpm+" aria-label="szybciej">+</button></div>
+    <button id="play" class="play" aria-label="play / stop">▶</button>
+  </header>
+  <div class="info" id="info"></div>
+
+  <main class="stage">
+    <section class="scopewrap" id="scopewrap"><canvas id="scope" aria-label="Ekran radarowy"></canvas></section>
+    <aside class="side" id="side">
+      <pre id="readout" aria-live="off"></pre>
+      <section class="knobrow" id="knobs-seq">
+        <div class="knob" id="density" data-label="DENS" data-min="0" data-max="1" data-step="0.01" data-value="0.6" data-fmt="pct"></div>
+        <div class="knob" id="sync" data-label="SYNC" data-min="0" data-max="1" data-step="0.01" data-value="0.5" data-fmt="pct"></div>
+        <div class="knob" id="gate" data-label="GATE" data-min="0.4" data-max="1.6" data-step="0.01" data-value="1" data-fmt="x"></div>
+        <div class="knob" id="swing" data-label="SWING" data-min="0" data-max="0.4" data-step="0.01" data-value="0" data-fmt="pct"></div>
+      </section>
+      <section class="knobrow two" id="knobs-mix" hidden>
+        <div class="knob" id="cutoff" data-label="CUTOFF" data-min="0" data-max="1" data-step="0.001" data-value="0.5" data-fmt="pct"></div>
+        <div class="knob" id="reso" data-label="RESO" data-min="0" data-max="1" data-step="0.01" data-value="0.5" data-fmt="pct"></div>
+      </section>
+    </aside>
+    <section id="fxpage" hidden></section>
+  </main>
+
+  <nav class="softkeys" id="softkeys" aria-label="Przyciski kontekstowe"></nav>
+</div>
+
+<div id="start">
+  <div class="sweepdemo" aria-hidden="true"></div>
+  <button id="go">START</button>
+  <p>słuchawki polecane</p>
+</div>
+<script type="module" src="js/radar.js"></script>
+</body>
+</html>

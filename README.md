@@ -18,6 +18,16 @@ Przycisk „widok” w nagłówku przełącza układ (wybór jest zapamiętywany
   (manifest + ikony), wtedy aplikacja działa pełnoekranowo.
 - **Desktop:** sekwencer po lewej, pad, silniki, filtr i efekty po prawej; skróty klawiszowe.
 
+## radarxxx: interfejs radarowy
+Osobna strona `docs/radar.html` (wersja do artefaktu: `node scripts/build-radar.mjs out.html`), ten sam silnik dźwięku, inny interfejs
+zainspirowany radarem morskim:
+- **SEQ:** przemiatająca linia to głowica odtwarzania (jedno okrążenie = jeden obieg wzoru), nuty to echa na obwodzie
+  (kąt = krok, odległość od środka = wysokość dźwięku), które gasną jak luminofor. Dotknięcie dodaje echo, przeciągnięcie je przesuwa,
+  dotknięcie istniejącego usuwa. Przycisk HDG MODE przełącza N-UP (linia się obraca) i H-UP (linia stoi, obraca się wzór).
+- **MIX:** cztery silniki jako cele na obwodzie, krzyżyk to punkt miksu.
+- **FX:** filtr i efekty (4 style po 8 parametrów).
+- Dolny rząd przycisków kontekstowych zmienia się zależnie od strony. Geometria jest w `docs/js/radargeo.js` (testowana).
+
 ## Skróty klawiszowe
 `spacja` play/stop · `R` losuj wzór · `M` mutuj · `T` moll/frygijska · `↑` `↓` BPM ±2 ·
 `1`–`4` solo silnika (z `shift` losuje jego parametry). Definicje są w tablicy `KEYS` w `docs/js/app.js`.

@@ -34,6 +34,12 @@ Nazwy jako punkt odniesienia, bez kopiowania działania:
 - Telefon: zakładki sekwencer / brzmienie / efekty, kroki 4×4, jedna karta silnika lub sekcji naraz.
 - Do sprawdzenia na prawdziwym telefonie: wielkość pokręteł i pada, wygoda przewijania, żyroskop, tryb poziomy (orientacja pozioma nie ma osobnego układu).
 
+## 6. radarxxx (interfejs radarowy)
+- Inspiracja: radary morskie (okrągły ekran, pierścienie zakresu, przemiatająca linia, echa, przyciski kontekstowe na dole).
+- Zrobione jako **osobna strona** (`docs/radar.html`) na tym samym silniku: sekwencer radarowy, miks silników z krzyżykiem, strona FX.
+- Do rozstrzygnięcia: czy radar zastępuje siatkę kroków w głównej aplikacji, czy zostaje jako osobny tryb (pasuje jako „nowoczesny” rodzaj sekwencera z punktu 2).
+- Pomysły na później: ślady (trails) powiązane z feedbackiem delaya, marker odległości (VRM) i linia namiaru (EBL) sterujące filtrem, cele z wektorami dla silników.
+
 ## Otwarte pytania
 1. Czy wybrane style filtra i efektów (patrz punkt 4) są właściwe, czy zmienić któryś.
 2. Czy wszystkie sekwencery mają tę samą siatkę 16 kroków, czy każdy własną długość.

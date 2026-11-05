@@ -115,6 +115,14 @@ export class Engine {
     this.voiceOn = false;
   }
 
+  // Pojedyncza nuta „na próbę” (np. przy układaniu wzoru dotykiem), niezależnie od zegara sekwencera.
+  audition(step) {
+    if (!this.ctx || !this.pattern) return;
+    const pat = this.pattern, t = this.ctx.currentTime + 0.01;
+    const freq = midiToHz(pitch(pat.root, pat.mode, step.degree, step.octave || 0)) * this.octMul;
+    this.voices.forEach((v, vi) => { if (this.eff[vi] > 0.02) v.note(t, freq, step.vel || 100, false, 0.16, false, false); });
+  }
+
   setBpm(v) { this.bpm = v; if (this.fx) this.fx.refresh(); }   // delay zsynchronizowany z tempem
 
   play() {
@@ -134,6 +142,7 @@ export class Engine {
   get playing() { return !!this.timer; }
 
   _tick() {
+    if (this.step >= this.pattern.steps.length) this.step = 0;   // wzór mógł się skrócić (zmiana długości)
     const ahead = this.ctx.currentTime + 0.12;
     while (this.nextTime < ahead) {
       this._scheduleStep(this.step, this.nextTime);
