@@ -21,9 +21,6 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--g);outline-offs
 .bpmchip b{font-weight:400;font-size:14px;color:var(--g);letter-spacing:.04em;margin-right:2px}
 .play{width:56px;height:46px;font-size:18px;color:var(--g);border-color:var(--gd)}
 .play.on{background:var(--g);color:var(--bg)}
-.info{padding:0 max(16px,env(safe-area-inset-right,0px)) 6px max(16px,env(safe-area-inset-left,0px));font-size:12px;letter-spacing:.08em;color:var(--g);display:flex;gap:14px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:6px}
-.info span{white-space:nowrap}
-.info .amb{color:var(--amber)}
 
 .stage{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:10px max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:10px}
 .scopewrap{display:grid;place-items:center}

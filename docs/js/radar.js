@@ -448,18 +448,9 @@ function setPage(p) {
 document.querySelectorAll('#pages button').forEach((b) => b.addEventListener('click', () => setPage(b.dataset.page)));
 
 // ---------- odczyty ----------
-function fxInfo() {
-  const nm = (j) => fxSecs[j].styles[fxSecs[j].slot.style].name.toUpperCase();
-  return ['FX', `FLT ${nm(0)}`, `FX ${nm(1)}`, `STEROW. ${CTL_LABEL[fxCtl]}`];
-}
 function updateInfo() {
   const n = pattern.steps.length, pos = curPos(), brg = Math.floor((pos / n) * 360) % 360;
   const on = pattern.steps.filter((s) => s.on), acc = on.filter((s) => s.vel >= 110).length;
-  const info = page === 'seq'
-    ? [`SEQ ${n}ST`, `BASE ${baseLabel()}`, MODE_LABEL[state.mode], `BRG ${String(brg).padStart(3, '0')}°`]
-    : page === 'mix' ? ['MIX', `X ${(padPos.x * 100) | 0}`, `Y ${(padPos.y * 100) | 0}`, `FLT ${(cutoffHz(+el('cutoff').value) | 0)} Hz`]
-      : fxInfo();
-  el('info').innerHTML = info.map((t, i) => `<span${i === 0 ? ' class="amb"' : ''}>${t}</span>`).join('');
   el('readout').textContent = [
     'RADARXXX', '',
     `BPM     ${engine.bpm}`,
