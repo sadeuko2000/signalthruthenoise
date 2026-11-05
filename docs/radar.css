@@ -1,4 +1,4 @@
-/* radarxxx: wygląd ekranu radarowego. Układ: telefon (domyślnie), komputer od 900 px. */
+/* radarxxx: wygląd ekranu radarowego. Jeden układ (telefon), na komputerze wyśrodkowany. */
 :root{
   --bg:#030805; --panel:#07110a; --line:#16341b; --g:#7dff5a; --gd:#3f9a2e; --amber:#ffcf4a; --alert:#ff5a4a;
   --txt:#b9ffa6; --dim:#4f7a48;
@@ -12,7 +12,7 @@ button{font:inherit;color:inherit;background:var(--panel);border:1px solid var(-
 button:active{filter:brightness(1.6)}
 button:focus-visible,.knob:focus-visible{outline:2px solid var(--g);outline-offset:2px}
 
-#radar{display:flex;flex-direction:column;height:100dvh;max-width:560px;margin:0 auto}
+#radar{display:flex;flex-direction:column;height:100dvh;max-width:430px;margin:0 auto}
 .bar{display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top,0px) + 8px) max(16px,env(safe-area-inset-right,0px)) 6px max(16px,env(safe-area-inset-left,0px))}
 .pages{display:flex;gap:4px;flex:1}
 .pages button{min-width:48px;min-height:46px;padding:0 8px;color:var(--dim)}
@@ -72,13 +72,8 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--g);outline-offs
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.sweepdemo{animation:none}}
 
-/* komputer: ekran po lewej, odczyty i pokrętła po prawej */
-@media (min-width:900px){
-  #radar{max-width:1180px}
-  .stage{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;align-items:start;overflow:visible}
-  #scope{width:min(100%,calc(100dvh - 190px))}
-  #readout{display:block}
-  .knob{--ks:52px}
-  #fxpage{grid-column:1/-1;grid-template-columns:1fr 1fr}
-  .info{font-size:13px}
+/* Na komputerze strona wygląda dokładnie jak aplikacja na telefon: wąska kolumna na środku, bez osobnego układu. */
+@media (min-width:600px){
+  html{background:#010402}
+  #radar{border-left:1px solid var(--line);border-right:1px solid var(--line);background:var(--bg)}
 }
