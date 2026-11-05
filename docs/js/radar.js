@@ -20,7 +20,7 @@ engine.pattern = pattern;
 let page = 'seq';
 const tabSel = { seq: 0, mix: 0, syn: 0, fx: 0 };   // wybrana pod-zakładka każdej strony (0 = MAIN)
 let synSel = 0;                                  // silnik edytowany na stronie SYN (0..3)
-const globals = { cutoff: 0.5, reso: 0.5, master: 1, comp: 0.5, mdrive: 0 };   // ustawienia wyjściowe i filtra globalnego (do zapisu w presetach)
+const globals = { cutoff: 0.5, reso: 0.5, master: 1, comp: 0.5, mdrive: 0, dj: 0, tape: 0, wow: 0, chorus: 0 };   // ustawienia wyjściowe i filtra globalnego (do zapisu w presetach)
 const padPos = { x: 0.25, y: 0.75 };
 const cv = el('scope'), g = cv.getContext('2d');
 let lastStep = { i: 0, t: 0 }, heldPos = 0;
@@ -390,6 +390,7 @@ const snapshot = () => JSON.parse(JSON.stringify({
 function applyGlobals() {
   engine.setCutoff(cutoffHz(globals.cutoff)); engine.setResonance(1 + globals.reso * 22);
   engine.setMaster(globals.master); engine.setComp(globals.comp); engine.setDrive(globals.mdrive);
+  engine.setDj(globals.dj); engine.setTape(globals.tape); engine.setWow(globals.wow); engine.setChorus(globals.chorus);
 }
 function restore(sn) {
   pattern = sn.pattern; engine.pattern = pattern;
@@ -647,6 +648,7 @@ const CONT = {
   eqlow: ['EQ LOW', (n) => engine.setEq(0, lin2(n, -12, 12))], eqmid: ['EQ MID', (n) => engine.setEq(1, lin2(n, -12, 12))], eqhigh: ['EQ HIGH', (n) => engine.setEq(2, lin2(n, -12, 12))],
   fmix: ['FLT MIX', (n) => setFxParam(fxSecs[0], 'mix', n)], fx1mix: ['FX1 MIX', (n) => setFxParam(fxSecs[1], 'mix', n)], fx2mix: ['FX2 MIX', (n) => setFxParam(fxSecs[2], 'mix', n)],
   flt1: ['FLT P1', fxIdx(0, 0)], flt2: ['FLT P2', fxIdx(0, 1)], fx1p1: ['FX1 P1', fxIdx(1, 0)], fx1p2: ['FX1 P2', fxIdx(1, 1)], fx2p1: ['FX2 P1', fxIdx(2, 0)], fx2p2: ['FX2 P2', fxIdx(2, 1)],
+  djf: ['DJ FLT', (n) => { globals.dj = n * 2 - 1; engine.setDj(globals.dj); }], tape: ['TAPE', (n) => { globals.tape = n; engine.setTape(n); }], wow: ['WOW', (n) => { globals.wow = n; engine.setWow(n); }], chorusm: ['CHORUS', (n) => { globals.chorus = n; engine.setChorus(n); }],
   padx: ['PAD X', (n) => setPad(n, padPos.y)], pady: ['PAD Y', (n) => setPad(padPos.x, n)],
   lv1: ['LEVEL 1', (n) => engine.setLevel(0, n * 1.5)], lv2: ['LEVEL 2', (n) => engine.setLevel(1, n * 1.5)], lv3: ['LEVEL 3', (n) => engine.setLevel(2, n * 1.5)], lv4: ['LEVEL 4', (n) => engine.setLevel(3, n * 1.5)],
 };
@@ -670,17 +672,18 @@ const saveCtrl = () => { try { localStorage.setItem(CTL_KEY, JSON.stringify(ctrl
 const ctrlVals = { x: 0.5, y: 0.5, faders: [0.5, 0.5, 0.5, 0.5], pitch: 0.5, mod: 0 };
 
 // pionowy suwak: value 0..1 od dołu; spring = wraca na środek po puszczeniu (pitch bend); bipolar = bez wypełnienia
-function vSlider({ label, value, onInput, spring }) {
-  const el0 = document.createElement('div'); el0.className = `vs${spring ? ' spring bipolar' : ''}`;
+function vSlider({ label, value, onInput, spring, rest = 0.5 }) {
+  const el0 = document.createElement('div'); el0.className = `vs${spring ? ' spring' : ''}${spring && rest === 0.5 ? ' bipolar' : ''}`;
   el0.innerHTML = '<div class="vt"><div class="vf"></div><div class="vk"></div></div><span class="vl"></span>';
   const t = el0.querySelector('.vt'), f = el0.querySelector('.vf'), k = el0.querySelector('.vk'), l = el0.querySelector('.vl');
   l.textContent = label;
   let v = value; const paint = () => { f.style.height = `${v * 100}%`; k.style.top = `${(1 - v) * 100}%`; }; paint();
-  const from = (e) => { const r = t.getBoundingClientRect(); v = Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height)); paint(); onInput(v); };
+  const say = (r) => { if (typeof r === 'string') l.textContent = r || label; };      // onInput może zwrócić nowy podpis (np. długość pętli)
+  const from = (e) => { const r = t.getBoundingClientRect(); v = Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height)); paint(); say(onInput(v)); };
   let on = false;
   el0.addEventListener('pointerdown', (e) => { on = true; el0.setPointerCapture(e.pointerId); from(e); });
   el0.addEventListener('pointermove', (e) => { if (on) from(e); });
-  const end = () => { if (!on) return; on = false; if (spring) { v = 0.5; paint(); onInput(0.5); } else commitSoon(); };
+  const end = () => { if (!on) return; on = false; if (spring) { v = rest; paint(); say(onInput(rest)); } else commitSoon(); };
   el0.addEventListener('pointerup', end); el0.addEventListener('pointercancel', end);
   return el0;
 }
@@ -899,10 +902,18 @@ function renderPanel() {
       [ep[0], ep[1], ep[2], 'mix'].forEach((id) => fk(1, id));
       B({ kind: 'act', label: () => 'RANDOM', act: () => { fxSecs.slice(0, 2).forEach((x) => x.randomize()); renderPanel(); } });
     } else if (tab === 4) {
-      panelEl.appendChild(grid);
+      // MSTR: master (głośność, kompresja, drive) i efekty na sumie: DJ filter, tape (TAPE + WOW), chorus oraz beat repeat jako pionowy suwak
+      panelEl.appendChild(grid); grid.classList.add('mstr');
       Kn('MASTER', 0, 1.2, 0.01, globals.master, 1, (v) => { globals.master = v; engine.setMaster(v); });
       Kn('COMP', 0, 1, 0.01, globals.comp, 0.5, (v) => { globals.comp = v; engine.setComp(v); });
       Kn('DRIVE', 0, 1, 0.01, globals.mdrive, 0, (v) => { globals.mdrive = v; engine.setDrive(v); });
+      Kn('DJ FLT', -1, 1, 0.01, globals.dj, 0, (v) => { globals.dj = v; engine.setDj(v); });
+      Kn('TAPE', 0, 1, 0.01, globals.tape, 0, (v) => { globals.tape = v; engine.setTape(v); });
+      Kn('WOW', 0, 1, 0.01, globals.wow, 0, (v) => { globals.wow = v; engine.setWow(v); });
+      Kn('CHORUS', 0, 1, 0.01, globals.chorus, 0, (v) => { globals.chorus = v; engine.setChorus(v); });
+      Sp();
+      const rs = vSlider({ label: 'REPEAT', value: 0, spring: true, rest: 0, onInput: (v) => engine.setRepeat(v) });   // chwilowy: puszczenie wyłącza pętlę
+      rs.classList.add('repeat'); grid.appendChild(rs);
     } else {
       panelEl.appendChild(fxSecs[tab - 1].sec);
     }

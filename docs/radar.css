@@ -161,3 +161,7 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .ctlbody .crow span{font-size:16px;letter-spacing:.08em}
 .ctlbody .csec{font-size:15px;opacity:.7;letter-spacing:.1em;margin-top:6px}
 .ctlbody select{font:inherit;font-size:18px;color:var(--ink);background:var(--paper);border:1px solid var(--ink);border-radius:0;min-height:36px;width:100%;padding:0 4px;letter-spacing:.05em}
+
+/* MSTR: 4 kolumny pokręteł i pionowy suwak beat repeat po prawej */
+.pgrid.mstr{grid-template-columns:repeat(4,minmax(0,1fr)) 64px}
+.pgrid.mstr .vs.repeat{grid-column:5;grid-row:1 / span 2;height:130px;align-self:start}

@@ -72,7 +72,8 @@ export class Engine {
     // po miksie silników: globalny filtr -> globalny efekt -> wyjście
     this.fx = new GlobalFx(c, () => this.bpm);
     this.mix.connect(this.dry).connect(this.fx.input);
-    this.fx.output.connect(this.master);
+    const mfx = this._buildMasterFx(c);             // efekty master: DJ filter, tape, chorus, beat repeat
+    this.fx.output.connect(mfx.input); mfx.output.connect(this.master);
     // korektor 3-pasmowy między silnikami a resztą toru
     this.eqIn = c.createGain();
     const lo = c.createBiquadFilter(), md = c.createBiquadFilter(), hi = c.createBiquadFilter();
@@ -96,6 +97,66 @@ export class Engine {
       return { lo, hi };
     });
     this.setBlend(0.25, 0.75);
+  }
+
+
+  // ---------- efekty na sumie (strona FX, zakładka MSTR) ----------
+  _buildMasterFx(c) {
+    const g = (v = 1) => { const n = c.createGain(); n.gain.value = v; return n; };
+    const bq = (type, f, q = 0.7) => { const n = c.createBiquadFilter(); n.type = type; n.frequency.value = f; n.Q.value = q; return n; };
+    const lfo = (type, f, depth, target) => { const o = c.createOscillator(); o.type = type; o.frequency.value = f; const d = g(depth); o.connect(d).connect(target); o.start(); return d; };
+    const input = g(), output = g();
+    // 1) DJ filter: jedna gałka, w lewo dolnoprzepustowy (zamyka górę), w prawo górnoprzepustowy (zabiera dół), środek = otwarte
+    const hp = bq('highpass', 20, 1.1), lp = bq('lowpass', 20000, 1.1);
+    // 2) tape: wow (wahanie wysokości przez modulowane opóźnienie), potem nasycenie, przycięcie góry i szum (mieszane suchy/mokry)
+    const wow = c.createDelay(0.05); wow.delayTime.value = 0.012;
+    const wowDepth = lfo('sine', 0.55, 0, wow.delayTime), flutDepth = lfo('triangle', 6.3, 0, wow.delayTime);
+    const sat = c.createWaveShaper(), cv = new Float32Array(2048), k = 1.6; for (let i = 0; i < cv.length; i++) cv[i] = Math.tanh(k * ((i / 2047) * 2 - 1)) / Math.tanh(k); sat.curve = cv; sat.oversample = '2x';
+    const pre = g(1), post = g(1), tlp = bq('lowpass', 18000, 0.5), tdry = g(1), twet = g(0);
+    const nb = c.createBuffer(1, c.sampleRate * 2, c.sampleRate), nd = nb.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+    const ns = c.createBufferSource(); ns.buffer = nb; ns.loop = true; const nhp = bq('highpass', 2500, 0.5), hiss = g(0); ns.connect(nhp).connect(hiss); ns.start();
+    // 3) chorus: dwie modulowane linie opóźnienia
+    const d1 = c.createDelay(0.05), d2 = c.createDelay(0.05); d1.delayTime.value = 0.0075; d2.delayTime.value = 0.0115;
+    const cd1 = lfo('sine', 0.8, 0.0025, d1.delayTime), cd2 = lfo('sine', 0.63, 0.0030, d2.delayTime);
+    const cdry = g(1), cwet = g(0);
+    // 4) beat repeat: pętla ostatniego kawałka dźwięku (długość zsynchronizowana z tempem), przy puszczeniu wraca zwykły dźwięk
+    const rdry = g(1), rwet = g(0), rin = g(1), rdel = c.createDelay(3), rfb = g(0); rdel.delayTime.value = 0.25;
+    input.connect(hp).connect(lp).connect(wow);
+    wow.connect(tdry); wow.connect(pre).connect(sat).connect(post).connect(tlp).connect(twet); hiss.connect(twet);
+    const tapeOut = g(); tdry.connect(tapeOut); twet.connect(tapeOut);
+    tapeOut.connect(cdry); tapeOut.connect(d1); tapeOut.connect(d2); d1.connect(cwet); d2.connect(cwet);
+    const chOut = g(); cdry.connect(chOut); cwet.connect(chOut);
+    chOut.connect(rdry).connect(output); chOut.connect(rin).connect(rdel); rdel.connect(rfb).connect(rdel); rdel.connect(rwet).connect(output);
+    this.mfx = { hp, lp, wowDepth, flutDepth, pre, post, tlp, tdry, twet, hiss, cdry, cwet, rdry, rwet, rin, rdel, rfb, cd1, cd2 };
+    return { input, output };
+  }
+  setDj(v) {                                    // v: -1 (dolnoprzepustowy do końca) … +1 (górnoprzepustowy do końca)
+    if (!this.mfx) return;
+    const t = this.ctx.currentTime, a = Math.abs(v) < 0.03 ? 0 : v;
+    this.mfx.lp.frequency.setTargetAtTime(a < 0 ? 20000 * Math.pow(150 / 20000, -a) : 20000, t, 0.02);
+    this.mfx.hp.frequency.setTargetAtTime(a > 0 ? 20 * Math.pow(300, a) : 20, t, 0.02);
+  }
+  setTape(a) {                                  // 0..1: nasycenie, ciemniejsza góra, szum
+    if (!this.mfx) return;
+    const t = this.ctx.currentTime, m = this.mfx;
+    m.twet.gain.setTargetAtTime(a, t, 0.02); m.tdry.gain.setTargetAtTime(1 - a, t, 0.02);
+    m.pre.gain.setTargetAtTime(1 + 3 * a, t, 0.02); m.post.gain.setTargetAtTime(1 / (1 + 1.8 * a), t, 0.02);
+    m.tlp.frequency.setTargetAtTime(18000 * Math.pow(3800 / 18000, a), t, 0.02); m.hiss.gain.setTargetAtTime(0.012 * a, t, 0.02);
+  }
+  setWow(w) { if (!this.mfx) return; const t = this.ctx.currentTime; this.mfx.wowDepth.gain.setTargetAtTime(0.0035 * w, t, 0.05); this.mfx.flutDepth.gain.setTargetAtTime(0.0006 * w, t, 0.05); }
+  setChorus(m) { if (!this.mfx) return; const t = this.ctx.currentTime; this.mfx.cwet.gain.setTargetAtTime(0.27 * m, t, 0.03); this.mfx.cdry.gain.setTargetAtTime(1 - 0.3 * m, t, 0.03); }
+  // beat repeat: v 0 = wyłączony, 0..1 wybiera długość pętli (1/2, 1/4, 1/8, 1/16, 1/32). Zwraca nazwę długości albo ''.
+  setRepeat(v) {
+    if (!this.mfx) return '';
+    const m = this.mfx, t = this.ctx.currentTime, on = v > 0.02;
+    if (on) {
+      const DIV = [['1/2', 2], ['1/4', 1], ['1/8', 0.5], ['1/16', 0.25], ['1/32', 0.125]], d = DIV[Math.min(DIV.length - 1, Math.floor(v * DIV.length))];
+      m.rdel.delayTime.setTargetAtTime(Math.min(2.9, (60 / this.bpm) * d[1]), t, 0.01);
+      if (!this._rep) { m.rin.gain.setTargetAtTime(0, t, 0.004); m.rfb.gain.setTargetAtTime(0.999, t, 0.004); m.rdry.gain.setTargetAtTime(0, t, 0.006); m.rwet.gain.setTargetAtTime(1, t, 0.006); this._rep = true; }
+      return d[0];
+    }
+    if (this._rep) { m.rin.gain.setTargetAtTime(1, t, 0.01); m.rfb.gain.setTargetAtTime(0, t, 0.01); m.rdry.gain.setTargetAtTime(1, t, 0.01); m.rwet.gain.setTargetAtTime(0, t, 0.01); this._rep = false; }
+    return '';
   }
 
   setCutoff(hz) {
