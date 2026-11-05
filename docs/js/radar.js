@@ -2,25 +2,25 @@
 // Przemiatająca linia = głowica odtwarzania (jedno okrążenie = jeden obieg wzoru), nuty = echa z poświatą.
 import { generateBass, mutate, DEFAULTS, withAccent, withSlide } from './generator.js';
 import { Engine } from './audio.js';
-import { VOICE_NAMES, PARAM_SPECS, clampToDisc } from './engines.js';
+import { VOICE_NAMES, PARAM_SPECS, clampToDisc, setGlideTime } from './engines.js';
 import { FILTER_STYLES, FX_STYLES, mapValues } from './fx.js';
 import { makeKnob, initKnobs } from './knob.js';
-import { TAU, DEG_MIN, DEG_MAX, R_OUT, degToR, rToDeg, angleOfStep, polar, stepFromAngle, sweepPos, echoAlpha, echoes, placeNote, clearNote, moveNote, resizeSteps, nFromR, rFromN, nFromTheta, thetaFromN, delayCopies, bandPass } from './radargeo.js';
+import { TAU, DEG_MIN, DEG_MAX, R_OUT, degToR, rToDeg, angleOfStep, polar, stepFromAngle, sweepPos, echoAlpha, echoes, placeNote, clearNote, moveNote, resizeSteps, nFromR, rFromN, nFromTheta, thetaFromN, delayCopies, bandPass, rotateSteps, reverseSteps, invertSteps, clearSteps, doubleSteps, halveSteps } from './radargeo.js';
 
 const el = (id) => document.getElementById(id);
 initKnobs();
 
 const engine = new Engine();
-const state = { ...DEFAULTS, seed: (Math.random() * 1e9) | 0, length: 16, accent: 0.5, slide: 0.1, oct: 0 };
+const state = { ...DEFAULTS, seed: (Math.random() * 1e9) | 0, length: 16, accent: 0.5, slide: 0.1, oct: 0, latch: false };
 // Akcenty i ślizgi są ustawiane pokrętłami i nakładane na każdy wzór (nowy, edytowany, zmutowany), bez generowania go od nowa.
 const effRoot = () => Math.max(12, Math.min(83, state.root + 12 * (state.oct || 0)));   // tonika + przesunięcie oktawowe z pokrętła OKTAWA (−2..+2)
 const finalize = (p) => withSlide(withAccent({ ...p, root: effRoot() }, state.accent), state.slide);
 let pattern = finalize(generateBass(state));
 engine.pattern = pattern;
 let page = 'seq';
-let mixView = null;                              // strona MIX: otwarte pod-menu pod radarem (null, 'eq', 'send', 'eng')
-let synSel = 0, synView = 0;                    // strona SYN: wybrany silnik (0..3) i widok (0 brzmienie, 1 obwiednie)
-let fxActive = 0;                              // sekcja FX, której pokrętła widać (0 filtr, 1 efekt)
+const tabSel = { seq: 0, mix: 0, syn: 0, fx: 0 };   // wybrana pod-zakładka każdej strony (0 = MAIN)
+let synSel = 0;                                  // silnik edytowany na stronie SYN (0..3)
+const globals = { cutoff: 0.5, reso: 0.5, master: 1, comp: 0.5, mdrive: 0 };   // ustawienia wyjściowe i filtra globalnego (do zapisu w presetach)
 const padPos = { x: 0.25, y: 0.75 };
 const cv = el('scope'), g = cv.getContext('2d');
 let lastStep = { i: 0, t: 0 }, heldPos = 0;
@@ -114,6 +114,27 @@ function drawSweepLine(G, S) {
   circle(cx, cy, R * 0.035, `rgba(${INK},1)`, 1.5 * dpr);
 }
 
+// Cztery kropki w rogach ekranu (przyciski o funkcji zależnej od strony). defs[i]: { label, sub, lit, bar, dim }.
+// lit === false = pusta kropka (przełącznik wyłączony), w pozostałych przypadkach pełna pomarańczowa.
+function drawCorners(G, defs) {
+  const { W, R, dpr } = G, m = W * 0.075, rd = W * 0.034;
+  g.textBaseline = 'middle';
+  defs.forEach((d, i) => {
+    if (!d) return;
+    const left = i % 2 === 0, top = i < 2, x = left ? m : W - m, y = top ? m : W - m, a = d.dim ? 0.4 : 1;
+    g.beginPath(); g.arc(x, y, rd, 0, TAU);
+    if (d.lit === false) { g.strokeStyle = `rgba(${ACC},${a})`; g.lineWidth = 2 * dpr; g.stroke(); }
+    else { g.fillStyle = `rgba(${ACC},${a})`; g.fill(); }
+    const tx = x + (left ? 1 : -1) * (rd + W * 0.025), sy = y + (top ? 1 : -1) * R * 0.1;
+    g.textAlign = left ? 'left' : 'right'; g.fillStyle = `rgba(${INK},${a})`; g.font = FONT(R * 0.085); g.fillText(d.label, tx, y);
+    if (d.bar != null) {
+      const bw = R * 0.5, bh = R * 0.04, bx = left ? tx : tx - bw, by = sy - bh / 2 + (top ? 0 : 0);
+      g.strokeStyle = `rgba(${INK},.35)`; g.lineWidth = dpr; g.strokeRect(bx, by, bw, bh);
+      g.fillStyle = d.barHot ? `rgb(${ACC})` : `rgba(${INK},.8)`; const fw = bw * d.bar; g.fillRect(left ? bx : bx + bw - fw, by, fw, bh);
+    } else if (d.sub) { g.font = FONT(R * 0.066); g.fillStyle = `rgba(${INK},${0.65 * a})`; g.fillText(d.sub, tx, sy); }
+  });
+}
+
 function drawSeq() {
   const G = geo(), S = sweepState(), { cx, cy, R, dpr } = G;
   drawBase(G, S);
@@ -125,6 +146,7 @@ function drawSeq() {
     g.setLineDash([4 * dpr, 4 * dpr]); g.beginPath(); g.moveTo(cx, cy); g.lineTo(tx, ty); g.strokeStyle = `rgba(${ACC},.7)`; g.lineWidth = dpr; g.stroke(); g.setLineDash([]);
     g.beginPath(); g.arc(mx, my, 9 * dpr, 0, TAU); g.strokeStyle = `rgba(${ACC},.95)`; g.lineWidth = 1.5 * dpr; g.stroke();
   }
+  drawCorners(G, dotDefs());
 }
 
 const PAD_ANCHORS = [[-1, 1], [1, 1], [-1, -1], [1, -1]].map(([a, b]) => [a * Math.SQRT1_2, b * Math.SQRT1_2]);
@@ -144,12 +166,10 @@ function drawMix() {
     g.strokeStyle = on ? `rgba(${INK},1)` : `rgba(${INK},.35)`; g.lineWidth = 1.6 * dpr; g.strokeRect(-sz, -sz, 2 * sz, 2 * sz);
     if (on) { g.fillStyle = w === Math.max(...engine.blend) ? `rgb(${ACC})` : `rgba(${INK},${(0.25 + 0.6 * w).toFixed(3)})`; g.fillRect(-sz, -sz, 2 * sz, 2 * sz); }   // najsilniejszy silnik na pomarańczowo
     g.restore();
-    g.textAlign = ax < 0 ? 'left' : 'right';
-    g.fillStyle = on ? `rgba(${INK},1)` : `rgba(${INK},.4)`;
-    g.fillText(typeName(i), ax < 0 ? cx - R * 0.97 : cx + R * 0.97, ay > 0 ? cy - R * 0.9 : cy + R * 0.9);
   });
   g.strokeStyle = `rgba(${ACC},1)`; g.lineWidth = 1.6 * dpr;
   g.beginPath(); g.arc(mx, my, R * 0.05, 0, TAU); g.moveTo(mx - R * 0.09, my); g.lineTo(mx + R * 0.09, my); g.moveTo(mx, my - R * 0.09); g.lineTo(mx, my + R * 0.09); g.stroke();
+  drawCorners(G, dotDefs());
 }
 
 // ---------- FX na ekranie radarowym ----------
@@ -229,16 +249,7 @@ function drawFx(ts) {
   g.setLineDash([4 * dpr, 4 * dpr]); g.beginPath(); g.moveTo(cx, cy); g.lineTo(bx, by); g.strokeStyle = `rgba(${ACC},.55)`; g.lineWidth = dpr; g.stroke(); g.setLineDash([]);
   g.strokeStyle = `rgba(${ACC},1)`; g.lineWidth = 1.6 * dpr;
   g.beginPath(); g.arc(kx, ky, R * 0.045, 0, TAU); g.moveTo(kx - R * 0.08, ky); g.lineTo(kx + R * 0.08, ky); g.moveTo(kx, ky - R * 0.08); g.lineTo(kx, ky + R * 0.08); g.stroke();
-  // rogi: parametry modulowane dotykiem (r = odległość od środka, kąt = obrót). Sekcja niesterowana jest przygaszona.
-  g.font = FONT(R * 0.085); g.textBaseline = 'middle';
-  const nameOf = (j, id) => (fxSecs[j].styles[fxSecs[j].slot.style].params.find((sp) => sp.id === id)?.label || id).toUpperCase();
-  const W = g.canvas.width, H = g.canvas.height, pad = 6 * dpr;
-  [[0, 0], [1, 1]].forEach(([j]) => {
-    const m = macroOf(j), on = ds.includes(j) ? 1 : 0.3, y = j === 0 ? pad + R * 0.05 : H - pad - R * 0.05;
-    g.fillStyle = `rgba(${INK},${on})`;
-    g.textAlign = 'left';  g.fillText(`${j === 0 ? 'F' : 'E'} r ${m.r.map((id) => nameOf(j, id)).join('+')}`, pad, y);
-    g.textAlign = 'right'; g.fillText(`${j === 0 ? 'F' : 'E'} ∠ ${m.a.map((id) => nameOf(j, id)).join('+')}`, W - pad, y);
-  });
+  drawCorners(G, dotDefs());
   if (ds.length > 1) { const c1 = cursorOf(ds[1]), [hx, hy] = polarXY(cx, cy, c1.r, c1.a); g.beginPath(); g.arc(hx, hy, R * 0.03, 0, TAU); g.strokeStyle = `rgba(${ACC},.8)`; g.lineWidth = 1.4 * dpr; g.stroke(); }
 }
 
@@ -250,9 +261,14 @@ const normParam = (i, id) => { const sp = specOf(i, id); return clamp01((engine.
 function setEngParam(i, id, nn) {
   const sp = specOf(i, id), raw = sp.min + clamp01(nn) * (sp.max - sp.min), v = Math.round(raw / sp.step) * sp.step;
   engine.setParam(i, id, v);
-  if (i === synSel && synRefs[id]) synRefs[id].value = v;
+  if (tabSel.syn === 0) { if (macroRefs[id]) macroRefs[id].value = v; }
+  else if (i === synSel && synRefs[id]) synRefs[id].value = v;
 }
-function synFrom(p) { setEngParam(synSel, 'fEnv', nFromR(p.rn)); setEngParam(synSel, 'fDec', nFromTheta(p.theta)); }
+// Na zakładce MAIN dotyk ustawia zryw i zanik filtra we wszystkich silnikach naraz, na zakładce silnika tylko w tym silniku.
+function synFrom(p) {
+  const all = tabSel.syn === 0 ? VOICE_NAMES.map((_, i) => i) : [synSel];
+  all.forEach((i) => { setEngParam(i, 'fEnv', nFromR(p.rn)); setEngParam(i, 'fDec', nFromTheta(p.theta)); });
+}
 
 function drawSyn() {
   const G = geo(), S = sweepState(), { cx, cy, R, dpr } = G, { n, pos } = S;
@@ -267,20 +283,7 @@ function drawSyn() {
     for (let k = 0; k < 6; k++) { g.beginPath(); g.arc(cx, cy, r0, start + (k * tail) / 6, start + ((k + 1) * tail) / 6); g.strokeStyle = `rgba(${INK},${((1 - k / 6) * 0.5 * al).toFixed(3)})`; g.lineWidth = Math.max(dpr, e.w * 0.5 * dpr); g.stroke(); }
   }
   drawSweepLine(G, S);
-  // proporcje głośności silników w rogach: długość paska = udział względem najgłośniejszego, najgłośniejszy na pomarańczowo, wybrany ze znacznikiem
-  const eff = engine.eff.map((v, i) => (engine.enabled[i] ? v : 0)), top = Math.max(...eff, 1e-6), lead = eff.indexOf(Math.max(...eff));
-  g.font = FONT(R * 0.085); g.textBaseline = 'middle';
-  VOICE_NAMES.forEach((_, i) => {
-    const left = i % 2 === 0, topRow = i < 2, x0 = left ? cx - R * 0.97 : cx + R * 0.97, share = eff[i] / top;
-    const ty = topRow ? cy - R * 0.9 : cy + R * 0.9, by = topRow ? ty + R * 0.11 : ty - R * 0.11, bw = R * 0.5, bh = R * 0.045;
-    g.textAlign = left ? 'left' : 'right';
-    g.fillStyle = `rgba(${INK},${engine.enabled[i] ? 1 : 0.4})`;
-    g.fillText((i === synSel ? '▸' : '') + typeName(i), x0, ty);
-    const bx = left ? x0 : x0 - bw;
-    g.strokeStyle = `rgba(${INK},.35)`; g.lineWidth = dpr; g.strokeRect(bx, by - bh / 2, bw, bh);
-    g.fillStyle = i === lead && eff[i] > 0 ? `rgb(${ACC})` : `rgba(${INK},.8)`;
-    const fw = bw * share; g.fillRect(left ? bx : bx + bw - fw, by - bh / 2, fw, bh);
-  });
+  drawCorners(G, dotDefs());
   const kr = rFromN(fE) * R, ka = thetaFromN(fD), [bx, by] = polarXY(cx, cy, R * 0.94, ka), [kx, ky] = polarXY(cx, cy, kr, ka);
   g.setLineDash([4 * dpr, 4 * dpr]); g.beginPath(); g.moveTo(cx, cy); g.lineTo(bx, by); g.strokeStyle = `rgba(${ACC},.55)`; g.lineWidth = dpr; g.stroke(); g.setLineDash([]);
   g.strokeStyle = `rgba(${ACC},1)`; g.lineWidth = 1.6 * dpr;
@@ -355,40 +358,128 @@ function endDrag() {
 cv.addEventListener('pointerup', endDrag);
 cv.addEventListener('pointercancel', () => { drag = null; touch = null; });
 
-// ---------- pokrętła ----------
-el('gate').addEventListener('input', (e) => { engine.gateMul = +e.target.value; });
-el('accent').addEventListener('input', (e) => { state.accent = +e.target.value; pattern = finalize(pattern); engine.pattern = pattern; });
-el('slide').addEventListener('input', (e) => { state.slide = +e.target.value; pattern = finalize(pattern); engine.pattern = pattern; });
-// Swing zmienia tylko rytm (opóźnienie parzystych kroków), nuty zostają: wzór nie jest generowany od nowa.
-el('oct').addEventListener('input', (e) => { state.oct = Math.round(+e.target.value); pattern = finalize(pattern); engine.pattern = pattern; engine.audition({ degree: 0, octave: 0, vel: 100 }); });
-el('swing').addEventListener('input', (e) => { state.swing = +e.target.value; pattern = { ...pattern, swing: state.swing }; engine.pattern = pattern; });
-el('cutoff').addEventListener('input', (e) => engine.setCutoff(cutoffHz(+e.target.value)));
-el('reso').addEventListener('input', (e) => engine.setResonance(1 + e.target.value * 22));
+
+// ============================================================================
+// Interfejs pod radarem: zakładki, siatka 5x2 pokręteł i przycisków, kropki w rogach, dolny pasek
+// ============================================================================
+const toastEl = el('toast');
+function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => toastEl.classList.remove('on'), 1800); }
+
+// ---------- historia (cofnij / ponów) i presety ----------
+const snapshot = () => JSON.parse(JSON.stringify({
+  pattern,
+  state: { root: state.root, mode: state.mode, accent: state.accent, slide: state.slide, oct: state.oct, swing: state.swing, seed: state.seed, density: state.density, syncopation: state.syncopation, latch: state.latch },
+  audio: { bpm: engine.bpm, gate: engine.gateMul, human: engine.human, ghost: engine.ghost, velo: engine.velo, types: engine.types, enabled: engine.enabled, levels: engine.levels, solo: engine.solo, xy: engine.xy, eq: engine.eq, vOct: engine.vOct, vTune: engine.vTune, vEq: engine.vEq, params: engine.voices.map((v) => v.params) },
+  globals, ctl: fxCtl, warp: warpIdx,
+  fx: [engine.fx.filter, engine.fx.fx].map((x) => ({ style: x.style, values: x.values, bypass: x.bypass })),
+}));
+function applyGlobals() {
+  engine.setCutoff(cutoffHz(globals.cutoff)); engine.setResonance(1 + globals.reso * 22);
+  engine.setMaster(globals.master); engine.setComp(globals.comp); engine.setDrive(globals.mdrive);
+}
+function restore(sn) {
+  pattern = sn.pattern; engine.pattern = pattern;
+  Object.assign(state, sn.state); engine.latch = state.latch;
+  const a = sn.audio;
+  engine.setBpm(a.bpm); engine.gateMul = a.gate; engine.human = a.human; engine.ghost = a.ghost; engine.velo = a.velo;
+  a.types.forEach((t, i) => { if (engine.types[i] !== t) engine.setType(i, t); });
+  a.params.forEach((pr, i) => Object.entries(pr).forEach(([id, v]) => { if (id in engine.voices[i].params) engine.setParam(i, id, v); }));
+  a.enabled.forEach((on, i) => engine.setEnabled(i, on)); a.levels.forEach((v, i) => engine.setLevel(i, v)); engine.setSolo(a.solo);
+  a.eq.forEach((v, b) => engine.setEq(b, v));
+  a.vOct.forEach((v, i) => { engine.vOct[i] = v; }); a.vTune.forEach((v, i) => { engine.vTune[i] = v; });
+  a.vEq.forEach((pair, i) => pair.forEach((v, b) => engine.setVoiceEq(i, b, v)));
+  setPad(a.xy[0], a.xy[1]);
+  Object.assign(globals, sn.globals); applyGlobals();
+  fxCtl = sn.ctl; warpIdx = sn.warp || 0;
+  sn.fx.forEach((x, j) => {
+    const sec = fxSecs[j], slot = sec.slot;
+    if (slot.style !== x.style) slot.setStyle(x.style);
+    slot.values = x.values.map((o) => ({ ...o })); slot.refresh(); slot.setBypass(x.bypass);
+    sec.sec.classList.toggle('off', x.bypass); sec.render();
+  });
+  el('bpm-v').textContent = engine.bpm;
+  renderSub(); renderPanel();
+}
+let hist = [], histIdx = -1, commitTimer = 0;
+function pushHistory() {
+  const sn = snapshot(), last = hist[histIdx];
+  if (last && JSON.stringify(last) === JSON.stringify(sn)) return;
+  hist = hist.slice(0, histIdx + 1); hist.push(sn); if (hist.length > 60) hist.shift();
+  histIdx = hist.length - 1; updateBar();
+}
+function commitSoon() { clearTimeout(commitTimer); commitTimer = setTimeout(pushHistory, 350); }
+function flushCommit() { if (commitTimer) { clearTimeout(commitTimer); commitTimer = 0; pushHistory(); } }
+function updateBar() { el('undo').disabled = histIdx <= 0; el('redo').disabled = histIdx >= hist.length - 1; }
+function stepHistory(d) {
+  flushCommit();
+  const ni = histIdx + d; if (ni < 0 || ni >= hist.length) return;
+  histIdx = ni; restore(hist[histIdx]); updateBar(); toast(d < 0 ? 'COFNIĘTO' : 'PONOWIONO');
+}
+el('undo').addEventListener('click', () => stepHistory(-1));
+el('redo').addEventListener('click', () => stepHistory(1));
+
+const PRESET_KEY = 'radarxxx.presets.v1';
+const loadPresets = () => { try { return JSON.parse(localStorage.getItem(PRESET_KEY) || '[]'); } catch { return []; } };
+const storePresets = (list) => { try { localStorage.setItem(PRESET_KEY, JSON.stringify(list)); return true; } catch { return false; } };
+el('save').addEventListener('click', () => {
+  flushCommit();
+  const list = loadPresets(), n = list.reduce((m, p) => Math.max(m, p.n), 0) + 1, name = `PRESET ${String(n).padStart(2, '0')}`;
+  list.push({ n, name, t: Date.now(), snap: snapshot() });
+  toast(storePresets(list) ? `ZAPISANO: ${name}` : 'NIE UDAŁO SIĘ ZAPISAĆ');
+});
+el('rec').addEventListener('click', () => toast('NAGRYWANIE: W PRZYGOTOWANIU'));
+
+// ---------- menu ----------
+const menuPop = el('menu-pop');
+function renderMenu(view = 'main') {
+  const body = el('menu-body'), row = (txt, fn, dim) => { const r = document.createElement('div'); r.className = 'mrow' + (dim ? ' dim' : ''); const b = document.createElement('button'); b.textContent = txt; if (fn) b.addEventListener('click', fn); r.appendChild(b); body.appendChild(r); return r; };
+  body.innerHTML = '';
+  if (view === 'main') {
+    row(`PRESETY (${loadPresets().length}) ›`, () => renderMenu('presets'));
+    row('USTAWIENIA MIDI (WKRÓTCE)', null, true);
+    row('NAGRANIA (WKRÓTCE)', null, true);
+  } else {
+    row('‹ WSTECZ', () => renderMenu('main'));
+    const list = loadPresets();
+    if (!list.length) { const m = document.createElement('div'); m.className = 'msub'; m.textContent = 'BRAK PRESETÓW. UŻYJ SAVE.'; body.appendChild(m); }
+    list.slice().reverse().forEach((p) => {
+      const r = row(`${p.name}`, () => { flushCommit(); restore(p.snap); pushHistory(); showMenu(false); toast(`WCZYTANO: ${p.name}`); });
+      const x = document.createElement('button'); x.className = 'x'; x.textContent = '×'; x.setAttribute('aria-label', `Usuń ${p.name}`);
+      x.addEventListener('click', () => { storePresets(loadPresets().filter((q) => q.n !== p.n)); renderMenu('presets'); });
+      r.appendChild(x);
+    });
+  }
+}
+const showMenu = (on) => { menuPop.hidden = !on; if (on) { renderMenu('main'); el('menu-ok').focus(); } };
+el('menu-open').addEventListener('click', () => showMenu(true));
+el('menu-ok').addEventListener('click', () => showMenu(false));
+menuPop.addEventListener('pointerdown', (e) => { if (e.target === menuPop) showMenu(false); });
 
 // ---------- akcje ----------
 const between = (a, b) => a + Math.random() * (b - a);
 const MODE_CYCLE = ['electro', 'phrygian', 'minor'];
 const MODE_LABEL = { electro: 'ELEKTRO', phrygian: 'FRYG', minor: 'MOLL' };
-const MODE_SHORT = { electro: 'ELEK', phrygian: 'FRYG', minor: 'MOLL' };
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const ROOT_MIN = 24, ROOT_MAX = 59;                           // tonika od C1 do B3 (36 półtonów)
 const rootParts = () => ({ pc: effRoot() % 12, oct: Math.floor(effRoot() / 12) - 1 });
 const baseLabel = () => { const r = rootParts(); return `${NOTE_NAMES[r.pc]}${r.oct}`; };
 const wrapRoot = (r) => (r > ROOT_MAX ? r - 36 : r < ROOT_MIN ? r + 36 : r);   // zawijanie w całym zakresie, nuta zostaje
+const refin = () => { pattern = finalize(pattern); engine.pattern = pattern; };
 // Zmiana nuty bazowej działa na żywo: wzór (stopnie skali) zostaje, zmienia się tylko wysokość toniki. Słychać ją od razu.
-function setRoot(r) {
-  state.root = r;
-  pattern = finalize(pattern); engine.pattern = pattern;
-  engine.audition({ degree: 0, octave: 0, vel: 100 });
-}
+function setRoot(r) { state.root = r; refin(); engine.audition({ degree: 0, octave: 0, vel: 100 }); }
+const WARP_OPS = [['OBRÓT', (st) => rotateSteps(st, 1)], ['ODBICIE', invertSteps], ['WSPAK', reverseSteps]];
+let warpIdx = 0;
 const actions = {
   base: (dir) => setRoot(wrapRoot(state.root + dir)),            // transpozycja o półton
-  octave: (dir) => setRoot(wrapRoot(state.root + 12 * dir)),     // skok o oktawę
-  key: () => { state.mode = MODE_CYCLE[(MODE_CYCLE.indexOf(state.mode) + 1) % MODE_CYCLE.length]; pattern = { ...pattern, mode: state.mode }; engine.pattern = pattern; },
+  key: (dir = 1) => { const n = MODE_CYCLE.length; state.mode = MODE_CYCLE[(MODE_CYCLE.indexOf(state.mode) + dir + n) % n]; pattern = { ...pattern, mode: state.mode }; engine.pattern = pattern; },
   // RANDOM: nowy wzór z losową gęstością i synkopą w rozsądnych granicach (swing i nuta bazowa zostają).
   random: () => { state.seed = (Math.random() * 1e9) | 0; state.density = between(0.3, 0.7); state.syncopation = between(0.25, 0.75); regen(); },
   // MUTATE: losuje ustawienia syntezatorów (parametry i obwiednie włączonych silników, w rozsądnych granicach). Wzór nut zostaje.
-  mut: () => { engine.enabled.forEach((on, i) => { if (on) engine.randomizeVoice(i); }); if (page === 'syn') renderSyn(); },
+  mut: () => { engine.enabled.forEach((on, i) => { if (on) engine.randomizeVoice(i); }); renderPanel(); },
+  latch: () => { state.latch = !state.latch; engine.latch = state.latch; toast(state.latch ? 'LATCH: WŁ.' : 'LATCH: WYŁ.'); },
+  // WARP: kolejne dotknięcia przekształcają wzór: obrót o krok, odbicie wysokości, odwrócenie kolejności
+  warp: () => { const [name, fn] = WARP_OPS[warpIdx % WARP_OPS.length]; warpIdx++; setSteps(fn(pattern.steps)); toast(`WARP: ${name}`); },
+  steps: (fn, name) => () => { setSteps(fn(pattern.steps)); if (name) toast(name); },
 };
 let wake = null;
 async function lockScreen() { try { if ('wakeLock' in navigator && !wake) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } } catch { /* odmowa */ } }
@@ -400,12 +491,12 @@ function togglePlay() {
   el('play').classList.toggle('on', engine.playing);
 }
 const setBpm = (v) => { engine.setBpm(Math.max(70, Math.min(180, Math.round(v)))); el('bpm-v').textContent = engine.bpm; };
-// Tempo: na ekranie mały napis „xxx BPM”, po dotknięciu okienko z dużą wartością i przyciskami − / + (przytrzymanie powtarza).
+// Tempo: ikona nutki otwiera okienko z dużą wartością i przyciskami − / + (przytrzymanie powtarza).
 const bpmPop = el('bpm-pop');
-const showBpm = (on) => { bpmPop.hidden = !on; if (on) el('bpm-ok').focus(); };
+const showBpm = (on) => { bpmPop.hidden = !on; if (on) el('bpm-ok').focus(); else commitSoon(); };
 el('bpm-open').addEventListener('click', () => showBpm(true));
 el('bpm-ok').addEventListener('click', () => showBpm(false));
-bpmPop.addEventListener('pointerdown', (e) => { if (e.target === bpmPop) showBpm(false); });   // dotknięcie tła zamyka
+bpmPop.addEventListener('pointerdown', (e) => { if (e.target === bpmPop) showBpm(false); });
 function holdRepeat(btn, step) {
   let t = 0, iv = 0;
   const stop = () => { clearTimeout(t); clearInterval(iv); };
@@ -418,191 +509,241 @@ el('bpm-5').addEventListener('click', () => setBpm(engine.bpm - 5));
 el('bpm+5').addEventListener('click', () => setBpm(engine.bpm + 5));
 el('play').addEventListener('click', togglePlay);
 
-// okienko BASE / KEY: nuta bazowa (półtony) i skala w jednym miejscu, zmiany słychać od razu
-const keyPop = el('key-pop');
-const refreshKeyPop = () => { el('kp-base').textContent = baseLabel(); el('kp-key').textContent = MODE_LABEL[state.mode]; };
-function showKey(on) { keyPop.hidden = !on; if (on) { refreshKeyPop(); el('kp-ok').focus(); } else renderKeys(); }
-keyPop.addEventListener('pointerdown', (e) => { if (e.target === keyPop) showKey(false); });
-el('kp-ok').addEventListener('click', () => showKey(false));
-const kpDo = (fn) => () => { fn(); refreshKeyPop(); };
-el('kp-base-').addEventListener('click', kpDo(() => actions.base(-1)));
-el('kp-base+').addEventListener('click', kpDo(() => actions.base(1)));
-el('kp-key+').addEventListener('click', kpDo(() => actions.key()));
-el('kp-key-').addEventListener('click', kpDo(() => { actions.key(); actions.key(); }));   // 3 skale: dwa kroki w przód = jeden w tył
-
-// ---------- przyciski kontekstowe (zależne od strony) ----------
-const rnd = (i) => { const vals = engine.randomizeVoice(i); return vals; };
-const short8 = (t) => (t.length > 8 ? `${t.slice(0, 7)}.` : t);       // napis w przycisku mieści się w komórce (np. DRABINK.)
-const KEYS = {
-  seq: [
-    { label: 'BASE/KEY', value: () => `${baseLabel()} ${MODE_SHORT[state.mode]}`, act: () => showKey(true) },
-    { label: 'RANDOM', value: () => 'LOSUJ', act: actions.random },
-    { label: 'MUTATE', value: () => 'SYNTH', act: actions.mut },
-  ],
-  mix: [
-    { label: 'EQ', value: () => 'LMH', lit: () => mixView === 'eq', act: () => toggleMixView('eq') },
-    { label: 'SEND', value: () => 'FX', lit: () => mixView === 'send', act: () => toggleMixView('send') },
-    { label: 'FILTR', value: () => (fxSecs[0].slot.bypass ? 'BYPASS' : 'ON'), lit: () => !fxSecs[0].slot.bypass, act: () => bypass(0) },
-    { label: 'SILNIKI', value: () => 'TYPY', lit: () => mixView === 'eng', act: () => toggleMixView('eng') },
-    { label: 'RND', value: () => 'LOSUJ', act: () => { engine.enabled.forEach((on, i) => { if (on) rnd(i); }); } },
-  ],
-  syn: [
-    { label: 'SILNIK', value: () => typeName(synSel), act: () => { synSel = (synSel + 1) % 4; renderSyn(); } },
-    { label: 'WIDOK', value: () => (synView === 0 ? 'SOUND' : 'ENV'), lit: () => synView === 1, act: () => { synView = 1 - synView; renderSyn(); } },
-    { label: 'RND', value: () => 'LOSUJ', act: randomizeSyn },
-  ],
-  fx: [
-    { label: 'SEKCJA', value: () => (fxActive === 0 ? 'FILTR' : 'EFEKT'), act: () => { fxActive = 1 - fxActive; showFxSection(); } },
-    { label: 'STYLE', value: () => short8(fxSecs[fxActive].styles[fxSecs[fxActive].slot.style].name.toUpperCase()), act: () => cycleStyle(fxActive) },
-    { label: 'RND', value: () => 'LOSUJ', act: () => fxSecs[fxActive].randomize() },
-    { label: 'STEROW.', value: () => CTL_LABEL[fxCtl], lit: () => fxCtl === 0, act: () => { fxCtl = (fxCtl + 1) % 3; } },
-  ],
-};
-function renderKeys() {
-  const host = el('softkeys');
-  host.innerHTML = '';
-  for (const k of KEYS[page]) {
-    const b = document.createElement('button');
-    b.className = k.lit && k.lit() ? 'lit' : '';
-    b.innerHTML = `<span class="l">${k.label}</span><span class="v">${k.value()}</span>`;
-    let hold = 0, held = false;
-    if (k.alt) {                                                  // przytrzymanie (0,45 s) = zmiana w drugą stronę
-      b.addEventListener('pointerdown', () => { held = false; hold = setTimeout(() => { held = true; k.alt(); renderKeys(); updateInfo(); }, 450); });
-      const cancel = () => clearTimeout(hold);
-      b.addEventListener('pointerup', cancel); b.addEventListener('pointerleave', cancel); b.addEventListener('pointercancel', cancel);
-    }
-    b.addEventListener('click', () => { if (held) { held = false; return; } k.act(); renderKeys(); updateInfo(); });
-    host.appendChild(b);
-  }
-}
-
-// ---------- strona SYN: pokrętła wybranego silnika ----------
-const synRefs = {};
-function synKnob(label, min, max, step, value, def, onInput) {
-  const k = document.createElement('div');
-  makeKnob(k, { label, min, max, step, value, def, fmt: 'num' });
-  k.addEventListener('input', () => onInput(k.value));
-  return k;
-}
-function renderSyn() {
-  const grid = el('syngrid'), holder = el('synstatic');
-  [el('cutoff'), el('reso')].forEach((k) => holder.appendChild(k));            // wyjmij globalne pokrętła, zanim wyczyścimy siatkę
-  grid.innerHTML = ''; Object.keys(synRefs).forEach((k) => delete synRefs[k]);
-  const i = synSel, pv = engine.voices[i].params, specs = PARAM_SPECS[engine.types[i]];
-  const add = (sp) => { const k = synKnob(sp.label.toUpperCase(), sp.min, sp.max, sp.step, pv[sp.id], sp.def, (v) => engine.setParam(i, sp.id, v)); synRefs[sp.id] = k; grid.appendChild(k); };
-  if (synView === 0) {
-    specs.filter((x) => x.group !== 'env').forEach(add);
-    grid.appendChild(el('cutoff')); grid.appendChild(el('reso'));               // globalne: wspólne dla silników
-  } else specs.filter((x) => x.group === 'env').forEach(add);
-}
-function randomizeSyn() {
-  const vals = engine.randomizeVoice(synSel);
-  for (const [id, v] of Object.entries(vals)) if (synRefs[id]) synRefs[id].value = v;
-}
-// ---------- strona MIX: pod-menu pod radarem ----------
-function toggleMixView(v) { mixView = mixView === v ? null : v; renderMix(); }
-function renderMix() {
-  const host = el('mixpage'), grid = el('mixgrid');
-  grid.innerHTML = '';
-  host.hidden = page !== 'mix' || !mixView;
-  if (host.hidden) return;
-  grid.className = mixView === 'eng' ? 'enggrid' : 'kgrid';
-  if (mixView === 'eq') {
-    ['LOW', 'MID', 'HIGH'].forEach((n, b) => grid.appendChild(synKnob(n, -12, 12, 0.5, engine.eq[b], 0, (v) => engine.setEq(b, v))));
-  } else if (mixView === 'send') {
-    // SEND na efekty: ilość sygnału kierowana do globalnego efektu (to samo, co MIX w sekcji EFEKT)
-    const sec = fxSecs[1], k = synKnob('SEND', 0, 1, 0.01, sec.slot.values[sec.slot.style].mix, 0, (v) => setFxParam(sec, 'mix', v));
-    grid.appendChild(k);
-  } else {
-    VOICE_NAMES.forEach((_, i) => {
-      const b = document.createElement('button');
-      b.className = 'engbtn';
-      b.innerHTML = `<span>${i + 1}</span><b>${typeName(i)}</b>`;
-      b.addEventListener('click', () => { engine.setType(i, (engine.types[i] + 1) % SHORT.length); renderMix(); if (synSel === i) renderSyn(); });
-      grid.appendChild(b);
-    });
-  }
-}
-// poziomy silników na stronie MIX
-VOICE_NAMES.forEach((n, i) => el(`lv${i}`).addEventListener('input', (e) => engine.setLevel(i, +e.target.value)));
-
-// ---------- strona FX ----------
+// ---------- FX: sekcje filtra i efektu (pokrętła budowane raz, pokazywane na zakładkach FLT i FX) ----------
 const fxSecs = [];
+const fxMainRefs = {};
+const short8 = (t) => (t.length > 8 ? `${t.slice(0, 7)}.` : t);
 function buildFx() {
-  const host = el('fxpage');
-  [[engine.fx.filter, FILTER_STYLES, 'FILTR'], [engine.fx.fx, FX_STYLES, 'EFEKT']].forEach(([slot, styles, title]) => {
+  [[engine.fx.filter, FILTER_STYLES], [engine.fx.fx, FX_STYLES]].forEach(([slot, styles], j) => {
     const sec = document.createElement('section');
     sec.className = 'fxsec';
-    sec.innerHTML = `<h2><span>${title}</span><b></b></h2><div class="kgrid"></div>`;
-    const grid = sec.querySelector('.kgrid'), label = sec.querySelector('b');
+    const grid = document.createElement('div'); grid.className = 'pgrid'; sec.appendChild(grid);
     let refs = {};
-    const render = () => {
+    const entry = {
+      slot, styles, sec, render,
+      get refs() { return refs; },
+      randomize() { const v = slot.randomize(); for (const [id, n] of Object.entries(v)) if (refs[id]) refs[id].value = n; },
+    };
+    function render() {
       grid.innerHTML = ''; refs = {};
-      label.textContent = styles[slot.style].name.toUpperCase();
       for (const sp of styles[slot.style].params) {
         const k = document.createElement('div');
         makeKnob(k, { label: sp.label.toUpperCase(), min: 0, max: 1, step: 0.001, value: slot.values[slot.style][sp.id], def: sp.def, show: (n) => sp.show(sp.map(n)) });
         k.addEventListener('input', () => slot.setParam(sp.id, k.value));
         grid.appendChild(k); refs[sp.id] = k;
       }
-    };
+      const used = styles[slot.style].params.length;
+      for (let i = used; i < 8; i++) { const sp = document.createElement('div'); sp.className = 'spacer'; grid.appendChild(sp); }
+      cellButton(grid, { kind: 'act', label: () => short8(styles[slot.style].name.toUpperCase()), act: () => { slot.setStyle((slot.style + 1) % styles.length); render(); } });
+      cellButton(grid, { kind: 'act', label: () => 'RANDOM', act: () => entry.randomize() });
+    }
+    fxSecs.push(entry);
     render();
-    fxSecs.push({
-      slot, styles, sec, render,
-      get refs() { return refs; },
-      randomize() { const v = slot.randomize(); for (const [id, n] of Object.entries(v)) refs[id].value = n; },
-    });
-    host.appendChild(sec);
   });
 }
-function showFxSection() { fxSecs.forEach((x, j) => { x.sec.hidden = j !== fxActive; }); }
-function cycleStyle(j) { const s = fxSecs[j]; s.slot.setStyle((s.slot.style + 1) % s.styles.length); s.render(); }
+function cycleStyle(j) { const s = fxSecs[j]; s.slot.setStyle((s.slot.style + 1) % s.styles.length); s.render(); if (page === 'fx') renderPanel(); }
 function bypass(j) { const s = fxSecs[j]; s.slot.setBypass(!s.slot.bypass); s.sec.classList.toggle('off', s.slot.bypass); }
+const fxStyleTarget = () => (tabSel.fx === 2 ? 1 : 0);
+
+// ---------- elementy siatki ----------
+const synRefs = {}, macroRefs = {};
+function synKnob(label, min, max, step, value, def, onInput) {
+  const k = document.createElement('div');
+  makeKnob(k, { label, min, max, step, value, def, fmt: 'num' });
+  k.addEventListener('input', () => onInput(k.value));
+  return k;
+}
+// Okrągły przycisk z nazwą nad nim. kind: 'act' (pomarańczowy, jednorazowy) albo 'tog' (zapalony = włączony).
+function cellButton(parent, { kind, label, on, act }) {
+  const c = document.createElement('div'), b = document.createElement('button'), l = document.createElement('span');
+  c.className = `cellbtn ${kind === 'tog' ? 'tog' : 'act'}`; l.className = 'cl'; c.appendChild(l); c.appendChild(b);
+  const refresh = () => { l.textContent = label(); b.setAttribute('aria-label', label()); if (kind === 'tog') c.classList.toggle('on', !!on()); };
+  b.addEventListener('click', () => { act(); refresh(); commitSoon(); });
+  refresh(); parent.appendChild(c); return c;
+}
+const spacer = (parent) => { const d = document.createElement('div'); d.className = 'spacer'; parent.appendChild(d); };
+// Wiersz „nazwa − wartość +” (zakładka SCALE).
+function stepRow(parent, name, value, minus, plus) {
+  const r = document.createElement('div'); r.className = 'steprow';
+  r.innerHTML = `<span>${name}</span><button aria-label="mniej">−</button><b></b><button aria-label="więcej">+</button>`;
+  const v = r.querySelector('b'), [bm, bp] = r.querySelectorAll('button');
+  const upd = () => { v.textContent = value(); };
+  bm.addEventListener('click', () => { minus(); upd(); commitSoon(); }); bp.addEventListener('click', () => { plus(); upd(); commitSoon(); });
+  upd(); parent.appendChild(r);
+}
+
+// ---------- zawartość zakładek ----------
+const panelEl = el('panel');
+const tabNames = (p) => ({
+  seq: ['MAIN', 'SEQ', 'SCALE', 'EXTRA'],
+  mix: ['MAIN', ...VOICE_NAMES.map((_, i) => typeName(i))],
+  syn: ['MAIN', ...VOICE_NAMES.map((_, i) => typeName(i))],
+  fx: ['MAIN', 'FLT', 'FX'],
+})[p];
+function renderSub() {
+  const host = el('subtabs'), names = tabNames(page);
+  host.innerHTML = '';
+  names.forEach((n, i) => {
+    const b = document.createElement('button'); b.textContent = n; b.className = i === tabSel[page] ? 'on' : '';
+    b.addEventListener('click', () => { tabSel[page] = i; if (page === 'syn' && i > 0) synSel = i - 1; renderSub(); renderPanel(); });
+    host.appendChild(b);
+  });
+}
+const specOfType = (t, id) => PARAM_SPECS[t].find((x) => x.id === id);
+const SHORT_LAB = { fEnv: 'F.ENV', fDec: 'F.ZAN.', aDec: 'A.ZAN.', aRel: 'A.REL.', aSus: 'A.SUST.', aAtk: 'A.ATAK' };   // krótkie nazwy, żeby mieściły się nad pokrętłem
+const labOf = (sp) => SHORT_LAB[sp.id] || sp.label.toUpperCase();
+
+function renderPanel() {
+  panelEl.replaceChildren();
+  Object.keys(synRefs).forEach((k) => delete synRefs[k]); Object.keys(macroRefs).forEach((k) => delete macroRefs[k]); Object.keys(fxMainRefs).forEach((k) => delete fxMainRefs[k]);
+  const grid = document.createElement('div'); grid.className = 'pgrid';
+  const tab = tabSel[page], B = (o) => cellButton(grid, o), Kn = (...a) => grid.appendChild(synKnob(...a)), Sp = () => spacer(grid);
+
+  if (page === 'seq') {
+    panelEl.appendChild(grid);
+    if (tab === 0) {
+      Kn('GATE', 0.4, 1.6, 0.01, engine.gateMul, 1, (v) => { engine.gateMul = v; });
+      Kn('SWING', 0, 0.4, 0.01, state.swing, 0, (v) => { state.swing = v; pattern = { ...pattern, swing: v }; engine.pattern = pattern; });
+      Kn('ACCENT', 0, 1, 0.01, state.accent, 0.5, (v) => { state.accent = v; refin(); });
+      Kn('SLIDE', 0, 1, 0.01, state.slide, 0.1, (v) => { state.slide = v; refin(); });
+      Kn('OKTAWA', -2, 2, 1, state.oct, 0, (v) => { state.oct = Math.round(v); refin(); engine.audition({ degree: 0, octave: 0, vel: 100 }); });
+      Kn('TEMPO', 70, 180, 1, engine.bpm, 130, (v) => setBpm(v));
+      Kn('LENGTH', 8, 32, 4, pattern.steps.length, 16, (v) => { const n = Math.round(v); if (n !== pattern.steps.length) setSteps(resizeSteps(pattern.steps, n)); });
+      let last = 0; Kn('SHIFT', -4, 4, 1, 0, 0, (v) => { const d = Math.round(v) - last; last = Math.round(v); if (d) setSteps(rotateSteps(pattern.steps, d)); });
+      Kn('HUMAN', 0, 1, 0.01, engine.human, 0, (v) => { engine.human = v; });
+      B({ kind: 'act', label: () => 'RANDOM', act: actions.random });
+    } else if (tab === 1) {
+      const A = (name, fn) => B({ kind: 'act', label: () => name, act: actions.steps(fn) });
+      A('CLEAR', clearSteps); A('REVERSE', reverseSteps); A('INVERT', invertSteps); A('ROT ←', (st) => rotateSteps(st, -1)); A('ROT →', (st) => rotateSteps(st, 1));
+      A('DOUBLE', doubleSteps); A('HALF', halveSteps);
+      Kn('GHOST', 0, 1, 0.01, engine.ghost, 0, (v) => { engine.ghost = v; });
+      Sp(); B({ kind: 'act', label: () => 'RANDOM', act: actions.random });
+    } else if (tab === 2) {
+      stepRow(grid, 'BASE', baseLabel, () => actions.base(-1), () => actions.base(1));
+      stepRow(grid, 'KEY', () => MODE_LABEL[state.mode], () => actions.key(-1), () => actions.key(1));
+    } else {
+      Kn('CUTOFF', 0, 1, 0.001, globals.cutoff, 0.5, (v) => { globals.cutoff = v; engine.setCutoff(cutoffHz(v)); });
+      Kn('RESO', 0, 1, 0.01, globals.reso, 0.5, (v) => { globals.reso = v; engine.setResonance(1 + v * 22); });
+      Kn('GLIDE', 0, 200, 5, glideMs, 50, (v) => { glideMs = v; setGlideTime(v / 1000); });
+      Kn('VELO', 0.4, 1, 0.01, engine.velo, 1, (v) => { engine.velo = v; });
+    }
+  } else if (page === 'mix') {
+    panelEl.appendChild(grid);
+    if (tab === 0) {
+      ['LOW', 'MID', 'HIGH'].forEach((n, b) => Kn(n, -12, 12, 0.5, engine.eq[b], 0, (v) => engine.setEq(b, v)));
+      const sec = fxSecs[1];
+      Kn('SEND', 0, 1, 0.01, sec.slot.values[sec.slot.style].mix, 0, (v) => setFxParam(sec, 'mix', v));
+      B({ kind: 'tog', label: () => 'FILTR', on: () => !fxSecs[0].slot.bypass, act: () => bypass(0) });
+      Kn('MASTER', 0, 1.2, 0.01, globals.master, 1, (v) => { globals.master = v; engine.setMaster(v); });
+      Kn('COMP', 0, 1, 0.01, globals.comp, 0.5, (v) => { globals.comp = v; engine.setComp(v); });
+      Kn('DRIVE', 0, 1, 0.01, globals.mdrive, 0, (v) => { globals.mdrive = v; engine.setDrive(v); });
+      Sp(); B({ kind: 'act', label: () => 'RANDOM', act: () => { engine.enabled.forEach((on, i) => { if (on) engine.randomizeVoice(i); }); } });
+    } else {
+      const i = tab - 1;
+      Kn('LEVEL', 0, 1.5, 0.01, engine.levels[i], 1, (v) => engine.setLevel(i, v));
+      Kn('TUNE', -100, 100, 1, engine.vTune[i], 0, (v) => { engine.vTune[i] = v; });
+      Kn('OCT', -2, 2, 1, engine.vOct[i], 0, (v) => { engine.vOct[i] = Math.round(v); });
+      Kn('EQ LOW', -12, 12, 0.5, engine.vEq[i][0], 0, (v) => engine.setVoiceEq(i, 0, v));
+      Kn('EQ HIGH', -12, 12, 0.5, engine.vEq[i][1], 0, (v) => engine.setVoiceEq(i, 1, v));
+      B({ kind: 'act', label: () => typeName(i), act: () => { engine.setType(i, (engine.types[i] + 1) % SHORT.length); renderSub(); renderPanel(); } });
+      B({ kind: 'tog', label: () => 'ON', on: () => !!engine.enabled[i], act: () => engine.setEnabled(i, !engine.enabled[i]) });
+      B({ kind: 'tog', label: () => 'SOLO', on: () => engine.solo === i, act: () => engine.setSolo(engine.solo === i ? null : i) });
+      Sp(); B({ kind: 'act', label: () => 'RANDOM', act: () => engine.randomizeVoice(i) });
+    }
+  } else if (page === 'syn') {
+    panelEl.appendChild(grid);
+    if (tab === 0) {
+      // makra: jedno pokrętło ustawia ten parametr we wszystkich czterech silnikach
+      const macro = (label, id) => { const sp = specOfType(engine.types[0], id); const k = synKnob(label, sp.min, sp.max, sp.step, engine.voices[0].params[id], sp.def, (v) => VOICE_NAMES.forEach((_, i) => engine.setParam(i, id, v))); macroRefs[id] = k; grid.appendChild(k); };
+      Kn('CUTOFF', 0, 1, 0.001, globals.cutoff, 0.5, (v) => { globals.cutoff = v; engine.setCutoff(cutoffHz(v)); });
+      Kn('RESO', 0, 1, 0.01, globals.reso, 0.5, (v) => { globals.reso = v; engine.setResonance(1 + v * 22); });
+      macro('F.ENV', 'fEnv'); macro('F.ZAN.', 'fDec'); macro('A.ZAN.', 'aDec');
+      macro('A.SUST.', 'aSus'); macro('A.REL.', 'aRel'); macro('A.ATAK', 'aAtk');
+      Sp(); B({ kind: 'act', label: () => 'RANDOM', act: () => { engine.enabled.forEach((on, i) => { if (on) engine.randomizeVoice(i); }); renderPanel(); } });
+    } else {
+      const i = synSel, t = engine.types[i], pv = engine.voices[i].params;
+      const own = PARAM_SPECS[t].filter((x) => x.group !== 'env').slice(0, 3);
+      const add = (sp) => { const k = synKnob(labOf(sp), sp.min, sp.max, sp.step, pv[sp.id], sp.def, (v) => engine.setParam(i, sp.id, v)); synRefs[sp.id] = k; grid.appendChild(k); };
+      own.forEach(add);
+      Kn('CUTOFF', 0, 1, 0.001, globals.cutoff, 0.5, (v) => { globals.cutoff = v; engine.setCutoff(cutoffHz(v)); });
+      Kn('RESO', 0, 1, 0.01, globals.reso, 0.5, (v) => { globals.reso = v; engine.setResonance(1 + v * 22); });
+      ['fEnv', 'fDec', 'aDec', 'aRel'].forEach((id) => add(specOfType(t, id)));
+      B({ kind: 'act', label: () => 'RANDOM', act: () => { const vals = engine.randomizeVoice(i); for (const [id, v] of Object.entries(vals)) if (synRefs[id]) synRefs[id].value = v; } });
+    }
+  } else {
+    if (tab === 0) {
+      panelEl.appendChild(grid);
+      const fk = (j, id) => { const sec = fxSecs[j], si = sec.slot.style, sp = sec.styles[si].params.find((x) => x.id === id); if (!sp) return Sp(); const k = document.createElement('div'); makeKnob(k, { label: sp.label.toUpperCase(), min: 0, max: 1, step: 0.001, value: sec.slot.values[si][id], def: sp.def, show: (n) => sp.show(sp.map(n)) }); k.addEventListener('input', () => setFxParam(sec, id, k.value)); fxMainRefs[`${j}:${id}`] = k; grid.appendChild(k); };
+      const fp = fxSecs[0].styles[fxSecs[0].slot.style].params.map((x) => x.id), ep = fxSecs[1].styles[fxSecs[1].slot.style].params.map((x) => x.id);
+      [fp[0], fp[1], fp[2], 'mix', fp.includes('tone') ? 'tone' : fp[3]].forEach((id) => fk(0, id));
+      [ep[0], ep[1], ep[2], 'mix'].forEach((id) => fk(1, id));
+      B({ kind: 'act', label: () => 'RANDOM', act: () => { fxSecs.forEach((x) => x.randomize()); renderPanel(); } });
+    } else {
+      panelEl.appendChild(fxSecs[tab === 1 ? 0 : 1].sec);
+    }
+  }
+}
+
+// ---------- kropki w rogach ----------
+const ctlLabel = ['OBA', 'FILTR', 'EFEKT'];
+function dotList() {
+  if (page === 'seq') return [
+    { label: 'RANDOM', act: actions.random }, { label: 'MUTATE', act: actions.mut },
+    { label: 'LATCH', lit: state.latch, act: actions.latch }, { label: 'WARP', sub: `› ${WARP_OPS[warpIdx % WARP_OPS.length][0]}`, act: actions.warp },
+  ];
+  if (page === 'mix') {
+    const top = Math.max(...engine.blend);
+    return VOICE_NAMES.map((_, i) => ({ label: typeName(i), lit: !!engine.enabled[i] && engine.blend[i] === top, dim: !engine.enabled[i], act: () => setPad(i % 2 === 0 ? 0 : 1, i < 2 ? 1 : 0) }));
+  }
+  if (page === 'syn') {
+    const eff = engine.eff.map((v, i) => (engine.enabled[i] ? v : 0)), top = Math.max(...eff, 1e-6), lead = eff.indexOf(Math.max(...eff));
+    return VOICE_NAMES.map((_, i) => ({ label: typeName(i), lit: tabSel.syn !== 0 && i === synSel, dim: !engine.enabled[i], bar: eff[i] / top, barHot: i === lead && eff[i] > 0, act: () => { synSel = i; tabSel.syn = i + 1; renderSub(); renderPanel(); } }));
+  }
+  const nameOf = (j, id) => (fxSecs[j].styles[fxSecs[j].slot.style].params.find((sp) => sp.id === id)?.label || id).toUpperCase();
+  const hint = (j) => { const m = macroOf(j); return `r ${m.r.map((id) => nameOf(j, id)).join('+')} ∠ ${m.a.map((id) => nameOf(j, id)).join('+')}`; };
+  return [
+    { label: 'FILTR', sub: hint(0), lit: !fxSecs[0].slot.bypass, dim: !driven().includes(0), act: () => bypass(0) },
+    { label: 'EFEKT', sub: hint(1), lit: !fxSecs[1].slot.bypass, dim: !driven().includes(1), act: () => bypass(1) },
+    { label: `STEROW. ${ctlLabel[fxCtl]}`, act: () => { fxCtl = (fxCtl + 1) % 3; } },
+    { label: 'STYLE', sub: short8(fxSecs[fxStyleTarget()].styles[fxSecs[fxStyleTarget()].slot.style].name.toUpperCase()), act: () => cycleStyle(fxStyleTarget()) },
+  ];
+}
+function dotDefs() { return dotList(); }
+el('dots').addEventListener('click', (e) => {
+  const b = e.target.closest('.dot'); if (!b) return;
+  dotList()[+b.dataset.i].act(); commitSoon();
+});
+el('dots').addEventListener('pointerdown', (e) => e.stopPropagation());
+
+// zmiany pokręteł i dotyk na radarze zapisują się w historii z opóźnieniem
+panelEl.addEventListener('input', commitSoon);
+cv.addEventListener('pointerup', commitSoon);
 
 // ---------- strony ----------
+let glideMs = 50;
 function setPage(p) {
   page = p;
   document.querySelectorAll('#pages button').forEach((b) => b.classList.toggle('on', b.dataset.page === p));
-  el('scopewrap').hidden = false;
-  el('side').hidden = p === 'fx' || p === 'syn';
-  el('knobs-seq').hidden = p !== 'seq';
-  el('knobs-mix').hidden = true;                    // poziomy silników nie są potrzebne: zostają na 100%, bez pokręteł
-  el('synpage').hidden = p !== 'syn';
-  renderMix();
-  el('fxpage').hidden = p !== 'fx';
-  if (p === 'syn') renderSyn();
-  if (p === 'fx') showFxSection();
-  fit(); renderKeys(); updateInfo();
+  if (p === 'syn' && tabSel.syn > 0) synSel = tabSel.syn - 1;
+  renderSub(); renderPanel();
+  fit(); updateInfo();
 }
 document.querySelectorAll('#pages button').forEach((b) => b.addEventListener('click', () => setPage(b.dataset.page)));
 
 // ---------- odczyty ----------
 function updateInfo() {
-  const n = pattern.steps.length, pos = curPos(), brg = Math.floor((pos / n) * 360) % 360;
-  const on = pattern.steps.filter((s) => s.on), acc = on.filter((s) => s.vel >= 110).length;
-  el('readout').textContent = [
-    'RADARXXX', '',
-    `BPM     ${engine.bpm}`,
-    `BASE    ${baseLabel()}`,
-    `KEY     ${MODE_LABEL[state.mode]}`,
-    `STEPS   ${String(on.length).padStart(2, '0')}/${n}`,
-    `ACCENT  ${Math.round(state.accent * 100)}% (${acc})`,
-    `SLIDE   ${Math.round(state.slide * 100)}% (${pattern.steps.filter((x) => x.on && x.tie).length})`,
-    `GATE    ${engine.gateMul.toFixed(2)}×`,
-    `SWING   ${Math.round(state.swing * 100)}%`,
-    `BRG     ${String(brg).padStart(3, '0')}°`,
-    `STEP    ${String(Math.floor(pos) + 1).padStart(2, '0')}`,
-    `ENG     ${engine.enabled.map((e, i) => (e ? typeName(i)[0] : '-')).join(' ')}`,
-  ].join('\n');
+  const n = pattern.steps.length, pos = curPos();
+  el('readout').textContent = `BPM ${engine.bpm}  BASE ${baseLabel()}  KEY ${MODE_LABEL[state.mode]}  STEP ${String(Math.floor(pos) + 1).padStart(2, '0')}/${n}`;
 }
-setInterval(() => { if (!el('radar').hidden) updateInfo(); }, 120);
+setInterval(() => { if (!el('radar').hidden) updateInfo(); }, 250);
 
 // ---------- skróty (komputer) ----------
 window.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || el('radar').hidden || (e.target instanceof HTMLElement && e.target.classList.contains('knob'))) return;
-  if (!keyPop.hidden) { if (e.code === 'Escape') { e.preventDefault(); showKey(false); } return; }
+  if (!menuPop.hidden) { if (e.code === 'Escape') { e.preventDefault(); showMenu(false); } return; }
   if (!bpmPop.hidden) { if (e.code === 'Escape') { e.preventDefault(); showBpm(false); } else if (e.code === 'ArrowUp') { e.preventDefault(); setBpm(engine.bpm + 1); } else if (e.code === 'ArrowDown') { e.preventDefault(); setBpm(engine.bpm - 1); } return; }
-  const map = { Space: togglePlay, KeyR: () => { actions.random(); renderKeys(); }, KeyM: () => { actions.mut(); },
+  const map = { Space: togglePlay, KeyR: () => { actions.random(); commitSoon(); }, KeyM: () => { actions.mut(); commitSoon(); },
+    KeyZ: () => stepHistory(e.shiftKey ? 1 : -1),
     Digit1: () => setPage('seq'), Digit2: () => setPage('mix'), Digit3: () => setPage('syn'), Digit4: () => setPage('fx'),
     ArrowUp: () => setBpm(engine.bpm + 2), ArrowDown: () => setBpm(engine.bpm - 2) };
   if (map[e.code]) { e.preventDefault(); if (e.target instanceof HTMLButtonElement) e.target.blur(); map[e.code](); }
@@ -611,13 +752,13 @@ window.addEventListener('keydown', (e) => {
 // ---------- start ----------
 el('go').addEventListener('click', async () => {
   await engine.start();
-  engine.setCutoff(cutoffHz(+el('cutoff').value));
-  engine.setResonance(1 + el('reso').value * 22);
+  applyGlobals();
   setPad(padPos.x, padPos.y);
   buildFx();
   el('start').hidden = true;
   el('radar').hidden = false;
   setPage('seq');
+  pushHistory();
   engine.play(); lockScreen();
   el('play').textContent = '■'; el('play').classList.add('on');
   cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);

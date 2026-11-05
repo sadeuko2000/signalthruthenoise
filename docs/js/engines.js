@@ -94,10 +94,12 @@ function holdAt(g, t) {
   if (g.cancelAndHoldAtTime) g.cancelAndHoldAtTime(t); else g.cancelScheduledValues(t);
 }
 
+let glideTime = 0.05;                                  // czas ślizgu (s), ustawiany pokrętłem GLIDE
+export const setGlideTime = (sec) => { glideTime = Math.max(0.005, sec); };
 function glide(param, freq, t) {
   param.cancelScheduledValues(t);
   param.setValueAtTime(param.value, t);
-  param.exponentialRampToValueAtTime(freq, t + 0.05);
+  param.exponentialRampToValueAtTime(freq, t + glideTime);
 }
 
 class Voice {

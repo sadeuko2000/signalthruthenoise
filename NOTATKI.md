@@ -54,3 +54,11 @@ Nazwy jako punkt odniesienia, bez kopiowania działania:
 2. Czy wszystkie sekwencery mają tę samą siatkę 16 kroków, czy każdy własną długość.
 3. Co dzieje się z żyroskopem i interfejsem mobilnym (odłożone na później).
 4. Perkusja i lead (odłożone na później).
+
+## 9. radarxxx: nowy układ (wersja z zakładkami)
+
+- Pod radarem: pasek pod-zakładek, siatka 5×2 pokręteł i przycisków (ostatnie miejsce to zwykle RANDOM), na dole ← → (cofnij/ponów), duże kółko REC (na razie tylko komunikat), SAVE (preset do localStorage), MENU (presety, MIDI i nagrania w przygotowaniu).
+- Cztery kropki w rogach radaru to przyciski zależne od strony. SEQ: RANDOM, MUTATE (losuje ustawienia syntezatorów), LATCH (nuty trzymają się do następnej), WARP (kolejno: obrót o krok, odbicie wysokości, wspak). MIX: skok pada do silnika. SYN: wybór silnika (pasek = udział w miksie). FX: bypass filtra, bypass efektu, STEROW., STYLE.
+- Zakładki: SEQ (MAIN, SEQ, SCALE, EXTRA), MIX (MAIN i po jednej na silnik), SYN (MAIN = makra na wszystkie silniki, potem silniki), FX (MAIN, FLT, FX).
+- Obsada pokręteł to propozycja z dokumentu „Obsada pokręteł”; można ją zmieniać w `renderPanel()` w `docs/js/radar.js`.
+- Dopisane w silniku: master, kompresja i drive wyjściowy, oktawa/strojenie/EQ każdego silnika, glide, velo, human, ghost, latch.

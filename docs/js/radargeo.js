@@ -122,3 +122,17 @@ export function bandPass(r, lo, hi, soft) {
   const d = r < lo ? lo - r : r > hi ? r - hi : 0;
   return 0.1 + 0.9 * Math.max(0, 1 - d / soft);
 }
+
+// ---------- przekształcenia wzoru (przyciski SEQ i WARP) ----------
+// Wszystkie zwracają nową tablicę kroków, nic nie zmieniają w miejscu.
+export const rotateSteps = (steps, k) => { const n = steps.length; return steps.map((_, i) => ({ ...steps[(((i - k) % n) + n) % n] })); };   // k > 0: do przodu
+export const reverseSteps = (steps) => steps.slice().reverse().map((s) => ({ ...s }));
+export function invertSteps(steps) {            // odbicie wysokości względem zakresu wzoru (najwyższa nuta zamienia się z najniższą)
+  const on = steps.filter((s) => s.on);
+  if (!on.length) return steps.map((s) => ({ ...s }));
+  const lo = Math.min(...on.map((s) => s.degree)), hi = Math.max(...on.map((s) => s.degree));
+  return steps.map((s) => (s.on ? { ...s, degree: lo + hi - s.degree } : { ...s }));
+}
+export const clearSteps = (steps) => steps.map((s) => ({ ...s, on: false, tie: false }));
+export const doubleSteps = (steps) => { const h = Math.max(1, Math.floor(steps.length / 2)); return steps.map((_, i) => ({ ...steps[i % h] })); };   // pierwsza połowa powtórzona na drugą
+export const halveSteps = (steps) => steps.slice(0, Math.max(4, Math.floor(steps.length / 2))).map((s) => ({ ...s }));

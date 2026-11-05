@@ -108,3 +108,32 @@ test('maska pasma: 1 w środku, gaśnie poza pasmem, nigdy poniżej 0,1', () => 
   assert.ok(bandPass(0.3, 0.4, 0.6, 0.1) < bandPass(0.35, 0.4, 0.6, 0.1));
   assert.equal(bandPass(2, 0.4, 0.6, 0.1), 0.1);
 });
+
+import { rotateSteps, reverseSteps, invertSteps, clearSteps, doubleSteps, halveSteps } from '../docs/js/radargeo.js';
+const mk = (...degs) => degs.map((d) => (d === null ? { on: false, degree: 0 } : { on: true, degree: d }));
+test('rotateSteps obraca wzór do przodu i wstecz bez zmiany długości', () => {
+  const s = mk(1, null, 3, null);
+  assert.deepEqual(rotateSteps(s, 1).map((x) => x.on && x.degree), [false, 1, false, 3]);
+  assert.deepEqual(rotateSteps(s, -1).map((x) => x.on && x.degree), [false, 3, false, 1]);
+  assert.equal(rotateSteps(s, 4).length, 4);
+  assert.deepEqual(rotateSteps(s, 4), s);
+});
+test('reverseSteps odwraca kolejność, a dwa razy daje oryginał', () => {
+  const s = mk(1, 2, null, 5);
+  assert.deepEqual(reverseSteps(s).map((x) => x.on && x.degree), [5, false, 2, 1]);
+  assert.deepEqual(reverseSteps(reverseSteps(s)), s);
+});
+test('invertSteps odbija wysokości w zakresie wzoru i zostawia puste kroki', () => {
+  const s = mk(0, 4, null, 1);
+  const r = invertSteps(s);
+  assert.deepEqual(r.map((x) => x.on && x.degree), [4, 0, false, 3]);
+  assert.deepEqual(invertSteps(r).map((x) => x.on && x.degree), [0, 4, false, 1]);
+  assert.deepEqual(invertSteps(mk(null, null)).map((x) => x.on), [false, false]);
+});
+test('clearSteps, doubleSteps i halveSteps', () => {
+  const s = mk(1, 2, 3, 4, null, null, null, null);
+  assert.ok(clearSteps(s).every((x) => !x.on));
+  assert.deepEqual(doubleSteps(s).map((x) => x.on && x.degree), [1, 2, 3, 4, 1, 2, 3, 4]);
+  assert.equal(halveSteps(s).length, 4);
+  assert.equal(halveSteps(mk(1, 2, 3, 4)).length, 4);
+});

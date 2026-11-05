@@ -27,34 +27,29 @@
   </header>
 
   <main class="stage">
-    <section class="scopewrap" id="scopewrap"><canvas id="scope" aria-label="Ekran radarowy"></canvas></section>
-    <aside class="side" id="side">
-      <pre id="readout" aria-live="off"></pre>
-      <section class="knobrow" id="knobs-seq">
-        <div class="knob" id="gate" data-label="GATE" data-min="0.4" data-max="1.6" data-step="0.01" data-value="1" data-fmt="x"></div>
-        <div class="knob" id="swing" data-label="SWING" data-min="0" data-max="0.4" data-step="0.01" data-value="0" data-fmt="pct"></div>
-        <div class="knob" id="accent" data-label="ACCENT" data-min="0" data-max="1" data-step="0.01" data-value="0.5" data-fmt="pct"></div>
-        <div class="knob" id="oct" data-label="OKTAWA" data-min="-2" data-max="2" data-step="1" data-value="0" data-fmt="num"></div>
-        <div class="knob" id="slide" data-label="SLIDE" data-min="0" data-max="1" data-step="0.01" data-value="0.1" data-fmt="pct"></div>
-      </section>
-      <section class="knobrow" id="knobs-mix" hidden>
-        <div class="knob" id="lv0" data-label="PROPHET" data-min="0" data-max="1.5" data-step="0.01" data-value="1" data-fmt="pct"></div>
-        <div class="knob" id="lv1" data-label="MS-20" data-min="0" data-max="1.5" data-step="0.01" data-value="1" data-fmt="pct"></div>
-        <div class="knob" id="lv2" data-label="DX" data-min="0" data-max="1.5" data-step="0.01" data-value="1" data-fmt="pct"></div>
-        <div class="knob" id="lv3" data-label="WAVETBL" data-min="0" data-max="1.5" data-step="0.01" data-value="1" data-fmt="pct"></div>
-      </section>
-    </aside>
-    <section id="synpage" hidden><div class="kgrid" id="syngrid"></div></section>
-    <section id="mixpage" hidden><div class="kgrid" id="mixgrid"></div></section>
-    <section id="fxpage" hidden></section>
-    <div id="synstatic" hidden>
-      <div class="knob" id="cutoff" data-label="CUTOFF" data-min="0" data-max="1" data-step="0.001" data-value="0.5" data-fmt="pct"></div>
-      <div class="knob" id="reso" data-label="RESO" data-min="0" data-max="1" data-step="0.01" data-value="0.5" data-fmt="pct"></div>
-    </div>
+    <section class="scopewrap" id="scopewrap">
+      <div class="scopebox">
+        <canvas id="scope" aria-label="Ekran radarowy"></canvas>
+        <div class="dots" id="dots">
+          <button class="dot" data-i="0"></button><button class="dot" data-i="1"></button>
+          <button class="dot" data-i="2"></button><button class="dot" data-i="3"></button>
+        </div>
+      </div>
+    </section>
+    <nav class="subtabs" id="subtabs" aria-label="Zakładki strony"></nav>
+    <section class="panel" id="panel"></section>
+    <pre id="readout" hidden></pre>
   </main>
 
-  <nav class="softkeys" id="softkeys" aria-label="Przyciski kontekstowe"></nav>
+  <nav class="bar" id="bar" aria-label="Pasek narzędzi">
+    <button id="undo" aria-label="Cofnij">←</button>
+    <button id="redo" aria-label="Ponów">→</button>
+    <button id="rec" class="rec" aria-label="Nagrywanie (w przygotowaniu)"></button>
+    <button id="save" aria-label="Zapisz preset">SAVE</button>
+    <button id="menu-open" aria-label="Menu">MENU</button>
+  </nav>
   <span class="cornerl" aria-hidden="true">RDX R 001</span><span class="cornerr" aria-hidden="true">PIXEL RADAR</span>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <div id="bpm-pop" class="pop" hidden role="dialog" aria-label="Tempo">
     <div class="popcard">
@@ -69,12 +64,11 @@
       <button id="bpm-ok" class="popok">OK</button>
     </div>
   </div>
-  <div id="key-pop" class="pop" hidden role="dialog" aria-label="Nuta bazowa i skala">
-    <div class="popcard">
-      <div class="poplabel">BASE / KEY</div>
-      <div class="keyrow"><span>BASE</span><button id="kp-base-" aria-label="półton niżej">−</button><b id="kp-base">C2</b><button id="kp-base+" aria-label="półton wyżej">+</button></div>
-      <div class="keyrow"><span>KEY</span><button id="kp-key-" aria-label="poprzednia skala">−</button><b id="kp-key">ELEKTRO</b><button id="kp-key+" aria-label="następna skala">+</button></div>
-      <button id="kp-ok" class="popok">OK</button>
+  <div id="menu-pop" class="pop" hidden role="dialog" aria-label="Menu">
+    <div class="popcard menucard">
+      <div class="poplabel">MENU</div>
+      <div id="menu-body" class="menubody"></div>
+      <button id="menu-ok" class="popok">ZAMKNIJ</button>
     </div>
   </div>
 </div>
