@@ -500,10 +500,13 @@ let wake = null;
 async function lockScreen() { try { if ('wakeLock' in navigator && !wake) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } } catch { /* odmowa */ } }
 function unlockScreen() { try { if (wake) wake.release(); } catch { /* nic */ } wake = null; }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && engine.playing) lockScreen(); });
+// Przycisk start/stop rysowany jako SVG (a nie znakiem z czcionki): kwadrat = stop (gra), trójkąt = play (stoi).
+const GLYPH_STOP = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" fill="currentColor"/></svg>';
+const GLYPH_PLAY = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M3 1.5v13l11-6.5z" fill="currentColor"/></svg>';
+function showPlayState() { el('play').innerHTML = engine.playing ? GLYPH_STOP : GLYPH_PLAY; el('play').classList.toggle('on', engine.playing); el('play').setAttribute('aria-label', engine.playing ? 'stop' : 'play'); }
 function togglePlay() {
   if (engine.playing) { engine.stop(); unlockScreen(); } else { engine.play(); lockScreen(); }
-  el('play').textContent = engine.playing ? '■' : '▶';
-  el('play').classList.toggle('on', engine.playing);
+  showPlayState();
 }
 const setBpm = (v) => { engine.setBpm(Math.max(70, Math.min(180, Math.round(v)))); el('bpm-v').textContent = engine.bpm; };
 // Tempo: ikona nutki otwiera okienko z dużą wartością i przyciskami − / + (przytrzymanie powtarza).
@@ -786,7 +789,7 @@ el('go').addEventListener('click', async () => {
   setPage('seq');
   pushHistory();
   engine.play(); lockScreen();
-  el('play').textContent = '■'; el('play').classList.add('on');
+  showPlayState();
   cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
 });
 el('go').focus();
