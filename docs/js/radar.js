@@ -384,7 +384,7 @@ const snapshot = () => JSON.parse(JSON.stringify({
   pattern,
   state: { root: state.root, mode: state.mode, accent: state.accent, slide: state.slide, oct: state.oct, swing: state.swing, seed: state.seed, density: state.density, syncopation: state.syncopation, latch: state.latch, mixMode: state.mixMode },
   audio: { offs: { offFAtk: engine.p.offFAtk, offFRel: engine.p.offFRel, offAAtk: engine.p.offAAtk, offARel: engine.p.offARel }, bpm: engine.bpm, gate: engine.gateMul, human: engine.human, ghost: engine.ghost, velo: engine.velo, types: engine.types, enabled: engine.enabled, levels: engine.levels, solo: engine.solo, xy: engine.xy, eq: engine.eq, vOct: engine.vOct, vTune: engine.vTune, vEq: engine.vEq, params: engine.voices.map((v) => v.params) },
-  globals, ctl: fxCtl, warp: warpIdx, ctrl,
+  globals, ctl: fxCtl, warp: warpIdx, ctrl, route: engine.fx.order,
   fx: [engine.fx.filter, engine.fx.fx, engine.fx.fx2].map((x) => ({ style: x.style, values: x.values, bypass: x.bypass })),
 }));
 function applyGlobals() {
@@ -407,6 +407,7 @@ function restore(sn) {
   Object.assign(globals, sn.globals); applyGlobals();
   fxCtl = sn.ctl; warpIdx = sn.warp || 0;
   if (sn.ctrl) { ctrl = { ...ctrlDefault(), ...sn.ctrl }; saveCtrl(); }
+  if (sn.route) engine.fx.route(sn.route);
   sn.fx.forEach((x, j) => {
     const sec = fxSecs[j]; if (!sec) return;
     const slot = sec.slot;
@@ -624,7 +625,7 @@ function stepRow(parent, name, value, minus, plus) {
 // Co steruje czym, wybiera się w okienku EDIT.
 // ============================================================================
 const modeSel = { seq: 'enc', mix: 'enc', syn: 'enc', fx: 'enc' };
-const hasMode = () => tabSel[page] === 0 || page === 'mix' || page === 'syn';
+const hasMode = () => page !== 'fx' && (tabSel[page] === 0 || page === 'mix' || page === 'syn');
 const lin2 = (n, a, b) => a + n * (b - a);
 const envAll = (id) => (n) => { const sp = specOfType(engine.types[0], id); const v = Math.round(lin2(n, sp.min, sp.max) / sp.step) * sp.step; VOICE_NAMES.forEach((_, i) => engine.setParam(i, id, v)); };
 const fxIdx = (j, idx) => (n) => { const sec = fxSecs[j], sp = sec.styles[sec.slot.style].params[idx]; if (sp) setFxParam(sec, sp.id, n); };
@@ -722,19 +723,43 @@ function renderControllers() {
   ['left', 'right'].forEach((side) => { const box = document.createElement('div'); box.className = 'cbox'; CTL_BUILD[ctrl[side]](box); wrap.appendChild(box); });
   panelEl.appendChild(wrap);
 }
+const FX_NAMES = ['FLT', 'FX1', 'FX2'];
+const PERMS = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+const routeText = () => `ROUTING:${engine.fx.order.map((i) => FX_NAMES[i]).join('-')}`;
 function moderow() {
-  const r = document.createElement('div'), on = hasMode(); r.className = `moderow${on ? '' : ' off'}`;
+  const r = document.createElement('div'), fxp = page === 'fx', on = fxp || hasMode(); r.className = `moderow${on ? '' : ' off'}`;
   const m = document.createElement('button'), e = document.createElement('button');
-  m.textContent = `MODE:${modeSel[page] === 'ctl' ? 'CONTROLLER' : 'ENCODER'}`; e.textContent = 'EDIT';
-  m.addEventListener('click', () => { modeSel[page] = modeSel[page] === 'ctl' ? 'enc' : 'ctl'; renderPanel(); });
-  e.addEventListener('click', () => showCtl(true));
+  e.textContent = 'EDIT';
+  if (fxp) {
+    // strona FX: kolejność sekcji w łańcuchu; dotknięcie napisu przełącza kolejne układy, EDIT otwiera okienko
+    m.textContent = routeText(); m.setAttribute('aria-label', 'Zmień kolejność efektów');
+    m.addEventListener('click', () => { const k = PERMS.findIndex((p) => p.join() === engine.fx.order.join()); engine.fx.route(PERMS[(k + 1) % PERMS.length]); m.textContent = routeText(); commitSoon(); });
+    e.addEventListener('click', () => showCtl(true, 'route'));
+  } else {
+    m.textContent = `MODE:${modeSel[page] === 'ctl' ? 'CONTROLLER' : 'ENCODER'}`;
+    m.addEventListener('click', () => { modeSel[page] = modeSel[page] === 'ctl' ? 'enc' : 'ctl'; renderPanel(); });
+    e.addEventListener('click', () => showCtl(true));
+  }
   if (!on) { m.tabIndex = -1; e.tabIndex = -1; }
   r.appendChild(m); r.appendChild(e); return r;
 }
 // okienko EDIT: typ obu boksów i przypisania parametrów (listy rozwijane)
 const ctlPop = el('ctl-pop');
+let ctlView = 'ctl';
+function renderRouteEdit() {
+  const body = el('ctl-body'); body.innerHTML = ''; el('ctl-title').textContent = 'ROUTING';
+  const info = document.createElement('div'); info.className = 'csec'; info.textContent = `WEJŚCIE › ${engine.fx.order.map((i) => FX_NAMES[i]).join(' › ')} › WYJŚCIE`; body.appendChild(info);
+  engine.fx.order.forEach((cur, pos) => {
+    const r = document.createElement('div'); r.className = 'crow'; const sp = document.createElement('span'); sp.textContent = `MIEJSCE ${pos + 1}`;
+    const sel = document.createElement('select'); sel.setAttribute('aria-label', `Miejsce ${pos + 1}`);
+    FX_NAMES.forEach((n, i) => { const o = document.createElement('option'); o.value = i; o.textContent = n; if (i === cur) o.selected = true; sel.appendChild(o); });
+    sel.addEventListener('change', () => { const o = engine.fx.order.slice(), want = +sel.value, from = o.indexOf(want); o[from] = o[pos]; o[pos] = want; engine.fx.route(o); renderRouteEdit(); renderPanel(); commitSoon(); });   // wybór zamienia miejscami z dotychczasowym właścicielem
+    r.appendChild(sp); r.appendChild(sel); body.appendChild(r);
+  });
+}
 function renderCtlEdit() {
-  const body = el('ctl-body'); body.innerHTML = '';
+  if (ctlView === 'route') { renderRouteEdit(); return; }
+  const body = el('ctl-body'); body.innerHTML = ''; el('ctl-title').textContent = 'KONTROLERY';
   const row = (lab, opts, cur, set) => {
     const r = document.createElement('div'); r.className = 'crow'; const sp = document.createElement('span'); sp.textContent = lab;
     const sel = document.createElement('select'); sel.setAttribute('aria-label', lab);
@@ -751,7 +776,7 @@ function renderCtlEdit() {
   if (used.has('faders')) { sec('4 SUWAKI'); [1, 2, 3, 4].forEach((n, i) => row(`S${n}`, cont, ctrl.faders[i], (v) => { ctrl.faders[i] = v; })); }
   if (used.has('wheels')) { sec('PITCH BEND (±2 PÓŁTONY) I MODULATION'); row('MOD', cont, ctrl.mod, (v) => { ctrl.mod = v; }); }
 }
-const showCtl = (on) => { ctlPop.hidden = !on; if (on) { renderCtlEdit(); el('ctl-ok').focus(); } };
+const showCtl = (on, view = 'ctl') => { ctlPop.hidden = !on; if (on) { ctlView = view; renderCtlEdit(); el('ctl-ok').focus(); } };
 el('ctl-ok').addEventListener('click', () => showCtl(false));
 ctlPop.addEventListener('pointerdown', (e) => { if (e.target === ctlPop) showCtl(false); });
 

@@ -370,10 +370,18 @@ export class GlobalFx {
     this.filter = new FxSlot(ctx, FILTER_STYLES, bpm);
     this.fx = new FxSlot(ctx, FX_STYLES, bpm);
     this.fx2 = new FxSlot(ctx, FX_STYLES, bpm);       // drugi efekt (FX2), domyślnie bez miksu, więc niesłyszalny
-    this.input.connect(this.filter.input);
-    this.filter.output.connect(this.fx.input);
-    this.fx.output.connect(this.fx2.input);
-    this.fx2.output.connect(this.output);
+    this.slots = [this.filter, this.fx, this.fx2];
+    this.order = [0, 1, 2];
+    this.route(this.order);
   }
-  refresh() { this.filter.refresh(); this.fx.refresh(); this.fx2.refresh(); }   // np. po zmianie BPM (delay zsynchronizowany z tempem)
+  // ROUTING: kolejność szeregowa trzech sekcji, np. [0, 1, 2] = FLT-FX1-FX2, [1, 0, 2] = FX1-FLT-FX2.
+  route(order) {
+    this.input.disconnect(); this.slots.forEach((x) => x.output.disconnect());
+    const chain = order.map((i) => this.slots[i]);
+    this.input.connect(chain[0].input);
+    for (let k = 0; k < chain.length - 1; k++) chain[k].output.connect(chain[k + 1].input);
+    chain[chain.length - 1].output.connect(this.output);
+    this.order = order.slice();
+  }
+  refresh() { this.slots.forEach((x) => x.refresh()); }   // np. po zmianie BPM (delay zsynchronizowany z tempem)
 }
