@@ -11,6 +11,13 @@ npm run serve     # http://localhost:8000 (mikrofon/czujniki na telefonie wymaga
 npm test          # testy generatora (node:test)
 ```
 
+## Widoki: telefon i desktop
+Przycisk „widok” w nagłówku przełącza układ (wybór jest zapamiętywany; domyślnie telefon wykrywany po dotyku i szerokości ekranu).
+- **Telefon:** jeden ekran na zakładkę (sekwencer / brzmienie / efekty), kroki w siatce 4×4, duże pokrętła i przyciski (min. 44 px),
+  jedna karta silnika lub sekcji naraz (wybór u góry), ekran nie gaśnie podczas grania. Na telefonie można „dodać do ekranu głównego”
+  (manifest + ikony), wtedy aplikacja działa pełnoekranowo.
+- **Desktop:** sekwencer po lewej, pad, silniki, filtr i efekty po prawej; skróty klawiszowe.
+
 ## Skróty klawiszowe
 `spacja` play/stop · `R` losuj wzór · `M` mutuj · `T` moll/frygijska · `↑` `↓` BPM ±2 ·
 `1`–`4` solo silnika (z `shift` losuje jego parametry). Definicje są w tablicy `KEYS` w `docs/js/app.js`.
@@ -20,6 +27,7 @@ npm test          # testy generatora (node:test)
   - `js/generator.js` – rytm ważony, skale, mutacje (czysta logika)
   - `js/engines.js` – 4 monofoniczne silniki basu (prophet, ms-20, dx/FM, wavetable), ich parametry i obwiednie filtra/amp (`PARAM_SPECS`), losowanie w granicach rozsądku i miks równomocowy dla pada XY
   - `js/fx.js` – globalny filtr i efekty: 4 style + 4 style, po 8 parametrów (`FILTER_STYLES`, `FX_STYLES`), losowanie w granicach rozsądku
+  - `js/knob.js` – potencjometr obrotowy (SVG): przeciąganie w pionie, podwójne dotknięcie = reset, kółko, klawiatura
   - `js/audio.js` – Web Audio: zegar z lookahead, rozsyłanie nut do silników, slide, ratchet
   - `js/vocoder.js` – vocoder kanałowy (16 pasm + tor szumu na spółgłoski); modulator = mikrofon, nośnik = bas
   - `js/sensors.js` – żyroskop (przechył → pad XY) i potrząśnięcie (→ mutacja)

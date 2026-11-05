@@ -1,61 +1,88 @@
 <!doctype html>
-<html lang="pl">
+<html lang="pl" data-view="desktop">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#0b0b10">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="STN">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
 <title>Signal Thru the Noise</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main id="app" hidden>
-  <div class="col seq">
-    <header>
-      <h1>signal<span>thru</span>noise</h1>
-      <div class="bpm"><button id="bpm-" aria-label="wolniej">−</button><b id="bpm">130</b><button id="bpm+" aria-label="szybciej">+</button></div>
-    </header>
+<main id="app" hidden data-view="desktop" data-tab="seq">
+  <header class="top">
+    <h1>signal<span>thru</span>noise</h1>
+    <div class="bpm"><button id="bpm-" aria-label="wolniej">−</button><b id="bpm">130</b><button id="bpm+" aria-label="szybciej">+</button></div>
+    <button id="play" class="play" aria-label="play / stop">▶</button>
+    <button id="viewsw" class="chip" title="przełącz widok telefon / desktop">widok: desktop</button>
+  </header>
 
-    <section id="grid" aria-label="Sekwencer 16 kroków"></section>
+  <div class="body">
+    <div class="col colseq">
+      <section id="grid" data-tab="seq" aria-label="Sekwencer 16 kroków"></section>
 
-    <section class="knobs">
-      <label>gęstość<input id="density" type="range" min="0" max="1" step="0.01" value="0.6"></label>
-      <label>synkopa<input id="sync" type="range" min="0" max="1" step="0.01" value="0.5"></label>
-      <label>filtr<input id="cutoff" type="range" min="0" max="1" step="0.001" value="0.5"></label>
-      <label>rezonans<input id="reso" type="range" min="0" max="1" step="0.01" value="0.5"></label>
-      <label>długość nut<input id="gate" type="range" min="0.4" max="1.6" step="0.01" value="1"></label>
-      <label>swing<input id="swing" type="range" min="0" max="0.4" step="0.01" value="0"></label>
-    </section>
+      <section class="patknobs" data-tab="seq">
+        <div class="knob" id="density" data-label="gęstość" data-min="0" data-max="1" data-step="0.01" data-value="0.6" data-fmt="pct"></div>
+        <div class="knob" id="sync" data-label="synkopa" data-min="0" data-max="1" data-step="0.01" data-value="0.5" data-fmt="pct"></div>
+        <div class="knob" id="gate" data-label="długość nut" data-min="0.4" data-max="1.6" data-step="0.01" data-value="1" data-fmt="x"></div>
+        <div class="knob" id="swing" data-label="swing" data-min="0" data-max="0.4" data-step="0.01" data-value="0" data-fmt="pct"></div>
+      </section>
 
-    <section id="voc" hidden>
-      <label>czułość głosu<input id="sens" type="range" min="0" max="1" step="0.01" value="0.5"></label>
-      <div id="meter" aria-label="poziom mikrofonu"><i></i></div>
-      <p>Użyj słuchawek, inaczej głośnik wróci do mikrofonu. Mów lub nuć do mikrofonu.</p>
-    </section>
+      <section class="actions" data-tab="seq">
+        <button id="dice" class="big accent">🎲 losuj</button>
+        <button id="mut" class="big">✦ mutuj</button>
+      </section>
+      <section class="toggles" data-tab="seq">
+        <button id="mode" class="chip">moll</button>
+      </section>
+      <p class="keys" data-tab="seq"></p>
+    </div>
 
-    <section class="actions">
-      <button id="play" class="big">▶</button>
-      <button id="dice" class="big accent">🎲 losuj</button>
-      <button id="mut" class="big">✦ mutuj</button>
-    </section>
-    <section class="toggles">
-      <button id="mode" class="chip">moll</button>
-      <button id="voice" class="chip">głos</button>
-      <button id="gyro" class="chip">żyro</button>
-      <button id="zero" class="chip" hidden>zeruj</button>
-    </section>
+    <div class="col colsyn">
+      <section id="padwrap" data-tab="synth">
+        <section id="pad" aria-label="Pad XY: miks czterech silników basu">
+          <div class="corner c0"><span>prophet</span><button class="cdice" data-v="0" aria-label="losuj parametry: prophet">🎲</button></div>
+          <div class="corner c1"><span>ms-20</span><button class="cdice" data-v="1" aria-label="losuj parametry: ms-20">🎲</button></div>
+          <div class="corner c2"><span>dx</span><button class="cdice" data-v="2" aria-label="losuj parametry: dx">🎲</button></div>
+          <div class="corner c3"><span>wavetable</span><button class="cdice" data-v="3" aria-label="losuj parametry: wavetable">🎲</button></div>
+          <i id="dot"></i>
+        </section>
+      </section>
+
+      <section class="tone" data-tab="synth">
+        <div class="knob" id="cutoff" data-label="filtr" data-min="0" data-max="1" data-step="0.001" data-value="0.5" data-fmt="pct"></div>
+        <div class="knob" id="reso" data-label="rezonans" data-min="0" data-max="1" data-step="0.01" data-value="0.5" data-fmt="pct"></div>
+        <div class="toggles synthtog">
+          <button id="voice" class="chip">głos</button>
+          <button id="gyro" class="chip">żyro</button>
+          <button id="zero" class="chip" hidden>zeruj</button>
+        </div>
+      </section>
+
+      <section id="voc" hidden data-tab="synth">
+        <div class="knob" id="sens" data-label="czułość głosu" data-min="0" data-max="1" data-step="0.01" data-value="0.5" data-fmt="pct"></div>
+        <div class="vocinfo"><div id="meter" aria-label="poziom mikrofonu"><i></i></div><p>Użyj słuchawek, inaczej głośnik wróci do mikrofonu. Mów lub nuć do mikrofonu.</p></div>
+      </section>
+
+      <nav id="engsel" class="sel" data-tab="synth" aria-label="Wybór silnika"></nav>
+      <section id="engines" data-tab="synth" aria-label="Silniki basu"></section>
+
+      <nav id="fxsel" class="sel" data-tab="fx" aria-label="Wybór sekcji"></nav>
+      <section id="globalfx" data-tab="fx" aria-label="Globalny filtr i efekty"></section>
+    </div>
   </div>
 
-  <div class="col syn">
-    <section id="pad" aria-label="Pad XY: miks czterech silników basu">
-      <div class="corner c0"><span>prophet</span><button class="cdice" data-v="0" aria-label="losuj parametry: prophet">🎲</button></div>
-      <div class="corner c1"><span>ms-20</span><button class="cdice" data-v="1" aria-label="losuj parametry: ms-20">🎲</button></div>
-      <div class="corner c2"><span>dx</span><button class="cdice" data-v="2" aria-label="losuj parametry: dx">🎲</button></div>
-      <div class="corner c3"><span>wavetable</span><button class="cdice" data-v="3" aria-label="losuj parametry: wavetable">🎲</button></div>
-      <i id="dot"></i>
-    </section>
-    <section id="engines" aria-label="Silniki basu"></section>
-    <section id="globalfx" aria-label="Globalny filtr i efekty"></section>
-  </div>
+  <nav id="tabbar" aria-label="Zakładki">
+    <button data-go="seq" class="on">sekwencer</button>
+    <button data-go="synth">brzmienie</button>
+    <button data-go="fx">efekty</button>
+  </nav>
 </main>
 
 <div id="start">

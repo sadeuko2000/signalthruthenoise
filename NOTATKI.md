@@ -29,6 +29,11 @@ Nazwy jako punkt odniesienia, bez kopiowania działania:
 - Efekty domyślnie mają mix = 0, a filtry są prawie otwarte i neutralne głośnościowo, więc po włączeniu nic nie zmieniają, dopóki się ich nie ruszy.
 - Stan: **zrobione** (`docs/js/fx.js`). Do zrobienia: presety, podpięcie żyroskopu/pada do parametrów filtra.
 
+## 5. Interfejs
+- Potencjometry zamiast suwaków; dwa widoki (telefon / desktop) z przełącznikiem. **Zrobione.**
+- Telefon: zakładki sekwencer / brzmienie / efekty, kroki 4×4, jedna karta silnika lub sekcji naraz.
+- Do sprawdzenia na prawdziwym telefonie: wielkość pokręteł i pada, wygoda przewijania, żyroskop, tryb poziomy (orientacja pozioma nie ma osobnego układu).
+
 ## Otwarte pytania
 1. Czy wybrane style filtra i efektów (patrz punkt 4) są właściwe, czy zmienić któryś.
 2. Czy wszystkie sekwencery mają tę samą siatkę 16 kroków, czy każdy własną długość.

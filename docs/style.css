@@ -1,105 +1,159 @@
 [hidden]{display:none!important}
-:root{--card:#13131b;--bg:#0b0b10;--fg:#e8e8f0;--dim:#6b6b80;--acc:#ff3d7f;--on:#39ffb0;--pad:#1a1a24}
+:root{--bg:#0b0b10;--fg:#e8e8f0;--dim:#6b6b80;--acc:#ff3d7f;--on:#39ffb0;--pad:#1a1a24;--card:#13131b;--line:#2c2c3a;--ks:48px}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,sans-serif;overscroll-behavior:none;user-select:none;-webkit-user-select:none}
-main{display:flex;flex-direction:column;gap:14px;max-width:560px;margin:0 auto;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom))}
-.col{display:contents}
-header{display:flex;justify-content:space-between;align-items:center}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,sans-serif;overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 h1{font-size:15px;margin:0;letter-spacing:.08em;font-weight:600}
 h1 span{color:var(--acc)}
+button{font:inherit;color:inherit;background:var(--pad);border:0;border-radius:12px;padding:10px 14px;cursor:pointer}
+button:active{filter:brightness(1.5)}
+button:focus-visible,.knob:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.chip{border-radius:999px;font-size:13px;color:var(--dim)}
+.chip.on{color:var(--on)}
+.big{font-size:18px;padding:18px 8px}
+.accent{background:var(--acc);color:#fff;font-weight:600}
+kbd{font:inherit;font-size:11px;padding:1px 6px;border-radius:5px;background:var(--pad);color:var(--fg);border:1px solid var(--line)}
+
+/* ---------- układ ogólny ---------- */
+#app{display:flex;flex-direction:column;gap:14px}
+.top{display:flex;align-items:center;gap:12px}
+.top h1{flex:1}
 .bpm{display:flex;align-items:center;gap:8px}
 .bpm b{min-width:3ch;text-align:center;font-variant-numeric:tabular-nums}
-button{font:inherit;color:inherit;background:var(--pad);border:0;border-radius:12px;padding:10px 14px}
-button:active{filter:brightness(1.5)}
+.play{width:48px;height:48px;border-radius:50%;background:var(--acc);color:#fff;font-size:18px;padding:0}
+.body{display:flex;gap:28px;align-items:flex-start;min-height:0}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+#tabbar,.sel{display:none}
+
+/* ---------- siatka kroków ---------- */
 #grid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
 .step{aspect-ratio:1;border-radius:8px;background:var(--pad);position:relative;padding:0;overflow:hidden}
-.step:nth-child(8n+1),.step:nth-child(8n+5){outline:1px solid #2c2c3a}
+.step:nth-child(8n+1),.step:nth-child(8n+5){outline:1px solid var(--line)}
 .step.on{background:var(--on);color:#04120c}
 .step.on.acc{background:var(--acc);color:#fff}
 .step .bar{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.28)}
 .step.now{box-shadow:inset 0 0 0 3px #fff}
-.knobs{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}
-label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em}
-input[type=range]{width:100%;height:36px;accent-color:var(--acc)}
-.actions{display:grid;grid-template-columns:1fr 2fr 1.4fr;gap:10px}
-.big{font-size:18px;padding:18px 8px}
-.accent{background:var(--acc);color:#fff;font-weight:600}
-.toggles{display:flex;gap:8px}
-.chip{border-radius:999px;font-size:13px;color:var(--dim)}
-.chip.on{color:var(--on)}
-#start{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:var(--bg)}
-#go{font-size:28px;padding:28px 56px;background:var(--acc);color:#fff;border-radius:999px}
-#start p{color:var(--dim);margin:0}
-#pad{position:relative;aspect-ratio:2/1;max-height:30vh;width:100%;background:
- linear-gradient(var(--pad),var(--pad)) padding-box;border-radius:14px;touch-action:none;overflow:hidden;
- background-image:linear-gradient(#2c2c3a 1px,transparent 1px),linear-gradient(90deg,#2c2c3a 1px,transparent 1px);background-size:25% 25%}
-#dot{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:var(--acc);box-shadow:0 0 24px var(--acc);pointer-events:none}
-.chip.on{color:var(--on)}
-#voc{display:grid;gap:8px}
-#voc p{margin:0;font-size:12px;color:var(--dim)}
-#meter{height:8px;border-radius:4px;background:var(--pad);overflow:hidden}
-#meter i{display:block;height:100%;width:0;background:var(--on);transition:width .06s linear}
 
-/* narożniki pada: nazwa silnika + losowanie parametrów */
+/* ---------- potencjometry ---------- */
+.knob{display:grid;justify-items:center;align-content:start;gap:1px;padding:4px 2px;border-radius:12px;outline:none;cursor:ns-resize;touch-action:pan-y;min-width:0}
+.knob svg{width:var(--ks);height:var(--ks);touch-action:none;overflow:visible}
+.knob .kv{font-size:11px;color:var(--fg);font-variant-numeric:tabular-nums;min-height:14px;touch-action:none;white-space:nowrap}
+.knob .kl{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);text-align:center;line-height:1.15;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.knob .tr,.knob .va{fill:none;stroke-width:4.2;stroke-linecap:round}
+.knob .tr{stroke:var(--line)}
+.knob .va{stroke:var(--acc)}
+.knob .pt{stroke:var(--fg);stroke-width:3;stroke-linecap:round}
+.knob.drag .va{stroke:var(--on)}
+.patknobs,.tone{display:grid;grid-template-columns:repeat(4,1fr);gap:4px 8px;align-items:start}
+.tone{grid-template-columns:repeat(2,minmax(0,1fr)) 2fr}
+.synthtog{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:flex-end}
+.kgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px 6px}
+.kgrid.env3{grid-template-columns:repeat(3,minmax(0,1fr))}
+
+.actions{display:grid;grid-template-columns:2fr 1.4fr;gap:10px}
+.toggles{display:flex;gap:8px}
+.keys{display:none;margin:0;font-size:12px;line-height:1.9;color:var(--dim)}
+
+/* ---------- pad XY (okrągły) ---------- */
+#padwrap{display:grid;place-items:center}
+#pad{position:relative;aspect-ratio:1;width:min(100%,380px);margin:0 auto;touch-action:none}
+#pad::before{content:"";position:absolute;inset:0;border-radius:50%;background:
+  repeating-radial-gradient(circle at 50% 50%,transparent 0 24%,var(--line) 24% calc(24% + 1px)),var(--pad)}
+#dot{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:var(--acc);box-shadow:0 0 24px var(--acc);pointer-events:none}
 .corner{position:absolute;display:flex;align-items:center;gap:6px;z-index:1}
 .corner span{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);pointer-events:none}
-.cdice{padding:4px 7px;border-radius:8px;font-size:13px;line-height:1;background:rgba(10,10,16,.75)}
-.c0{left:8px;top:8px}.c1{right:8px;top:8px;flex-direction:row-reverse}
-.c2{left:8px;bottom:8px}.c3{right:8px;bottom:8px;flex-direction:row-reverse}
+.cdice{padding:4px 8px;border-radius:10px;font-size:15px;line-height:1;background:rgba(10,10,16,.75)}
+.c0{left:6px;top:6px}.c1{right:6px;top:6px;flex-direction:row-reverse}
+.c2{left:6px;bottom:6px}.c3{right:6px;bottom:6px;flex-direction:row-reverse}
 
-/* karty silników */
-#engines{display:grid;grid-template-columns:1fr;gap:10px}
-.eng{background:var(--card);border-radius:14px;padding:10px 12px;display:grid;gap:2px}
+/* ---------- głos ---------- */
+#voc{display:grid;grid-template-columns:90px 1fr;gap:10px;align-items:center}
+#voc p{margin:0;font-size:12px;color:var(--dim)}
+#meter{height:8px;border-radius:4px;background:var(--pad);overflow:hidden;margin-bottom:6px}
+#meter i{display:block;height:100%;width:0;background:var(--on);transition:width .06s linear}
+
+/* ---------- karty silników i efektów ---------- */
+#engines,#globalfx{display:grid;grid-template-columns:1fr;gap:10px}
+.eng{background:var(--card);border-radius:14px;padding:10px 12px;display:grid;gap:6px;align-content:start}
 .eng header{display:flex;align-items:center;gap:8px}
 .eng header b{flex:1;font-size:13px;letter-spacing:.06em;text-transform:uppercase}
-.eng header button{padding:5px 10px;font-size:13px;border-radius:8px;background:var(--pad)}
+.eng header button{padding:5px 10px;font-size:13px;border-radius:8px;background:var(--pad);color:var(--dim)}
+.eng header .pwr.on{color:var(--on)}
 .eng header .solo.on{background:var(--on);color:#04120c;font-weight:700}
-.eng label{flex-direction:row;align-items:center;gap:8px;font-size:11px}
-.eng label span{width:11ch;flex:none;white-space:nowrap}
-.eng label input{height:22px;flex:1;min-width:0}
 .eng.dim{opacity:.55}
-
-/* komputer: sekwencer po lewej, pad i silniki po prawej */
-@media (min-width:900px){
-  main{max-width:1240px;flex-direction:row;align-items:flex-start;gap:28px;padding:24px}
-  .col{display:flex;flex-direction:column;gap:14px;min-width:0}
-  .seq{flex:0 0 440px}
-  .syn{flex:1}
-  #pad{aspect-ratio:2/1;max-height:none}
-  .cdice{padding:6px 10px;font-size:15px}
-  #engines{grid-template-columns:1fr 1fr}
-  button{cursor:pointer}
-  input[type=range]{cursor:pointer}
-}
-
-.keys{display:none;margin:0;font-size:12px;line-height:1.9;color:var(--dim)}
-kbd{font:inherit;font-size:11px;padding:1px 6px;border-radius:5px;background:var(--pad);color:var(--fg);border:1px solid #2c2c3a}
-@media (min-width:900px){.keys{display:block}}
-
-.env{margin-top:4px;border-top:1px solid #23232f;padding-top:4px}
-.env summary{cursor:pointer;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);padding:4px 0;list-style:none}
+.eng.off{opacity:.45}
+.env{border-top:1px solid #23232f;padding-top:4px}
+.env summary{cursor:pointer;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);padding:6px 0;list-style:none}
 .env summary::before{content:"▸ "}
 .env[open] summary::before{content:"▾ "}
-.env[open]{display:grid;gap:2px}
-
-/* okrągły pad: kontener kwadratowy, koło rysuje ::before, nazwy silników w rogach kwadratu */
-#pad{aspect-ratio:1;width:min(100%,360px);max-height:none;margin:0 auto;background:none;overflow:visible}
-#pad::before{content:"";position:absolute;inset:0;border-radius:50%;background:
-  radial-gradient(circle,#1b1b27 0 1px,transparent 1px) center/100% 100%,
-  repeating-radial-gradient(circle at 50% 50%,transparent 0 24%,#2c2c3a 24% calc(24% + 1px)),var(--pad)}
-.pwr{padding:5px 9px;font-size:13px;border-radius:8px;background:var(--pad);color:var(--dim)}
-.pwr.on{color:var(--on)}
-.eng.off{opacity:.45}
-@media (min-width:900px){#pad{aspect-ratio:1;width:min(100%,380px)}}
-
-/* globalny filtr i efekty */
-#globalfx{display:grid;grid-template-columns:1fr;gap:10px}
-.fxcard .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 6px}
-.tab{padding:4px 9px;border-radius:999px;font-size:11px;color:var(--dim);background:var(--pad)}
+.fxcard .tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{white-space:nowrap;padding:4px 9px;border-radius:999px;font-size:11px;color:var(--dim);background:var(--pad)}
 .tab.on{color:#04120c;background:var(--on);font-weight:600}
-.fxgrid{display:grid;grid-template-columns:1fr;gap:2px 20px}
-.fxcard label{flex-direction:row;align-items:center;gap:8px;font-size:11px}
-.fxcard label span{width:15ch;flex:none;white-space:nowrap}
-.fxcard label input{height:22px;flex:1;min-width:0}
-.fxcard label output{width:8ch;flex:none;text-align:right;color:var(--fg);font-variant-numeric:tabular-nums;font-size:11px;text-transform:none;letter-spacing:0}
-@media (min-width:900px){#globalfx{grid-template-columns:1fr 1fr}.fxgrid{grid-template-columns:1fr}}
+
+/* ---------- ekran startowy ---------- */
+#start{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:var(--bg);z-index:50}
+#go{font-size:28px;padding:28px 56px;background:var(--acc);color:#fff;border-radius:999px}
+#start p{color:var(--dim);margin:0}
+
+/* =========================================================
+   WIDOK DESKTOP
+   ========================================================= */
+html[data-view=desktop] #app{max-width:1240px;margin:0 auto;padding:24px max(24px,env(safe-area-inset-right,0px)) 24px max(24px,env(safe-area-inset-left,0px))}
+html[data-view=desktop] .colseq{flex:0 0 440px}
+html[data-view=desktop] .colsyn{flex:1}
+html[data-view=desktop] .keys{display:block}
+html[data-view=desktop] #engines,html[data-view=desktop] #globalfx{grid-template-columns:1fr 1fr}
+html[data-view=desktop] .step{border-radius:8px}
+
+/* =========================================================
+   WIDOK TELEFON: jedna kolumna na ekran, zakładki na dole
+   ========================================================= */
+html[data-view=phone],html[data-view=phone] body{height:100%;overflow:hidden}
+html[data-view=phone]{--ks:62px}
+html[data-view=phone] #app{height:100dvh;max-width:480px;margin:0 auto;padding:0;gap:0}
+html[data-view=phone] .top{padding:calc(env(safe-area-inset-top,0px) + 8px) max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px));justify-content:space-between}
+html[data-view=phone] .top h1{display:none}
+html[data-view=phone] .bpm{gap:6px}
+html[data-view=phone] .bpm button{width:46px;height:46px;padding:0;font-size:20px}
+html[data-view=phone] .bpm b{font-size:20px;min-width:3.2ch}
+html[data-view=phone] .play{width:54px;height:54px;font-size:21px}
+html[data-view=phone] #viewsw{min-height:46px;padding:0 14px}
+html[data-view=phone] .body{display:block;flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:6px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px))}
+html[data-view=phone] .col{display:contents}
+html[data-view=phone] .body > .col > *{margin-bottom:12px}
+/* pokazuj tylko sekcje bieżącej zakładki */
+html[data-view=phone] #app[data-tab=seq] [data-tab=synth],
+html[data-view=phone] #app[data-tab=seq] [data-tab=fx],
+html[data-view=phone] #app[data-tab=synth] [data-tab=seq],
+html[data-view=phone] #app[data-tab=synth] [data-tab=fx],
+html[data-view=phone] #app[data-tab=fx] [data-tab=seq],
+html[data-view=phone] #app[data-tab=fx] [data-tab=synth]{display:none}
+html[data-view=phone] #tabbar{display:grid;grid-template-columns:repeat(3,1fr);background:#0e0e15;border-top:1px solid #1d1d28;padding-bottom:env(safe-area-inset-bottom,0px)}
+html[data-view=phone] #tabbar button{height:58px;border-radius:0;background:none;color:var(--dim);font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+html[data-view=phone] #tabbar button.on{color:var(--on);box-shadow:inset 0 3px 0 var(--on)}
+/* sekwencer: kroki 4x4, duże pokrętła i przyciski */
+html[data-view=phone] #grid{grid-template-columns:repeat(4,1fr);gap:10px}
+html[data-view=phone] .step{border-radius:14px;aspect-ratio:1.2}
+html[data-view=phone] .step.now{box-shadow:inset 0 0 0 4px #fff}
+html[data-view=phone] .actions{grid-template-columns:2fr 1fr;gap:12px}
+html[data-view=phone] .big{min-height:64px;font-size:19px}
+html[data-view=phone] .chip{min-height:44px;padding:0 16px;font-size:14px}
+/* brzmienie: pad, pokrętła, wybór silnika, jedna karta naraz */
+html[data-view=phone] #pad{width:clamp(230px,calc(100dvh - 480px),340px)}
+html[data-view=phone] .cdice{min-width:44px;min-height:44px;font-size:18px}
+html[data-view=phone] .corner span{font-size:12px}
+html[data-view=phone] .tone{grid-template-columns:repeat(2,minmax(0,1fr)) 2fr;align-items:center}
+html[data-view=phone] .synthtog{justify-content:flex-end}
+html[data-view=phone] #voc{grid-template-columns:100px 1fr}
+html[data-view=phone] .sel{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:8px}
+html[data-view=phone] .sel button{min-height:46px;padding:0 4px;font-size:13px;color:var(--dim);position:relative}
+html[data-view=phone] .sel button.on{background:var(--on);color:#04120c;font-weight:700}
+html[data-view=phone] .sel button.off::after{content:"";position:absolute;right:6px;top:6px;width:8px;height:8px;border-radius:50%;background:var(--acc)}
+html[data-view=phone] #engines .eng:not(.cur),html[data-view=phone] #globalfx .eng:not(.cur){display:none}
+html[data-view=phone] .eng{padding:10px}
+html[data-view=phone] .eng header button{min-width:46px;min-height:46px;font-size:15px}
+html[data-view=phone] .env summary{min-height:44px;display:flex;align-items:center}
+html[data-view=phone] .tab{min-height:44px;padding:0 6px;font-size:12px;flex:1 1 auto}
+html[data-view=phone] .fxcard .tabs{flex-wrap:nowrap}
+html[data-view=phone] .knob{padding:6px 2px}
+html[data-view=phone] .knob .kv{font-size:12px}
+html[data-view=phone] .knob .kl{font-size:10px}

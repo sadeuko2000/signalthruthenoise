@@ -3,8 +3,37 @@ import { Engine } from './audio.js';
 import { Sensors } from './sensors.js';
 import { PARAM_SPECS, VOICE_NAMES, clampToDisc } from './engines.js';
 import { FILTER_STYLES, FX_STYLES } from './fx.js';
+import { makeKnob, initKnobs } from './knob.js';
 
 const $ = (id) => document.getElementById(id);
+initKnobs();                                    // pokrętła zapisane w HTML (data-*)
+
+// ---------- widok: telefon / desktop, zakładki ----------
+const appEl = $('app'), root = document.documentElement;
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch { /* tryb prywatny: bez zapamiętywania */ } },
+};
+function detectView() {
+  const saved = store.get('stn.view');
+  if (saved === 'phone' || saved === 'desktop') return saved;
+  return matchMedia('(pointer: coarse)').matches || innerWidth < 900 ? 'phone' : 'desktop';
+}
+function setView(v) {
+  root.dataset.view = v; appEl.dataset.view = v;
+  $('viewsw').textContent = v === 'phone' ? 'widok: telefon' : 'widok: desktop';
+  store.set('stn.view', v);
+}
+function setTab(t) {
+  appEl.dataset.tab = t;
+  document.querySelectorAll('#tabbar button').forEach((b) => b.classList.toggle('on', b.dataset.go === t));
+  document.querySelector('.body').scrollTop = 0;
+  store.set('stn.tab', t);
+}
+$('viewsw').addEventListener('click', () => setView(root.dataset.view === 'phone' ? 'desktop' : 'phone'));
+document.querySelectorAll('#tabbar button').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.go)));
+setView(detectView());
+setTab(['seq', 'synth', 'fx'].includes(store.get('stn.tab')) ? store.get('stn.tab') : 'seq');
 const engine = new Engine();
 const state = { ...DEFAULTS, seed: (Math.random() * 1e9) | 0 };
 let pattern = generateBass(state);
@@ -83,38 +112,44 @@ function padFromEvent(e) {
 }
 let padDown = false;
 
-// Karty silników: głośność, solo, parametry i losowanie „w granicach rozsądku”.
+// Karty silników: głośność, solo, parametry i losowanie „w granicach rozsądku”. Na telefonie widać jedną kartę naraz.
 const engHost = $('engines');
-const sliderRefs = VOICE_NAMES.map(() => ({}));
+const sliderRefs = VOICE_NAMES.map(() => ({}));   // id parametru -> pokrętło (do odświeżenia po losowaniu)
 const cards = [];
-function mkSlider(label, min, max, step, val, onInput) {
-  const l = document.createElement('label');
-  l.innerHTML = `<span>${label}</span><input type="range" min="${min}" max="${max}" step="${step}" value="${val}">`;
-  const inp = l.querySelector('input');
-  inp.addEventListener('input', () => onInput(+inp.value));
-  return [l, inp];
+function mkKnob(label, min, max, step, val, onInput, fmt = 'num') {
+  const el = document.createElement('div');
+  makeKnob(el, { label, min, max, step, value: val, def: val, fmt });
+  el.addEventListener('input', () => onInput(el.value));
+  return el;
+}
+const engSel = $('engsel');
+function selEngine(i) {
+  cards.forEach((c, j) => c.classList.toggle('cur', j === i));
+  engSel.querySelectorAll('button').forEach((b, j) => b.classList.toggle('on', j === i));
 }
 VOICE_NAMES.forEach((name, i) => {
   const card = document.createElement('article');
   card.className = 'eng';
-  card.innerHTML = `<header><b>${name}</b><button class="pwr on" title="włącz / wyłącz silnik">⏻</button><button class="solo" title="solo">S</button><button class="rnd" title="losuj parametry">🎲</button></header>`;
-  const [lv, lvIn] = mkSlider('głośność', 0, 1.5, 0.01, 1, (v) => engine.setLevel(i, v));
-  card.appendChild(lv);
-  sliderRefs[i].level = lvIn;
+  card.innerHTML = `<header><b>${name}</b><button class="pwr on" title="włącz / wyłącz silnik">⏻</button><button class="solo" title="solo">S</button><button class="rnd" title="losuj parametry">🎲</button></header><div class="kgrid main"></div>`;
+  const main = card.querySelector('.main');
+  const lv = mkKnob('głośność', 0, 1.5, 0.01, 1, (v) => engine.setLevel(i, v), 'pct');
+  main.appendChild(lv); sliderRefs[i].level = lv;
   // Parametry brzmienia na wierzchu, obwiednie (filtr i amp) w rozwijanej sekcji.
   const env = document.createElement('details');
   env.className = 'env';
-  env.innerHTML = '<summary>obwiednie</summary>';
+  env.innerHTML = '<summary>obwiednie</summary><div class="kgrid env3"></div>';
+  const envGrid = env.querySelector('.env3');
   for (const sp of PARAM_SPECS[i]) {
-    const [l, inp] = mkSlider(sp.label, sp.min, sp.max, sp.step, sp.def, (v) => engine.setParam(i, sp.id, v));
-    (sp.group === 'env' ? env : card).appendChild(l);
-    sliderRefs[i][sp.id] = inp;
+    const k = mkKnob(sp.label, sp.min, sp.max, sp.step, sp.def, (v) => engine.setParam(i, sp.id, v));
+    (sp.group === 'env' ? envGrid : main).appendChild(k);
+    sliderRefs[i][sp.id] = k;
   }
   card.appendChild(env);
   card.querySelector('.pwr').addEventListener('click', (e) => {
     const on = !e.currentTarget.classList.contains('on');
     e.currentTarget.classList.toggle('on', on);
     card.classList.toggle('off', !on);
+    engSel.children[i].classList.toggle('off', !on);
     engine.setEnabled(i, on);
     setPad(padPos.x, padPos.y);                   // odśwież podświetlenie narożników
   });
@@ -122,7 +157,12 @@ VOICE_NAMES.forEach((name, i) => {
   card.querySelector('.rnd').addEventListener('click', () => randomizeVoice(i));
   engHost.appendChild(card);
   cards.push(card);
+  const sb = document.createElement('button');
+  sb.textContent = name;
+  sb.addEventListener('click', () => selEngine(i));
+  engSel.appendChild(sb);
 });
+selEngine(0);
 function setSolo(i) {
   engine.setSolo(i);
   cards.forEach((c, j) => {
@@ -175,10 +215,22 @@ function doMode() {
   regen();
 }
 const setBpm = (v) => { engine.setBpm(Math.max(70, Math.min(180, v))); $('bpm').textContent = engine.bpm; };
+// Ekran nie gaśnie podczas grania (telefon). Brak API albo odmowa nie szkodzi.
+let wake = null;
+async function lockScreen() {
+  try {
+    if ('wakeLock' in navigator && !wake) {
+      wake = await navigator.wakeLock.request('screen');
+      wake.addEventListener('release', () => { wake = null; });
+    }
+  } catch { /* odmowa: ekran może zgasnąć */ }
+}
+function unlockScreen() { try { if (wake) wake.release(); } catch { /* nic */ } wake = null; }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && engine.playing) lockScreen(); });
 function togglePlay() {
   const btn = $('play');
-  if (engine.playing) { engine.stop(); btn.textContent = '▶'; if (lastNow >= 0) cells[lastNow].classList.remove('now'); }
-  else { engine.play(); btn.textContent = '■'; }
+  if (engine.playing) { engine.stop(); unlockScreen(); btn.textContent = '▶'; if (lastNow >= 0) cells[lastNow].classList.remove('now'); }
+  else { engine.play(); lockScreen(); btn.textContent = '■'; }
 }
 $('dice').addEventListener('click', doDice);
 $('mut').addEventListener('click', doMutate);
@@ -203,13 +255,14 @@ window.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || e.repeat && e.code !== 'ArrowUp' && e.code !== 'ArrowDown') return;
   if ($('app').hidden) return;
   const t = e.target;
-  const typing = t instanceof HTMLInputElement && t.type !== 'range';
+  const typing = t instanceof HTMLInputElement;
+  const onKnob = t instanceof HTMLElement && t.classList.contains('knob');
   if (typing) return;
   for (const k of KEYS) {
     const hit = e.code === k.code ? k : (k.alt && e.code === k.alt.code ? k.alt : null);
     if (!hit) continue;
-    // strzałki na zaznaczonym suwaku zostają suwakowi
-    if (k.skipInRange && t instanceof HTMLInputElement && t.type === 'range') return;
+    // strzałki na zaznaczonym pokrętle zostają pokrętłu
+    if (k.skipInRange && onKnob) return;
     e.preventDefault();
     if (e.code === 'Space' && t instanceof HTMLButtonElement) t.blur();   // spacja nie ma kliknąć też zaznaczonego przycisku
     (e.shiftKey && k.shift ? k.shift : hit.run)();
@@ -217,28 +270,30 @@ window.addEventListener('keydown', (e) => {
   }
 });
 const help = document.createElement('p');
-help.className = 'keys';
 help.innerHTML = KEYS.filter((k) => k.what).map((k) => `<kbd>${k.label}</kbd> ${k.what}`).join(' · ')
   .replace('<kbd>1</kbd>', '<kbd>1–4</kbd>');
-$('app').querySelector('.seq').appendChild(help);
+document.querySelector('.keys').innerHTML = help.innerHTML;
 
-// Globalny filtr i efekty: karta ze stylami (zakładki), 8 suwakami, bypassem i losowaniem.
+// Globalny filtr i efekty: karta ze stylami (zakładki), 8 pokrętłami, bypassem i losowaniem.
+const fxCards = [];
+function selFx(j) {
+  fxCards.forEach((c, k) => c.classList.toggle('cur', k === j));
+  $('fxsel').querySelectorAll('button').forEach((b, k) => b.classList.toggle('on', k === j));
+}
 function buildFxCard(host, title, slot, styles) {
   const card = document.createElement('article');
   card.className = 'eng fxcard';
-  card.innerHTML = `<header><b>${title}</b><button class="pwr on" title="włącz / wyłącz">⏻</button><button class="rnd" title="losuj parametry w granicach rozsądku">🎲</button></header><div class="tabs"></div><div class="fxgrid"></div>`;
+  card.innerHTML = `<header><b>${title}</b><button class="pwr on" title="włącz / wyłącz">⏻</button><button class="rnd" title="losuj parametry w granicach rozsądku">🎲</button></header><div class="tabs"></div><div class="kgrid fxgrid"></div>`;
   const tabs = card.querySelector('.tabs'), grid = card.querySelector('.fxgrid');
   let refs = {};
   function renderParams() {
     grid.innerHTML = ''; refs = {};
     const st = styles[slot.style], vals = slot.values[slot.style];
     for (const sp of st.params) {
-      const l = document.createElement('label');
-      l.innerHTML = `<span>${sp.label}</span><input type="range" min="0" max="1" step="0.001" value="${vals[sp.id]}"><output></output>`;
-      const inp = l.querySelector('input'), out = l.querySelector('output');
-      const show = () => { out.textContent = sp.show(sp.map(+inp.value)); };
-      inp.addEventListener('input', () => { slot.setParam(sp.id, +inp.value); show(); });
-      show(); grid.appendChild(l); refs[sp.id] = { inp, show };
+      const k = document.createElement('div');
+      makeKnob(k, { label: sp.label, min: 0, max: 1, step: 0.001, value: vals[sp.id], def: sp.def, show: (n) => sp.show(sp.map(n)) });
+      k.addEventListener('input', () => slot.setParam(sp.id, k.value));
+      grid.appendChild(k); refs[sp.id] = k;
     }
   }
   styles.forEach((st, i) => {
@@ -254,10 +309,11 @@ function buildFxCard(host, title, slot, styles) {
   });
   card.querySelector('.rnd').addEventListener('click', () => {
     const vals = slot.randomize();
-    for (const [id, n] of Object.entries(vals)) { refs[id].inp.value = n; refs[id].show(); }
+    for (const [id, n] of Object.entries(vals)) refs[id].value = n;
   });
   renderParams();
   host.appendChild(card);
+  fxCards.push(card);
 }
 let fxBuilt = false;
 function buildFxUi() {
@@ -265,6 +321,12 @@ function buildFxUi() {
   const host = $('globalfx');
   buildFxCard(host, 'globalny filtr', engine.fx.filter, FILTER_STYLES);
   buildFxCard(host, 'efekty', engine.fx.fx, FX_STYLES);
+  ['filtr', 'efekty'].forEach((name, j) => {
+    const b = document.createElement('button');
+    b.textContent = name; b.addEventListener('click', () => selFx(j));
+    $('fxsel').appendChild(b);
+  });
+  selFx(0);
 }
 
 // Start: odblokowuje audio (wymóg iOS/Chrome: gest użytkownika)
@@ -278,6 +340,7 @@ $('go').addEventListener('click', async () => {
   $('app').hidden = false;
   render();
   engine.play();
+  lockScreen();
   $('play').textContent = '■';
 });
 

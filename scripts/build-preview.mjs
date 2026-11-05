@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const read = (p) => readFileSync(new URL(`../docs/${p}`, import.meta.url), 'utf8');
 const out = process.argv[2] ?? 'preview.html';
 
-const js = ['generator', 'vocoder', 'engines', 'fx', 'audio', 'sensors', 'app']
+const js = ['generator', 'vocoder', 'engines', 'fx', 'knob', 'audio', 'sensors', 'app']
   .map((m) => read(`js/${m}.js`)
     .replace(/^import .*$/gm, '')
     .replace(/^export (async |const |function |class )/gm, '$1'))
@@ -26,7 +26,9 @@ const stages = [
   ['gotowe', 'Globalny filtr (4 style) i efekty (4 style), po 8 parametrów, bypass i losowanie'],
   ['gotowe', 'Dłuższe nuty (60–85% kroku zamiast 35–50%), suwaki długości nut i swingu, oversampling saturacji'],
   ['gotowe', 'Obwiednie filtra i amp w każdym silniku (sterowalne i losowane), nasycenie, nowy tor wyjściowy'],
-  ['później', 'Żyroskop i interfejs mobilny (kod jest, nie rozwijamy go teraz)'],
+  ['gotowe', 'Potencjometry zamiast suwaków, przełącznik widoku telefon / desktop'],
+  ['gotowe', 'Widok telefon: trzy zakładki, duże cele dotykowe, ekran nie gaśnie, instalacja na ekranie głównym'],
+  ['później', 'Żyroskop: kod jest, do sprawdzenia na prawdziwym telefonie'],
   ['gotowe', 'Vocoder: bas "mówi" głosem z mikrofonu'],
   ['dalej', 'Dostrojenie brzmienia silników i wzorów po odsłuchu'],
 ];
@@ -34,23 +36,21 @@ const progress = `
 <aside id="progress">
   <h2>Postępy</h2>
   <ul>${stages.map(([s, t]) => `<li class="${s}"><b>${s}</b> ${t}</li>`).join('')}</ul>
-  <p>Makieta jest zrobiona pod komputer. Żyroskop i mikrofon nie działają w podglądzie, tylko po uruchomieniu aplikacji poza artefaktem.</p>
+  <p>Przełącznik „widok” w nagłówku pokazuje układ telefonu i komputera. Żyroskop i mikrofon nie działają w podglądzie, tylko po uruchomieniu aplikacji poza artefaktem.</p>
 </aside>`;
 
 const page = `<title>Signal Thru the Noise</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <style>
 :root{color-scheme:dark}
-body{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 ${css}
-main{padding-left:0;padding-right:0}
 #progress{max-width:1240px;padding:0 16px;margin:8px auto 24px;color:var(--dim);font-size:13px;line-height:1.5}
 #progress h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin:0 0 8px;color:var(--fg)}
 #progress ul{list-style:none;padding:0;margin:0 0 8px;display:grid;gap:4px}
 #progress b{display:inline-block;min-width:5.5ch;font-size:11px;text-transform:uppercase;color:var(--acc)}
 #progress li.gotowe b{color:var(--on)}
 #progress li.później b{color:var(--dim)}
-html,body{height:auto;min-height:100%}
+html[data-view=phone] #progress{display:none}
 </style>
 <div id="shell">${body}${progress}</div>
 <script>

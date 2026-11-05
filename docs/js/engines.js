@@ -31,11 +31,11 @@ const cl = (v, a, b) => Math.max(a, Math.min(b, v));
 // aAtk i aRel w milisekundach, pozostałe czasy w sekundach.
 const ENV_SPECS = [
   { id: 'fEnv', label: 'filtr env', group: 'env', min: 0, max: 3, step: 0.01, def: 1.2, rand: [0.6, 2.0] },
-  { id: 'fDec', label: 'filtr zanik', group: 'env', min: 0.03, max: 0.8, step: 0.01, def: 0.2, rand: [0.08, 0.4] },
+  { id: 'fDec', label: 'filtr zan.', group: 'env', min: 0.03, max: 0.8, step: 0.01, def: 0.2, rand: [0.08, 0.4] },
   { id: 'aAtk', label: 'amp atak', group: 'env', min: 0, max: 40, step: 0.5, def: 2, rand: [0.5, 8] },
   { id: 'aDec', label: 'amp zanik', group: 'env', min: 0.03, max: 0.8, step: 0.01, def: 0.25, rand: [0.08, 0.4] },
-  { id: 'aSus', label: 'amp sustain', group: 'env', min: 0, max: 1, step: 0.01, def: 0.85, rand: [0.5, 1] },
-  { id: 'aRel', label: 'amp release', group: 'env', min: 3, max: 300, step: 1, def: 30, rand: [10, 120] },
+  { id: 'aSus', label: 'amp sust.', group: 'env', min: 0, max: 1, step: 0.01, def: 0.85, rand: [0.5, 1] },
+  { id: 'aRel', label: 'amp rel.', group: 'env', min: 3, max: 300, step: 1, def: 30, rand: [10, 120] },
 ];
 
 // Parametry silników. min/max = pełny zakres suwaka, rand = „rozsądny” zakres losowania

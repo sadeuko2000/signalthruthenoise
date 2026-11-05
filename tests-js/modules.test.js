@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 // Makieta (scripts/build-preview.mjs) skleja moduły w jeden skrypt. Zdublowana nazwa najwyższego poziomu
 // w dwóch modułach dałaby tam błąd składni, którego nie widać w wersji z modułami.
-const MODULES = ['generator', 'vocoder', 'engines', 'fx', 'audio', 'sensors', 'app'];
+const MODULES = ['generator', 'vocoder', 'engines', 'fx', 'knob', 'audio', 'sensors', 'app'];
 
 test('nazwy najwyższego poziomu nie powtarzają się między modułami', () => {
   const seen = {};

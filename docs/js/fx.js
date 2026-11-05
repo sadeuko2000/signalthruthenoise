@@ -122,18 +122,18 @@ function buildComb(ctx) {
 
 export const FILTER_STYLES = [
   { name: 'drabinkowy', params: [
-    P('cutoff', 'częstotliwość', 0.9, [0.45, 0.95], expm(40, 8000), hz),
+    P('cutoff', 'cutoff', 0.9, [0.45, 0.95], expm(40, 8000), hz),
     P('reso', 'rezonans', 0.15, [0.1, 0.55], lin(0, 30), (v) => `${v.toFixed(0)} dB`),
     P('drive', 'drive', 0.2, [0.1, 0.5], lin(0, 1), pc),
     P('lfoRate', 'lfo tempo', 0.3, [0.15, 0.55], expm(0.1, 12), (v) => `${v.toFixed(1)} Hz`),
     P('lfoDepth', 'lfo głębia', 0, [0, 0.4], lin(0, 2400), (v) => `${Math.round(v)} ct`),
-    P('lfoShape', 'lfo kształt', 0, [0, 0.99], choice(SHAPES), (v) => v),
+    P('lfoShape', 'lfo kszt.', 0, [0, 0.99], choice(SHAPES), (v) => v),
     MIX(1, [0.8, 1]), LEVEL(),
   ], build: buildLadder },
   { name: 'wielomodowy', params: [
-    P('cutoff', 'częstotliwość', 0.9, [0.4, 0.95], expm(40, 8000), hz),
+    P('cutoff', 'cutoff', 0.9, [0.4, 0.95], expm(40, 8000), hz),
     P('reso', 'rezonans', 0.15, [0.1, 0.5], lin(0.3, 20), (v) => `Q ${v.toFixed(1)}`),
-    P('mode', 'tryb LP→BP→HP', 0, [0, 0.15], lin(0, 1), pc),
+    P('mode', 'tryb LP-HP', 0, [0, 0.15], lin(0, 1), pc),
     P('drive', 'drive', 0.15, [0.05, 0.4], lin(0, 1), pc),
     P('lfoRate', 'lfo tempo', 0.3, [0.15, 0.55], expm(0.1, 12), (v) => `${v.toFixed(1)} Hz`),
     P('lfoDepth', 'lfo głębia', 0, [0, 0.4], lin(0, 2400), (v) => `${Math.round(v)} ct`),
@@ -141,16 +141,16 @@ export const FILTER_STYLES = [
   ], build: buildSvf },
   { name: 'ms-20', params: [
     P('hpCut', 'hp częst.', 0.1, [0.05, 0.4], expm(30, 3000), hz),
-    P('hpRes', 'hp rezonans', 0.1, [0.05, 0.5], lin(0.5, 14), (v) => `Q ${v.toFixed(1)}`),
+    P('hpRes', 'hp rez.', 0.1, [0.05, 0.5], lin(0.5, 14), (v) => `Q ${v.toFixed(1)}`),
     P('lpCut', 'lp częst.', 0.9, [0.45, 0.95], expm(60, 9000), hz),
-    P('lpRes', 'lp rezonans', 0.2, [0.15, 0.6], lin(0.5, 24), (v) => `Q ${v.toFixed(1)}`),
+    P('lpRes', 'lp rez.', 0.2, [0.15, 0.6], lin(0.5, 24), (v) => `Q ${v.toFixed(1)}`),
     P('drive', 'drive', 0.2, [0.1, 0.6], expm(1, 8), (v) => `${v.toFixed(1)}×`),
     P('lfoRate', 'lfo tempo', 0.3, [0.15, 0.55], expm(0.1, 12), (v) => `${v.toFixed(1)} Hz`),
     P('lfoDepth', 'lfo głębia', 0, [0, 0.4], lin(0, 2400), (v) => `${Math.round(v)} ct`),
     MIX(1, [0.8, 1]),
   ], build: buildMs20 },
   { name: 'grzebień', params: [
-    P('freq', 'ton grzebienia', 0.45, [0.25, 0.65], expm(40, 2000), hz),
+    P('freq', 'ton', 0.45, [0.25, 0.65], expm(40, 2000), hz),
     P('feedback', 'feedback', 0.3, [0.2, 0.6], lin(0, 0.93), pc),
     P('damping', 'tłumienie', 0.6, [0.4, 0.8], expm(800, 12000), hz),
     P('lfoRate', 'lfo tempo', 0.3, [0.15, 0.55], expm(0.1, 12), (v) => `${v.toFixed(1)} Hz`),
@@ -280,7 +280,7 @@ function buildDist(ctx) {
 
 export const FX_STYLES = [
   { name: 'delay', params: [
-    P('time', 'czas (16-tki)', 0.4, [0.3, 0.75], choice([0.5, 1, 1.5, 2, 3, 4, 6, 8]), (v) => `${v}`),
+    P('time', 'czas', 0.4, [0.3, 0.75], choice([0.5, 1, 1.5, 2, 3, 4, 6, 8]), (v) => `${v}/16`),
     P('feedback', 'feedback', 0.4, [0.25, 0.6], lin(0, 0.9), pc),
     P('tone', 'barwa', 0.7, [0.45, 0.85], expm(500, 12000), hz),
     P('spread', 'ping-pong', 0.8, [0.4, 1], lin(0, 1), pc),
@@ -292,8 +292,8 @@ export const FX_STYLES = [
     P('size', 'wielkość', 0.45, [0.25, 0.7], expm(0.3, 5), (v) => `${v.toFixed(1)} s`),
     P('predelay', 'predelay', 0.15, [0, 0.4], lin(0, 0.12), (v) => msf(v * 1000)),
     P('damping', 'tłumienie', 0.5, [0.3, 0.75], expm(1500, 14000), hz),
-    P('lowCut', 'dolny filtr', 0.2, [0.1, 0.5], expm(40, 600), hz),
-    P('highCut', 'górny filtr', 0.8, [0.5, 0.9], expm(1500, 16000), hz),
+    P('lowCut', 'lowcut', 0.2, [0.1, 0.5], expm(40, 600), hz),
+    P('highCut', 'highcut', 0.8, [0.5, 0.9], expm(1500, 16000), hz),
     P('width', 'szerokość', 0.8, [0.5, 1], lin(0, 1), pc),
     MIX(0, [0.1, 0.35]), LEVEL(),
   ], build: buildReverb },
@@ -302,17 +302,17 @@ export const FX_STYLES = [
     P('depth', 'głębia', 0.4, [0.2, 0.7], lin(0, 1), pc),
     P('delay', 'opóźnienie', 0.5, [0.2, 0.75], expm(1, 25), msf),
     P('feedback', 'feedback', 0.15, [0, 0.45], lin(0, 0.85), pc),
-    P('spread', 'rozstrojenie L/P', 0.5, [0.3, 0.9], lin(0, 1), pc),
+    P('spread', 'szerokość', 0.5, [0.3, 0.9], lin(0, 1), pc),
     P('tone', 'barwa', 0.8, [0.5, 0.9], expm(800, 14000), hz),
     MIX(0, [0.2, 0.5]), LEVEL(),
   ], build: buildChorus },
   { name: 'dystorsja', params: [
     P('drive', 'drive', 0.3, [0.15, 0.55], expm(1, 12), (v) => `${v.toFixed(1)}×`),
-    P('curve', 'miękka→fold', 0.2, [0, 0.5], lin(0, 1), pc),
+    P('curve', 'fold', 0.2, [0, 0.5], lin(0, 1), pc),
     P('bias', 'asymetria', 0, [0, 0.4], lin(0, 1), pc),
     P('bits', 'bity', 0, [0, 0.45], choice(BITS), (v) => `${v} bit`),
     P('tone', 'barwa', 0.7, [0.4, 0.85], expm(600, 14000), hz),
-    P('lowCut', 'dolny filtr', 0.1, [0.05, 0.4], expm(20, 500), hz),
+    P('lowCut', 'lowcut', 0.1, [0.05, 0.4], expm(20, 500), hz),
     MIX(0, [0.15, 0.5]), LEVEL(),
   ], build: buildDist },
 ];
