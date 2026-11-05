@@ -40,6 +40,11 @@ Nazwy jako punkt odniesienia, bez kopiowania działania:
 - Do rozstrzygnięcia: czy radar zastępuje siatkę kroków w głównej aplikacji, czy zostaje jako osobny tryb (pasuje jako „nowoczesny” rodzaj sekwencera z punktu 2).
 - Pomysły na później: ślady (trails) powiązane z feedbackiem delaya, marker odległości (VRM) i linia namiaru (EBL) sterujące filtrem, cele z wektorami dla silników.
 
+## 7. Generator uczony z pętli
+- Generator uczony z 50 pętli basu electro (rytm Markowa, mała paleta wysokości, długie nuty, ghost notes). Do repo trafiają tylko statystyki, nie pętle.
+- Zweryfikowano: statystyki wygenerowanych wzorów są bliskie źródłowym (nut na takt, udział toniki, długości, ciche nuty), a generator nie odtwarza dosłownie żadnego taktu z pętli.
+- Pomysły na później: osobny model na kilka stylów (np. wiele pętli ≥ 2 taktów, „ewolucja” wzoru po kilku obiegach), akcent i slide jako osobne pokrętła, import własnego pliku MIDI do sekwencera.
+
 ## Otwarte pytania
 1. Czy wybrane style filtra i efektów (patrz punkt 4) są właściwe, czy zmienić któryś.
 2. Czy wszystkie sekwencery mają tę samą siatkę 16 kroków, czy każdy własną długość.

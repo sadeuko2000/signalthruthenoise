@@ -1,4 +1,4 @@
-import { generateBass, mutate, DEFAULTS } from './generator.js';
+import { generateBass, mutate, DEFAULTS, DEGREE_MIN, DEGREE_MAX } from './generator.js';
 import { Engine } from './audio.js';
 import { Sensors } from './sensors.js';
 import { PARAM_SPECS, VOICE_NAMES, clampToDisc } from './engines.js';
@@ -58,7 +58,7 @@ function render() {
     c.classList.toggle('on', s.on);
     c.classList.toggle('acc', s.on && s.vel >= 110);
     // wysokość słupka ~ stopień skali
-    c.firstChild.style.height = s.on ? `${100 - Math.max(0, Math.min(100, (s.degree + 3) * 10))}%` : '0';
+    c.firstChild.style.height = s.on ? `${100 - Math.max(0, Math.min(100, ((s.degree - DEGREE_MIN) / (DEGREE_MAX - DEGREE_MIN)) * 100))}%` : '0';
   });
 }
 
@@ -210,9 +210,10 @@ $('reso').addEventListener('input', (e) => engine.setResonance(1 + e.target.valu
 // Akcje (wspólne dla przycisków i skrótów klawiszowych)
 function doDice() { state.seed = (Math.random() * 1e9) | 0; regen(); }
 function doMutate() { setPattern(mutate(pattern)); }
+const MODE_CYCLE = ['electro', 'phrygian', 'minor'], MODE_LABEL = { electro: 'elektro', phrygian: 'frygijska', minor: 'moll' };
 function doMode() {
-  state.mode = state.mode === 'minor' ? 'phrygian' : 'minor';
-  $('mode').textContent = state.mode === 'minor' ? 'moll' : 'frygijska';
+  state.mode = MODE_CYCLE[(MODE_CYCLE.indexOf(state.mode) + 1) % MODE_CYCLE.length];
+  $('mode').textContent = MODE_LABEL[state.mode];
   setPattern({ ...pattern, mode: state.mode });                      // tonacja nie kasuje nut
 }
 const setBpm = (v) => { engine.setBpm(Math.max(70, Math.min(180, v))); $('bpm').textContent = engine.bpm; };
@@ -235,6 +236,7 @@ function togglePlay() {
 }
 $('dice').addEventListener('click', doDice);
 $('mut').addEventListener('click', doMutate);
+$('mode').textContent = MODE_LABEL[state.mode];
 $('mode').addEventListener('click', doMode);
 $('bpm-').addEventListener('click', () => setBpm(engine.bpm - 2));
 $('bpm+').addEventListener('click', () => setBpm(engine.bpm + 2));
@@ -245,7 +247,7 @@ const KEYS = [
   { code: 'Space', label: 'spacja', what: 'play / stop', run: togglePlay },
   { code: 'KeyR', label: 'R', what: 'losuj wzór', run: doDice },
   { code: 'KeyM', label: 'M', what: 'mutuj', run: doMutate },
-  { code: 'KeyT', label: 'T', what: 'moll / frygijska', run: doMode },
+  { code: 'KeyT', label: 'T', what: 'tonacja (elektro / frygijska / moll)', run: doMode },
   { code: 'ArrowUp', label: '↑ ↓', what: 'BPM ±2', run: () => setBpm(engine.bpm + 2), alt: { code: 'ArrowDown', run: () => setBpm(engine.bpm - 2) }, skipInRange: true },
   ...VOICE_NAMES.map((n, i) => ({
     code: `Digit${i + 1}`, label: String(i + 1), what: i === 0 ? 'solo silnika (shift = losuj parametry)' : null,

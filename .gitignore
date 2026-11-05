@@ -3,3 +3,9 @@ __pycache__/
 *.egg-info/
 out/
 .venv/
+
+# Pliki źródłowe do uczenia generatora (pakiety loopów mają własne licencje, nie trafiają do repo)
+*.mid
+*.midi
+*.zip
+__MACOSX/

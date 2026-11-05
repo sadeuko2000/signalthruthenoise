@@ -2,14 +2,35 @@
 // Kąty liczone od góry, zgodnie z ruchem wskazówek zegara. Krok i leży pod kątem i/n * 2π.
 // Odległość od środka koduje wysokość dźwięku (stopień skali).
 
+import { DEGREE_MIN, DEGREE_MAX } from './generator.js';
+
 export const TAU = Math.PI * 2;
-export const DEG_MIN = -3, DEG_MAX = 7;      // zakres stopni skali, jak w generatorze
-export const R_IN = 0.14, R_OUT = 0.80;      // promień (ułamek promienia ekranu) dla najniższego i najwyższego stopnia
+export const DEG_MIN = DEGREE_MIN, DEG_MAX = DEGREE_MAX;      // zakres stopni skali, jak w generatorze
+export const R_IN = 0.22, R_OUT = 0.82;      // promień (ułamek promienia ekranu) dla najniższego i najwyższego stopnia
 
 const clampN = (v, a, b) => Math.max(a, Math.min(b, v));
 
-export const degToR = (d) => R_IN + ((d - DEG_MIN) / (DEG_MAX - DEG_MIN)) * (R_OUT - R_IN);
-export const rToDeg = (r) => clampN(Math.round(DEG_MIN + ((r - R_IN) / (R_OUT - R_IN)) * (DEG_MAX - DEG_MIN)), DEG_MIN, DEG_MAX);
+// Skala promienia jest odcinkowo liniowa: pierwsza oktawa (stopnie 0-6, gdzie gra większość nut) dostaje najwięcej miejsca,
+// stopnie poniżej toniki i druga oktawa mniej. Dzięki temu sąsiednie stopnie da się odróżnić palcem.
+const KNOTS = [[DEG_MIN, R_IN], [0, 0.31], [7, 0.60], [DEG_MAX, R_OUT]];
+
+export function degToR(d) {
+  const x = clampN(d, DEG_MIN, DEG_MAX);
+  for (let i = 0; i < KNOTS.length - 1; i++) {
+    const [d0, r0] = KNOTS[i], [d1, r1] = KNOTS[i + 1];
+    if (x <= d1) return r0 + ((x - d0) / (d1 - d0)) * (r1 - r0);
+  }
+  return R_OUT;
+}
+
+export function rToDeg(r) {
+  const x = clampN(r, R_IN, R_OUT);
+  for (let i = 0; i < KNOTS.length - 1; i++) {
+    const [d0, r0] = KNOTS[i], [d1, r1] = KNOTS[i + 1];
+    if (x <= r1) return clampN(Math.round(d0 + ((x - r0) / (r1 - r0)) * (d1 - d0)), DEG_MIN, DEG_MAX);
+  }
+  return DEG_MAX;
+}
 
 export const angleOfStep = (i, n) => (i / n) * TAU;
 
@@ -44,8 +65,8 @@ export function echoes(steps) {
     if (!s.on) return;
     out.push({
       i, a0: angleOfStep(i, n), r: degToR(Math.max(DEG_MIN, Math.min(DEG_MAX, s.degree))),
-      len: Math.max(0.25, Math.min(1, s.gate)) * (TAU / n) * 0.92,
-      w: 5 + (s.vel / 127) * 9, accent: s.vel >= 110,
+      len: Math.max(0.25, Math.min(4, s.gate)) * (TAU / n) * 0.92,
+      w: 4 + (s.vel / 127) * 7, accent: s.vel >= 110,
     });
   });
   return out;

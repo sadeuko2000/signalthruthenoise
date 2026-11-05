@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const read = (p) => readFileSync(new URL(`../docs/${p}`, import.meta.url), 'utf8');
 const out = process.argv[2] ?? 'radar-preview.html';
 
-export const RADAR_MODULES = ['generator', 'vocoder', 'engines', 'fx', 'knob', 'audio', 'radargeo', 'radar'];
+export const RADAR_MODULES = ['electro-model', 'generator', 'vocoder', 'engines', 'fx', 'knob', 'audio', 'radargeo', 'radar'];
 const js = RADAR_MODULES
   .map((m) => read(`js/${m}.js`).replace(/^import .*$/gm, '').replace(/^export (async |const |function |class )/gm, '$1'))
   .join('\n');

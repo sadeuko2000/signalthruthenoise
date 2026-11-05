@@ -168,7 +168,7 @@ export class Engine {
     const part = dur / r;
     for (let k = 0; k < r; k++) {
       const t0 = tt + k * part;
-      const len = r === 1 ? dur * Math.min(1, s.gate * this.gateMul) : part * 0.5;
+      const len = r === 1 ? dur * Math.min(4, s.gate * this.gateMul) : part * 0.5;
       const slide = k === 0 && this.lastTied;
       const hold = tiedOut && k === r - 1;
       this.voices.forEach((v, vi) => { if (this.eff[vi] > 0.02) v.note(t0, freq, s.vel, accent, len, slide, hold); });

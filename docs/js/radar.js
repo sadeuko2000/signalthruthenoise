@@ -14,7 +14,8 @@ const engine = new Engine();
 const state = { ...DEFAULTS, seed: (Math.random() * 1e9) | 0, length: 16 };
 let pattern = generateBass(state);
 engine.pattern = pattern;
-let page = 'seq', hup = false;
+let page = 'seq';
+const hup = false;                            // tryb H-UP usunięty z interfejsu (zawsze N-UP)
 const padPos = { x: 0.25, y: 0.75 };
 const cv = el('scope'), g = cv.getContext('2d');
 let lastStep = { i: 0, t: 0 }, heldPos = 0, lastRot = 0;
@@ -64,8 +65,9 @@ function drawSeq() {
   g.fillStyle = bg; g.fillRect(0, 0, W, W);
 
   // pierścienie zakresu (bez opisów liczbowych)
-  for (let d = -2; d <= DEG_MAX - 1; d += 2) {
-    circle(cx, cy, degToR(d) * R, d === 0 ? 'rgba(125,255,90,.38)' : 'rgba(125,255,90,.2)', dpr);
+  for (let d = DEG_MIN; d <= DEG_MAX - 1; d++) {
+    if (d % 2 !== 0 && d !== 7) continue;                       // co drugi stopień; oktawa (7) osobno
+    circle(cx, cy, degToR(d) * R, d === 0 || d === 7 ? 'rgba(125,255,90,.4)' : 'rgba(125,255,90,.14)', dpr);
   }
   circle(cx, cy, R * (R_OUT + 0.075), 'rgba(125,255,90,.28)', dpr, [3 * dpr, 5 * dpr]);
 
@@ -221,18 +223,26 @@ el('cutoff').addEventListener('input', (e) => engine.setCutoff(cutoffHz(+e.targe
 el('reso').addEventListener('input', (e) => engine.setResonance(1 + e.target.value * 22));
 
 // ---------- akcje ----------
-const RANGES = [8, 12, 16];
 const between = (a, b) => a + Math.random() * (b - a);
+const MODE_CYCLE = ['electro', 'phrygian', 'minor'];
+const MODE_LABEL = { electro: 'ELEKTRO', phrygian: 'FRYG', minor: 'MOLL' };
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const ROOT_MIN = 24, ROOT_MAX = 59;                           // tonika od C1 do B3 (36 półtonów)
+const rootParts = () => ({ pc: state.root % 12, oct: Math.floor(state.root / 12) - 1 });
+const baseLabel = () => { const r = rootParts(); return `${NOTE_NAMES[r.pc]}${r.oct}`; };
+const wrapRoot = (r) => (r > ROOT_MAX ? r - 36 : r < ROOT_MIN ? r + 36 : r);   // zawijanie w całym zakresie, nuta zostaje
+// Zmiana nuty bazowej działa na żywo: wzór (stopnie skali) zostaje, zmienia się tylko wysokość toniki. Słychać ją od razu.
+function setRoot(r) {
+  state.root = r;
+  pattern = { ...pattern, root: r }; engine.pattern = pattern;
+  engine.audition({ degree: 0, octave: 0, vel: 100 });
+}
 const actions = {
-  hdg: () => { hup = !hup; },
-  // Zmiana długości i tonacji zachowuje nuty (nie generuje wzoru od nowa).
-  range: () => {
-    state.length = RANGES[(RANGES.indexOf(state.length) + 1) % RANGES.length];
-    pattern = { ...pattern, steps: resizeSteps(pattern.steps, state.length) }; engine.pattern = pattern;
-  },
-  key: () => { state.mode = state.mode === 'minor' ? 'phrygian' : 'minor'; pattern = { ...pattern, mode: state.mode }; engine.pattern = pattern; },
-  // RANDOM: nowy wzór z losową gęstością i synkopą w rozsądnych granicach (swing zostaje).
-  random: () => { state.seed = (Math.random() * 1e9) | 0; state.density = between(0.35, 0.8); state.syncopation = between(0.2, 0.7); regen(); },
+  base: (dir) => setRoot(wrapRoot(state.root + dir)),            // transpozycja o półton
+  octave: (dir) => setRoot(wrapRoot(state.root + 12 * dir)),     // skok o oktawę
+  key: () => { state.mode = MODE_CYCLE[(MODE_CYCLE.indexOf(state.mode) + 1) % MODE_CYCLE.length]; pattern = { ...pattern, mode: state.mode }; engine.pattern = pattern; },
+  // RANDOM: nowy wzór z losową gęstością i synkopą w rozsądnych granicach (swing i nuta bazowa zostają).
+  random: () => { state.seed = (Math.random() * 1e9) | 0; state.density = between(0.3, 0.7); state.syncopation = between(0.25, 0.75); regen(); },
   mut: () => { pattern = mutate(pattern); engine.pattern = pattern; },
 };
 let wake = null;
@@ -253,9 +263,9 @@ el('play').addEventListener('click', togglePlay);
 const rnd = (i) => { const vals = engine.randomizeVoice(i); return vals; };
 const KEYS = {
   seq: [
-    { label: 'HDG MODE', value: () => (hup ? 'H-UP' : 'N-UP'), lit: () => hup, act: actions.hdg },
-    { label: 'RANGE', value: () => `${state.length} ST`, act: actions.range },
-    { label: 'KEY', value: () => (state.mode === 'minor' ? 'MOLL' : 'FRYG'), act: actions.key },
+    { label: 'BASE', value: () => baseLabel(), act: () => actions.base(1), alt: () => actions.base(-1) },
+    { label: 'OKTAWA', value: () => String(rootParts().oct), act: () => actions.octave(1), alt: () => actions.octave(-1) },
+    { label: 'KEY', value: () => MODE_LABEL[state.mode], act: actions.key },
     { label: 'RANDOM', value: () => 'LOSUJ', act: actions.random },
     { label: 'MUTATE', value: () => '1 KROK', act: actions.mut },
   ],
@@ -278,7 +288,13 @@ function renderKeys() {
     const b = document.createElement('button');
     b.className = k.lit && k.lit() ? 'lit' : '';
     b.innerHTML = `<span class="l">${k.label}</span><span class="v">${k.value()}</span>`;
-    b.addEventListener('click', () => { k.act(); renderKeys(); updateInfo(); });
+    let hold = 0, held = false;
+    if (k.alt) {                                                  // przytrzymanie (0,45 s) = zmiana w drugą stronę
+      b.addEventListener('pointerdown', () => { held = false; hold = setTimeout(() => { held = true; k.alt(); renderKeys(); updateInfo(); }, 450); });
+      const cancel = () => clearTimeout(hold);
+      b.addEventListener('pointerup', cancel); b.addEventListener('pointerleave', cancel); b.addEventListener('pointercancel', cancel);
+    }
+    b.addEventListener('click', () => { if (held) { held = false; return; } k.act(); renderKeys(); updateInfo(); });
     host.appendChild(b);
   }
 }
@@ -332,14 +348,15 @@ function updateInfo() {
   const n = pattern.steps.length, pos = curPos(), brg = Math.floor((pos / n) * 360) % 360;
   const on = pattern.steps.filter((s) => s.on), acc = on.filter((s) => s.vel >= 110).length;
   const info = page === 'seq'
-    ? [`SEQ ${n}ST`, 'RINGS 2°', hup ? 'H-UP' : 'N-UP', `BRG ${String(brg).padStart(3, '0')}°`]
+    ? [`SEQ ${n}ST`, `BASE ${baseLabel()}`, MODE_LABEL[state.mode], `BRG ${String(brg).padStart(3, '0')}°`]
     : page === 'mix' ? ['MIX', `X ${(padPos.x * 100) | 0}`, `Y ${(padPos.y * 100) | 0}`, `FLT ${(cutoffHz(+el('cutoff').value) | 0)} Hz`]
       : ['FX', `FLT ${FILTER_STYLES[engine.fx.filter.style].name.toUpperCase()}`, `FX ${FX_STYLES[engine.fx.fx.style].name.toUpperCase()}`];
   el('info').innerHTML = info.map((t, i) => `<span${i === 0 ? ' class="amb"' : ''}>${t}</span>`).join('');
   el('readout').textContent = [
     'RADARXXX', '',
     `BPM     ${engine.bpm}`,
-    `KEY     ${state.mode === 'minor' ? 'MOLL' : 'FRYGIJSKA'}`,
+    `BASE    ${baseLabel()}`,
+    `KEY     ${MODE_LABEL[state.mode]}`,
     `STEPS   ${String(on.length).padStart(2, '0')}/${n}`,
     `ACCENT  ${String(acc).padStart(2, '0')}`,
     `GATE    ${engine.gateMul.toFixed(2)}×`,
@@ -354,7 +371,7 @@ setInterval(() => { if (!el('radar').hidden) updateInfo(); }, 120);
 // ---------- skróty (komputer) ----------
 window.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || el('radar').hidden || (e.target instanceof HTMLElement && e.target.classList.contains('knob'))) return;
-  const map = { Space: togglePlay, KeyR: () => { actions.random(); renderKeys(); }, KeyM: () => { actions.mut(); }, KeyH: () => { actions.hdg(); renderKeys(); },
+  const map = { Space: togglePlay, KeyR: () => { actions.random(); renderKeys(); }, KeyM: () => { actions.mut(); },
     Digit1: () => setPage('seq'), Digit2: () => setPage('mix'), Digit3: () => setPage('fx'),
     ArrowUp: () => setBpm(engine.bpm + 2), ArrowDown: () => setBpm(engine.bpm - 2) };
   if (map[e.code]) { e.preventDefault(); if (e.target instanceof HTMLButtonElement) e.target.blur(); map[e.code](); }

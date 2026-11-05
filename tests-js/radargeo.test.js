@@ -77,3 +77,11 @@ test('zmiana długości wzoru zachowuje nuty: skrócenie ucina, wydłużenie pow
   assert.notEqual(long[0], long[8]);                    // kopie, nie te same obiekty
   assert.deepEqual(resizeSteps(steps, 8), steps);
 });
+
+test('skala promienia jest rosnąca, a pierwsza oktawa dostaje więcej miejsca niż druga', () => {
+  for (let d = DEG_MIN; d < DEG_MAX; d++) assert.ok(degToR(d + 1) > degToR(d), `d=${d}`);
+  const first = (degToR(6) - degToR(0)) / 6, second = (degToR(13) - degToR(7)) / 6;
+  assert.ok(first > second * 1.05, `${first} ${second}`);
+  assert.equal(rToDeg(degToR(0) + 0.005), 0);            // dokładność odczytu z dotyku w pobliżu toniki
+  assert.equal(rToDeg(degToR(1) - 0.005), 1);
+});

@@ -23,11 +23,27 @@ Osobna strona `docs/radar.html` (jeden układ jak aplikacja na telefon, na kompu
 zainspirowany radarem morskim:
 - **SEQ:** przemiatająca linia to głowica odtwarzania (jedno okrążenie = jeden obieg wzoru), nuty to echa na obwodzie
   (kąt = krok, odległość od środka = wysokość dźwięku), które gasną jak luminofor. Dotknięcie dodaje echo, przeciągnięcie je przesuwa,
-  dotknięcie istniejącego usuwa. Przycisk HDG MODE przełącza N-UP (linia się obraca) i H-UP (linia stoi, obraca się wzór).
+  dotknięcie istniejącego usuwa. Przyciski kontekstowe: BASE (nuta bazowa, tap = +1 półton, przytrzymanie = −1), OKTAWA (tap = w górę, przytrzymanie = w dół),
+  KEY (elektro / frygijska / moll), RANDOM, MUTATE. Zmiana nuty bazowej, oktawy i tonacji nie kasuje wzoru.
 - **MIX:** cztery silniki jako cele na obwodzie, krzyżyk to punkt miksu.
 - **FX:** filtr i efekty (4 style po 8 parametrów).
-- Wzór generuje przycisk RANDOM (losowa gęstość i synkopa w rozsądnych granicach). SWING, KEY i RANGE zmieniają tylko rytm, tonację i długość, nie kasują nut.
+- Wzór generuje przycisk RANDOM (losowa gęstość i synkopa w rozsądnych granicach). SWING, KEY, BASE i OKTAWA zmieniają tylko rytm, tonację i wysokość toniki, nie kasują nut.
 - Dolny rząd przycisków kontekstowych zmienia się zależnie od strony. Geometria jest w `docs/js/radargeo.js` (testowana).
+
+## Generator uczony z pętli MIDI
+Domyślny generator (`style: 'electro'` w `docs/js/generator.js`) korzysta z modelu `docs/js/electro-model.js`, nauczonego z 50 pętli basu electro:
+- **rytm:** łańcuch Markowa po 16 krokach (prawdopodobieństwo nuty zależy od pozycji w takcie i od tego, czy poprzedni krok grał),
+  `density` przesuwa gęstość (0,5 = średnia z pętli, ok. 8,7 nuty na takt), `syncopation` przenosi nuty z mocnych kroków na słabe;
+- **wysokości:** mała paleta na wzór (1-5 dźwięków: tonika, półton nad nią, rzadziej ♭3, kwarta, ♭7, oktawa), nuta powtarza się ok. połowy razy;
+  skala `electro` (półtony 0, 1, 3, 5, 6, 10, 11);
+- **długości:** nuty długie (średnio ok. 0,85 kroku), zależne od odstępu do następnej nuty; **głośność:** większość mocna, ok. 10% cichych nut.
+Wzory poprzedniego generatora nadal dostępne jako `style: 'classic'`.
+
+Do repo trafiają **tylko zagregowane statystyki** (tablice prawdopodobieństw, ok. 2 kB), nie same pętle. Źródłowe pliki MIDI nie są częścią repo
+(`.gitignore`), bo pakiety loopów mają własne licencje. Ponowne uczenie z własnego katalogu z plikami `NNN_<bpm>_..._<TONACJA>_....mid`:
+```bash
+python3 -I tools/learn/learn_model.py <katalog_z_mid> docs/js/electro-model.js
+```
 
 ## Skróty klawiszowe
 `spacja` play/stop · `R` losuj wzór · `M` mutuj · `T` moll/frygijska · `↑` `↓` BPM ±2 ·
