@@ -285,6 +285,20 @@ function drawSyn() {
     for (let k = 0; k < 6; k++) { g.beginPath(); g.arc(cx, cy, r0, start + (k * tail) / 6, start + ((k + 1) * tail) / 6); g.strokeStyle = `rgba(${INK},${((1 - k / 6) * 0.5 * al).toFixed(3)})`; g.lineWidth = Math.max(dpr, e.w * 0.5 * dpr); g.stroke(); }
   }
   drawSweepLine(G, S);
+  // proporcje głośności silników w rogach: długość paska = udział względem najgłośniejszego, najgłośniejszy na pomarańczowo, wybrany ze znacznikiem
+  const eff = engine.eff.map((v, i) => (engine.enabled[i] ? v : 0)), top = Math.max(...eff, 1e-6), lead = eff.indexOf(Math.max(...eff));
+  g.font = FONT(R * 0.085); g.textBaseline = 'middle';
+  VOICE_NAMES.forEach((_, i) => {
+    const left = i % 2 === 0, topRow = i < 2, x0 = left ? cx - R * 0.97 : cx + R * 0.97, share = eff[i] / top;
+    const ty = topRow ? cy - R * 0.9 : cy + R * 0.9, by = topRow ? ty + R * 0.11 : ty - R * 0.11, bw = R * 0.5, bh = R * 0.045;
+    g.textAlign = left ? 'left' : 'right';
+    g.fillStyle = `rgba(${INK},${engine.enabled[i] ? 1 : 0.4})`;
+    g.fillText((i === synSel ? '▸' : '') + SHORT[i], x0, ty);
+    const bx = left ? x0 : x0 - bw;
+    g.strokeStyle = `rgba(${INK},.35)`; g.lineWidth = dpr; g.strokeRect(bx, by - bh / 2, bw, bh);
+    g.fillStyle = i === lead && eff[i] > 0 ? `rgb(${ACC})` : `rgba(${INK},.8)`;
+    const fw = bw * share; g.fillRect(left ? bx : bx + bw - fw, by - bh / 2, fw, bh);
+  });
   const kr = rFromN(fE) * R, ka = thetaFromN(fD), [bx, by] = polarXY(cx, cy, R * 0.94, ka), [kx, ky] = polarXY(cx, cy, kr, ka);
   g.setLineDash([4 * dpr, 4 * dpr]); g.beginPath(); g.moveTo(cx, cy); g.lineTo(bx, by); g.strokeStyle = `rgba(${ACC},.55)`; g.lineWidth = dpr; g.stroke(); g.setLineDash([]);
   g.strokeStyle = `rgba(${ACC},1)`; g.lineWidth = 1.6 * dpr;
