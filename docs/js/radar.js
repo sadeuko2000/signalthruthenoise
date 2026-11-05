@@ -490,11 +490,13 @@ const actions = {
   // RANDOM: nowy wzór z losową gęstością i synkopą w rozsądnych granicach (swing i nuta bazowa zostają).
   random: () => { state.seed = (Math.random() * 1e9) | 0; state.density = between(0.3, 0.7); state.syncopation = between(0.25, 0.75); regen(); },
   // MUTATE: losuje ustawienia syntezatorów (parametry i obwiednie włączonych silników, w rozsądnych granicach) i zmienia wysokość kilku nut.
-  // Oprócz brzmienia zmienia też wysokości: 2-3 nuty dostają nowy dźwięk z palety wzoru (albo o 1-2 stopnie skali obok).
+  // Oprócz brzmienia zmienia też wysokości: około 40% nut (3 do 8) dostaje nowy dźwięk z palety wzoru (albo o 1-2 stopnie skali obok).
   mut: () => {
     engine.enabled.forEach((on, i) => { if (on) engine.randomizeVoice(i); });
+    const want = Math.max(3, Math.min(8, Math.round(pattern.steps.filter((x) => x.on).length * 0.4)));   // ok. 40% nut wzoru, od 3 do 8
+    const diffs = (a, b) => a.steps.reduce((n, x, i) => n + (x.on && x.degree !== b.steps[i].degree ? 1 : 0), 0);
     let p = pattern, changed = 0;
-    for (let t = 0; t < 24 && changed < 3; t++) { const q = mutate(p, Math.random, 'pitch'); if (q !== p) { p = q; changed++; } }
+    for (let t = 0; t < 120 && changed < want; t++) { p = mutate(p, Math.random, 'pitch'); changed = diffs(pattern, p); }   // liczymy nuty, które faktycznie zmieniły wysokość
     if (changed) { pattern = finalize(p); engine.pattern = pattern; }
     renderPanel();
   },
