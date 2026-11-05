@@ -24,7 +24,6 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .stage{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:8px max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:6px}
 .scopewrap{display:grid;place-items:center}
 #scope{display:block;width:min(100%,300px);min-width:240px;aspect-ratio:1;touch-action:none;cursor:crosshair}
-#strip{display:block;width:100%;height:34px;flex:none}
 .side{display:flex;flex-direction:column;gap:8px}
 #readout{margin:0;font:inherit;font-size:14px;line-height:1.3;white-space:pre;display:none}
 

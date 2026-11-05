@@ -240,26 +240,6 @@ function drawFx(ts) {
   if (ds.length > 1) { const c1 = cursorOf(ds[1]), [hx, hy] = polarXY(cx, cy, c1.r, c1.a); g.beginPath(); g.arc(hx, hy, R * 0.03, 0, TAU); g.strokeStyle = `rgba(${ACC},.8)`; g.lineWidth = 1.4 * dpr; g.stroke(); }
 }
 
-// ---------- pasek przeglądu wzoru ----------
-const strip = el('strip'), sg = strip.getContext('2d');
-function drawStrip() {
-  const d = Math.min(devicePixelRatio || 1, 2), W = Math.max(40, Math.round(strip.clientWidth * d)), H = Math.max(12, Math.round(strip.clientHeight * d));
-  if (strip.width !== W || strip.height !== H) { strip.width = W; strip.height = H; }
-  const S = sweepState(), n = S.n, cw = W / n, rows = DEG_MAX - DEG_MIN + 1, rh = (H - 2) / rows;
-  sg.clearRect(0, 0, W, H);
-  sg.fillStyle = PAPER; sg.fillRect(0, 0, W, H);
-  sg.strokeStyle = `rgba(${INK},.28)`; sg.lineWidth = Math.max(1, d); sg.strokeRect(0.5, 0.5, W - 1, H - 1);
-  for (let i = 4; i < n; i += 4) { sg.fillStyle = `rgba(${INK},.14)`; sg.fillRect(Math.round(i * cw), 0, Math.max(1, d), H); }
-  sg.fillStyle = `rgba(${INK},.12)`; sg.fillRect(Math.round((Math.floor(S.pos) % n) * cw), 0, Math.max(1, Math.round(cw)), H);   // bieżący krok
-  pattern.steps.forEach((s, i) => {
-    if (!s.on) return;
-    const y = H - 1 - ((Math.max(DEG_MIN, Math.min(DEG_MAX, s.degree)) - DEG_MIN) / (rows - 1)) * (H - 2 - rh) - rh;
-    sg.fillStyle = `rgb(${s.vel >= 110 ? ACC : INK})`;
-    sg.fillRect(Math.round(i * cw), Math.max(0, Math.round(y)), Math.max(1, Math.round(Math.min(4, s.gate) * cw - 1)), Math.max(2, Math.round(rh)));
-  });
-  sg.fillStyle = `rgb(${INK})`; sg.fillRect(Math.round(S.pos * cw), 0, Math.max(1, d), H);                                           // linia odtwarzania
-}
-
 // ---------- SYN: parametry silników na ekranie radarowym ----------
 // Dotyk ustawia „kształt dźwięku” wybranego silnika: odległość od środka = siła obwiedni filtra (zryw na początku nuty),
 // kąt = jej zanik. Na ekranie echa dostają kolec (siła) i ogon (zanik) odpowiadające tym wartościom.
@@ -307,7 +287,7 @@ function drawSyn() {
 
 let raf = 0;
 function loop(ts) {
-  if (!el('radar').hidden) { if (page === 'mix') drawMix(); else if (page === 'fx') drawFx(ts); else if (page === 'syn') drawSyn(); else { drawSeq(); drawStrip(); } }
+  if (!el('radar').hidden) { if (page === 'mix') drawMix(); else if (page === 'fx') drawFx(ts); else if (page === 'syn') drawSyn(); else drawSeq(); }
   raf = requestAnimationFrame(loop);
 }
 
@@ -545,7 +525,6 @@ function setPage(p) {
   page = p;
   document.querySelectorAll('#pages button').forEach((b) => b.classList.toggle('on', b.dataset.page === p));
   el('scopewrap').hidden = false;
-  el('strip').hidden = p !== 'seq';                    // pasek przeglądu wzoru tylko na stronie sekwencera
   el('side').hidden = p === 'fx' || p === 'syn';
   el('knobs-seq').hidden = p !== 'seq';
   el('knobs-mix').hidden = true;                    // poziomy silników nie są potrzebne: zostają na 100%, bez pokręteł
