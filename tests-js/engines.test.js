@@ -1,18 +1,35 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { blendWeights } from '../docs/js/engines.js';
+import { blendWeights, clampToDisc } from '../docs/js/engines.js';
 
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} != ${b}`);
 
-test('narożniki pada wybierają jeden silnik', () => {
-  assert.deepEqual(blendWeights(0, 1), [1, 0, 0, 0]);   // prophet
-  assert.deepEqual(blendWeights(1, 1), [0, 1, 0, 0]);   // ms-20
-  assert.deepEqual(blendWeights(0, 0), [0, 0, 1, 0]);   // dx
-  assert.deepEqual(blendWeights(1, 0), [0, 0, 0, 1]);   // wavetable
+test('narożniki pada wybierają jeden silnik (pad okrągły, kotwice na 45°)', () => {
+  const pure = (w, i) => { assert.ok(w[i] > 0.999, `w[${i}]=${w[i]}`); };
+  pure(blendWeights(0, 1), 0);   // prophet
+  pure(blendWeights(1, 1), 1);   // ms-20
+  pure(blendWeights(0, 0), 2);   // dx
+  pure(blendWeights(1, 0), 3);   // wavetable
 });
 
 test('środek miesza po równo', () => {
   blendWeights(0.5, 0.5).forEach((w) => near(w, 0.5));
+});
+
+test('punkty poza kołem trafiają na brzeg koła', () => {
+  const c = clampToDisc(1, 1);
+  near(Math.hypot(2 * c.x - 1, 2 * c.y - 1), 1);
+  const inside = clampToDisc(0.6, 0.55);
+  near(inside.x, 0.6); near(inside.y, 0.55);
+});
+
+test('wyłączone silniki dostają wagę 0, reszta zostaje równomocowa', () => {
+  const w = blendWeights(0.5, 0.5, [1, 0, 1, 0]);
+  assert.equal(w[1], 0); assert.equal(w[3], 0);
+  near(w[0] ** 2 + w[2] ** 2, 1);
+  assert.deepEqual(blendWeights(0.5, 0.5, [0, 0, 0, 0]), [0, 0, 0, 0]);
+  const solo = blendWeights(0.9, 0.1, [0, 0, 1, 0]);   // jedyny aktywny silnik gra pełnym poziomem niezależnie od pada
+  near(solo[2], 1);
 });
 
 test('miks jest równomocowy w każdym punkcie', () => {

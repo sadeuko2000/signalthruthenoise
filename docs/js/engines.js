@@ -3,10 +3,26 @@
 // Własne implementacje inspirowane typami syntezy (analog 3xVCO, MS-20, FM 2-op, wavetable).
 // Każdy silnik ma własne obwiednie filtra i amplitudy (wspólna część PARAM_SPECS, grupa 'env').
 
-// Narożniki pada: lewy-góra, prawy-góra, lewy-dół, prawy-dół. Miks równomocowy (suma kwadratów = 1).
-export function blendWeights(x, y) {
-  const w = [(1 - x) * y, x * y, (1 - x) * (1 - y), x * (1 - y)];
-  return w.map(Math.sqrt);
+// Okrągły pad: silniki leżą na obwodzie koła pod kątem 45° (lewy-góra, prawy-góra, lewy-dół, prawy-dół).
+// (x, y) z kwadratu 0..1 jest rzutowane na koło, punkty poza kołem trafiają na jego brzeg.
+// Wagi rosną gwałtownie przy zbliżaniu się do silnika (w jego punkcie gra tylko on), środek miesza po równo,
+// a suma kwadratów wag wynosi 1 (miks równomocowy). `enabled` wyłącza silniki: ich waga jest 0, reszta się renormalizuje.
+const ANCHORS = [[-1, 1], [1, 1], [-1, -1], [1, -1]].map(([a, b]) => [a * Math.SQRT1_2, b * Math.SQRT1_2]);
+
+export function clampToDisc(x, y) {
+  const u = 2 * x - 1, v = 2 * y - 1, r = Math.hypot(u, v);
+  const k = r > 1 ? 1 / r : 1;
+  return { x: (u * k + 1) / 2, y: (v * k + 1) / 2 };
+}
+
+export function blendWeights(x, y, enabled = [1, 1, 1, 1]) {
+  const c = clampToDisc(x, y), u = 2 * c.x - 1, v = 2 * c.y - 1;
+  const w = ANCHORS.map(([ax, ay], i) => {
+    const d2 = (u - ax) ** 2 + (v - ay) ** 2;
+    return enabled[i] ? 1 / ((d2 + 0.04) ** 2) : 0;
+  });
+  const norm = Math.sqrt(w.reduce((s, x) => s + x * x, 0));
+  return norm ? w.map((x) => x / norm) : [0, 0, 0, 0];
 }
 
 const cl = (v, a, b) => Math.max(a, Math.min(b, v));

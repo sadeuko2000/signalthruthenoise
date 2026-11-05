@@ -1,7 +1,7 @@
 import { generateBass, mutate, DEFAULTS } from './generator.js';
 import { Engine } from './audio.js';
 import { Sensors } from './sensors.js';
-import { PARAM_SPECS, VOICE_NAMES } from './engines.js';
+import { PARAM_SPECS, VOICE_NAMES, clampToDisc } from './engines.js';
 
 const $ = (id) => document.getElementById(id);
 const engine = new Engine();
@@ -63,7 +63,8 @@ const cutoffHz = (v) => 60 * Math.pow(100, v);           // 60 Hz .. 6 kHz
 const pad = $('pad'), dot = $('dot');
 const corners = [...pad.querySelectorAll('.corner span')];
 const padPos = { x: 0.25, y: 0.75 };
-function setPad(x, y) {
+function setPad(x0, y0) {
+  const { x, y } = clampToDisc(x0, y0);          // kropka zostaje wewnątrz okrągłego pada
   padPos.x = x; padPos.y = y;
   dot.style.left = `${x * 100}%`;
   dot.style.top = `${(1 - y) * 100}%`;
@@ -95,7 +96,7 @@ function mkSlider(label, min, max, step, val, onInput) {
 VOICE_NAMES.forEach((name, i) => {
   const card = document.createElement('article');
   card.className = 'eng';
-  card.innerHTML = `<header><b>${name}</b><button class="solo" title="solo">S</button><button class="rnd" title="losuj parametry">🎲</button></header>`;
+  card.innerHTML = `<header><b>${name}</b><button class="pwr on" title="włącz / wyłącz silnik">⏻</button><button class="solo" title="solo">S</button><button class="rnd" title="losuj parametry">🎲</button></header>`;
   const [lv, lvIn] = mkSlider('głośność', 0, 1.5, 0.01, 1, (v) => engine.setLevel(i, v));
   card.appendChild(lv);
   sliderRefs[i].level = lvIn;
@@ -109,6 +110,13 @@ VOICE_NAMES.forEach((name, i) => {
     sliderRefs[i][sp.id] = inp;
   }
   card.appendChild(env);
+  card.querySelector('.pwr').addEventListener('click', (e) => {
+    const on = !e.currentTarget.classList.contains('on');
+    e.currentTarget.classList.toggle('on', on);
+    card.classList.toggle('off', !on);
+    engine.setEnabled(i, on);
+    setPad(padPos.x, padPos.y);                   // odśwież podświetlenie narożników
+  });
   card.querySelector('.solo').addEventListener('click', () => setSolo(engine.solo === i ? null : i));
   card.querySelector('.rnd').addEventListener('click', () => randomizeVoice(i));
   engHost.appendChild(card);

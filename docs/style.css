@@ -81,3 +81,13 @@ kbd{font:inherit;font-size:11px;padding:1px 6px;border-radius:5px;background:var
 .env summary::before{content:"▸ "}
 .env[open] summary::before{content:"▾ "}
 .env[open]{display:grid;gap:2px}
+
+/* okrągły pad: kontener kwadratowy, koło rysuje ::before, nazwy silników w rogach kwadratu */
+#pad{aspect-ratio:1;width:min(100%,360px);max-height:none;margin:0 auto;background:none;overflow:visible}
+#pad::before{content:"";position:absolute;inset:0;border-radius:50%;background:
+  radial-gradient(circle,#1b1b27 0 1px,transparent 1px) center/100% 100%,
+  repeating-radial-gradient(circle at 50% 50%,transparent 0 24%,#2c2c3a 24% calc(24% + 1px)),var(--pad)}
+.pwr{padding:5px 9px;font-size:13px;border-radius:8px;background:var(--pad);color:var(--dim)}
+.pwr.on{color:var(--on)}
+.eng.off{opacity:.45}
+@media (min-width:900px){#pad{aspect-ratio:1;width:min(100%,380px)}}

@@ -3,6 +3,8 @@
 Mobilna aplikacja w przeglądarce do zabawy z electro: sekwencer basu acid (303) z generatorem
 wzorów. Sterowanie padem XY i żyroskopem, vocoder z mikrofonu. Na razie tylko sekwencer i bas; perkusja i lead później.
 
+Plan rozwoju i otwarte pytania: [NOTATKI.md](NOTATKI.md).
+
 ## Uruchomienie
 ```bash
 npm run serve     # http://localhost:8000 (mikrofon/czujniki na telefonie wymagają HTTPS, np. Pages)
@@ -20,7 +22,7 @@ npm test          # testy generatora (node:test)
   - `js/audio.js` – Web Audio: zegar z lookahead, rozsyłanie nut do silników, slide, ratchet
   - `js/vocoder.js` – vocoder kanałowy (16 pasm + tor szumu na spółgłoski); modulator = mikrofon, nośnik = bas
   - `js/sensors.js` – żyroskop (przechył → pad XY) i potrząśnięcie (→ mutacja)
-  - `js/app.js` – UI; pad XY miksuje silniki (narożniki: prophet, ms-20, dx, wavetable), filtr i gęstość na suwakach
+  - `js/app.js` – UI; okrągły pad XY miksuje silniki (kotwice na 45°: prophet, ms-20, dx, wavetable), filtr i gęstość na suwakach
 - `scripts/build-preview.mjs` – składa `docs/` w jeden plik HTML (makieta do artefaktu): `node scripts/build-preview.mjs out.html`.
 - `tools/` – pierwotny prototyp w Pythonie (eksport MIDI), referencja; nie jest rozwijany.
 - `.github/workflows/pages.yml` – testy + deploy `docs/` po wpisie do `main`.

@@ -13,6 +13,8 @@ export class Engine {
     // parametry wspólne dla wszystkich silników (silniki trzymają referencję do tego obiektu)
     this.p = { cutoff: 600, res: 12, bright: 0.35 };
     this.blend = [1, 0, 0, 0];
+    this.xy = [0.25, 0.75];       // pozycja na padzie
+    this.enabled = [1, 1, 1, 1];  // które silniki biorą udział w miksie
     this.levels = [1, 1, 1, 1];   // głośność każdego silnika (niezależnie od pada)
     this.solo = null;             // indeks silnika solo albo null
     this.eff = [1, 0, 0, 0];      // efektywna waga = pad lub solo, razy głośność
@@ -70,10 +72,12 @@ export class Engine {
   }
 
   // Pad XY: miks czterech silników (narożniki: prophet, ms-20, dx, wavetable).
-  setBlend(x, y) { this.blend = blendWeights(x, y); this._applyGains(); }
+  setBlend(x, y) { this.xy = [x, y]; this._applyGains(); }
+  setEnabled(i, on) { this.enabled[i] = on ? 1 : 0; this._applyGains(); }
   setLevel(i, v) { this.levels[i] = v; this._applyGains(); }
   setSolo(i) { this.solo = i; this._applyGains(); }
   _applyGains() {
+    this.blend = blendWeights(this.xy[0], this.xy[1], this.enabled);
     const base = this.solo == null ? this.blend : this.blend.map((_, i) => (i === this.solo ? 1 : 0));
     this.eff = base.map((w, i) => w * this.levels[i]);
     if (this.vgains) this.vgains.forEach((g, i) => g.gain.setTargetAtTime(this.eff[i], this.ctx.currentTime, 0.03));
