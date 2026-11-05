@@ -130,7 +130,6 @@ const SHORT = ['PROPHET', 'MS-20', 'DX', 'WAVETBL'];
 function drawMix() {
   const G = geo(), S = sweepState(), { cx, cy, R, dpr } = G, Rp = R * R_OUT;
   drawBase(G, S);
-  for (const e of echoes(pattern.steps)) drawEcho(G, e, echoAlpha(e.i, S.pos, S.n) * 0.3, { raw: true });   // wzór blado w tle
   drawSweepLine(G, S);
   const mx = cx + (2 * padPos.x - 1) * Rp, my = cy - (2 * padPos.y - 1) * Rp;
   g.font = FONT(R * 0.085); g.textBaseline = 'middle';
@@ -366,6 +365,7 @@ el('reso').addEventListener('input', (e) => engine.setResonance(1 + e.target.val
 const between = (a, b) => a + Math.random() * (b - a);
 const MODE_CYCLE = ['electro', 'phrygian', 'minor'];
 const MODE_LABEL = { electro: 'ELEKTRO', phrygian: 'FRYG', minor: 'MOLL' };
+const MODE_SHORT = { electro: 'ELEK', phrygian: 'FRYG', minor: 'MOLL' };
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const ROOT_MIN = 24, ROOT_MAX = 59;                           // tonika od C1 do B3 (36 półtonów)
 const rootParts = () => ({ pc: state.root % 12, oct: Math.floor(state.root / 12) - 1 });
@@ -413,14 +413,25 @@ el('bpm-5').addEventListener('click', () => setBpm(engine.bpm - 5));
 el('bpm+5').addEventListener('click', () => setBpm(engine.bpm + 5));
 el('play').addEventListener('click', togglePlay);
 
+// okienko BASE / KEY: nuta bazowa (półtony) i skala w jednym miejscu, zmiany słychać od razu
+const keyPop = el('key-pop');
+const refreshKeyPop = () => { el('kp-base').textContent = baseLabel(); el('kp-key').textContent = MODE_LABEL[state.mode]; };
+function showKey(on) { keyPop.hidden = !on; if (on) { refreshKeyPop(); el('kp-ok').focus(); } else renderKeys(); }
+keyPop.addEventListener('pointerdown', (e) => { if (e.target === keyPop) showKey(false); });
+el('kp-ok').addEventListener('click', () => showKey(false));
+const kpDo = (fn) => () => { fn(); refreshKeyPop(); };
+el('kp-base-').addEventListener('click', kpDo(() => actions.base(-1)));
+el('kp-base+').addEventListener('click', kpDo(() => actions.base(1)));
+el('kp-key+').addEventListener('click', kpDo(() => actions.key()));
+el('kp-key-').addEventListener('click', kpDo(() => { actions.key(); actions.key(); }));   // 3 skale: dwa kroki w przód = jeden w tył
+
 // ---------- przyciski kontekstowe (zależne od strony) ----------
 const rnd = (i) => { const vals = engine.randomizeVoice(i); return vals; };
 const short8 = (t) => (t.length > 8 ? `${t.slice(0, 7)}.` : t);       // napis w przycisku mieści się w komórce (np. DRABINK.)
 const KEYS = {
   seq: [
-    { label: 'BASE', value: () => baseLabel(), act: () => actions.base(1), alt: () => actions.base(-1) },
+    { label: 'BASE/KEY', value: () => `${baseLabel()} ${MODE_SHORT[state.mode]}`, act: () => showKey(true) },
     { label: 'OKTAWA', value: () => String(rootParts().oct), act: () => actions.octave(1), alt: () => actions.octave(-1) },
-    { label: 'KEY', value: () => MODE_LABEL[state.mode], act: actions.key },
     { label: 'RANDOM', value: () => 'LOSUJ', act: actions.random },
     { label: 'MUTATE', value: () => '1 KROK', act: actions.mut },
   ],
@@ -560,6 +571,7 @@ setInterval(() => { if (!el('radar').hidden) updateInfo(); }, 120);
 // ---------- skróty (komputer) ----------
 window.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || el('radar').hidden || (e.target instanceof HTMLElement && e.target.classList.contains('knob'))) return;
+  if (!keyPop.hidden) { if (e.code === 'Escape') { e.preventDefault(); showKey(false); } return; }
   if (!bpmPop.hidden) { if (e.code === 'Escape') { e.preventDefault(); showBpm(false); } else if (e.code === 'ArrowUp') { e.preventDefault(); setBpm(engine.bpm + 1); } else if (e.code === 'ArrowDown') { e.preventDefault(); setBpm(engine.bpm - 1); } return; }
   const map = { Space: togglePlay, KeyR: () => { actions.random(); renderKeys(); }, KeyM: () => { actions.mut(); },
     Digit1: () => setPage('seq'), Digit2: () => setPage('mix'), Digit3: () => setPage('syn'), Digit4: () => setPage('fx'),

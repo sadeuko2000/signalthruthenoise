@@ -91,3 +91,10 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .poprow button:last-child{border-right:0}
 .poprow button:nth-child(1),.poprow button:nth-child(4){font-size:20px}
 .popok{width:100%;min-height:48px;background:var(--ink);color:var(--paper);letter-spacing:.2em;font-size:22px}
+
+/* okienko BASE / KEY */
+.keyrow{display:grid;grid-template-columns:64px 52px 1fr 52px;align-items:center;width:100%;border:1px solid var(--ink)}
+.keyrow span{padding-left:8px;font-size:16px;letter-spacing:.14em}
+.keyrow b{font-weight:400;font-size:34px;text-align:center;line-height:1}
+.keyrow button{min-height:56px;font-size:28px;border-left:1px solid var(--ink)}
+.keyrow button:last-child{border-left:1px solid var(--ink)}
