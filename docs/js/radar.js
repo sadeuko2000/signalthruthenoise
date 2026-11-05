@@ -68,31 +68,22 @@ function sweepState() { const n = pattern.steps.length, pos = curPos(); return {
 function drawBase(G, S) {
   const { W, cx, cy, R, dpr } = G;
   g.fillStyle = PAPER; g.fillRect(0, 0, W, W);
-  // pierścienie zakresu (bez opisów liczbowych): co drugi stopień skali, oktawa i tonika mocniej
-  for (let d = DEG_MIN; d <= DEG_MAX - 1; d++) {
-    if (d % 2 !== 0 && d !== 7) continue;
-    circle(cx, cy, degToR(d) * R, d === 0 || d === 7 ? `rgba(${INK},.75)` : `rgba(${INK},.22)`, dpr);
-  }
-  circle(cx, cy, R * (R_OUT + 0.075), `rgba(${INK},.3)`, dpr, [3 * dpr, 5 * dpr]);
-  // obrzeże: kreski kroków i bieżący krok
+  // uproszczone tło: tylko pierścień toniki i oktawy oraz obrzeże, bez siatki stopni i bez drobnej podziałki
+  circle(cx, cy, degToR(0) * R, `rgba(${INK},.5)`, dpr);
+  circle(cx, cy, degToR(7) * R, `rgba(${INK},.5)`, dpr);
   circle(cx, cy, R * 0.985, `rgba(${INK},1)`, dpr);
   const { n, pos } = S, hot = Math.floor(pos) % n;
-  for (let k = 0; k < n * 4; k++) {
-    const a = (k / (n * 4)) * TAU, major = k % 4 === 0;
-    const [x0, y0] = polarXY(cx, cy, R * (major ? 0.935 : 0.96), a), [x1, y1] = polarXY(cx, cy, R * 0.985, a);
-    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1);
-    g.strokeStyle = major ? `rgba(${INK},1)` : `rgba(${INK},.35)`; g.lineWidth = dpr; g.stroke();
+  for (let k = 0; k < n; k += 4) {                         // krótka kreska co 4 kroki (ćwierćnuta)
+    const a = angleOfStep(k, n), [x0, y0] = polarXY(cx, cy, R * 0.945, a), [x1, y1] = polarXY(cx, cy, R * 0.985, a);
+    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.strokeStyle = `rgba(${INK},1)`; g.lineWidth = dpr; g.stroke();
   }
   { const a = angleOfStep(hot, n), [x0, y0] = polarXY(cx, cy, R * 0.9, a), [x1, y1] = polarXY(cx, cy, R * 0.985, a);
     g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.strokeStyle = `rgba(${ACC},1)`; g.lineWidth = 3 * dpr; g.stroke(); }
   { const [x, y] = polarXY(cx, cy, R * 0.985, 0), [x2, y2] = polarXY(cx, cy, R * 0.94, -0.045), [x3, y3] = polarXY(cx, cy, R * 0.94, 0.045);
     g.beginPath(); g.moveTo(x, y); g.lineTo(x2, y2); g.lineTo(x3, y3); g.closePath(); g.fillStyle = `rgba(${ACC},1)`; g.fill(); }
-  // ślad za linią: cienkie kreski, coraz słabsze (jak kreskowanie w druku)
-  for (let k = 0; k < 14; k++) {
-    const a = S.sw - k * (TAU / 90), [x0, y0] = polarXY(cx, cy, R * 0.12, a), [x1, y1] = polarXY(cx, cy, R * 0.93, a);
-    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1);
-    g.strokeStyle = `rgba(${INK},${(0.22 * (1 - k / 14)).toFixed(3)})`; g.lineWidth = dpr; g.stroke();
-  }
+  // ślad za linią: jedna miękka smuga zamiast kreskowania
+  g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, R * 0.93, S.sw - 0.5 - Math.PI / 2, S.sw - Math.PI / 2); g.closePath();
+  g.fillStyle = `rgba(${INK},.07)`; g.fill();
 }
 
 // Jedno echo. o: r (promień w px zamiast wzorowego), da (przesunięcie kąta), lw (mnożnik grubości), col, noGlow.
