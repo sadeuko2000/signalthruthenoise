@@ -63,30 +63,24 @@ function drawSeq() {
   bg.addColorStop(0, '#07210f'); bg.addColorStop(1, '#020604');
   g.fillStyle = bg; g.fillRect(0, 0, W, W);
 
-  // pierścienie zakresu (stopnie skali)
-  g.font = FONT(R * 0.05); g.textAlign = 'left'; g.textBaseline = 'bottom';
+  // pierścienie zakresu (bez opisów liczbowych)
   for (let d = -2; d <= DEG_MAX - 1; d += 2) {
-    const r = degToR(d) * R;
-    circle(cx, cy, r, d === 0 ? 'rgba(125,255,90,.38)' : 'rgba(125,255,90,.2)', dpr);
-    g.fillStyle = 'rgba(125,255,90,.55)'; g.fillText(d > 0 ? `+${d}` : `${d}`, cx + 3 * dpr, cy - r - 1 * dpr);
+    circle(cx, cy, degToR(d) * R, d === 0 ? 'rgba(125,255,90,.38)' : 'rgba(125,255,90,.2)', dpr);
   }
   circle(cx, cy, R * (R_OUT + 0.075), 'rgba(125,255,90,.28)', dpr, [3 * dpr, 5 * dpr]);
 
-  // obrzeże: kreski i numery kroków
+  // obrzeże: kreski kroków
   circle(cx, cy, R * 0.985, 'rgba(125,255,90,.55)', 1.5 * dpr);
   const hot = Math.floor(pos) % n;
-  g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = FONT(R * (n > 16 ? 0.045 : 0.055));
   for (let k = 0; k < n * 4; k++) {
     const a = (k / (n * 4)) * TAU + rot, major = k % 4 === 0;
     const [x0, y0] = polarXY(cx, cy, R * (major ? 0.935 : 0.96), a), [x1, y1] = polarXY(cx, cy, R * 0.985, a);
     g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1);
     g.strokeStyle = major ? 'rgba(125,255,90,.8)' : 'rgba(125,255,90,.35)'; g.lineWidth = dpr; g.stroke();
   }
-  for (let i = 0; i < n; i++) {
-    const [x, y] = polarXY(cx, cy, R * 0.895, angleOfStep(i, n) + rot + (TAU / n) * 0.5);
-    g.fillStyle = i === hot ? `rgba(${AMBER},1)` : 'rgba(125,255,90,.55)';
-    g.fillText(String(i + 1).padStart(2, '0'), x, y);
-  }
+  // bieżący krok: wyraźniejsza, bursztynowa kreska na obrzeżu (zamiast numerów)
+  { const a = angleOfStep(hot, n) + rot, [x0, y0] = polarXY(cx, cy, R * 0.9, a), [x1, y1] = polarXY(cx, cy, R * 0.985, a);
+    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.strokeStyle = `rgba(${AMBER},1)`; g.lineWidth = 3 * dpr; g.stroke(); }
   // znacznik północy (krok 1)
   { const a = rot, [x, y] = polarXY(cx, cy, R * 0.985, a), [x2, y2] = polarXY(cx, cy, R * 0.94, a - 0.045), [x3, y3] = polarXY(cx, cy, R * 0.94, a + 0.045);
     g.beginPath(); g.moveTo(x, y); g.lineTo(x2, y2); g.lineTo(x3, y3); g.closePath(); g.fillStyle = `rgba(${AMBER},1)`; g.fill(); }
