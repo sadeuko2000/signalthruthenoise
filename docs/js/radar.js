@@ -809,8 +809,9 @@ const labOf = (sp) => SHORT_LAB[sp.id] || sp.label.toUpperCase();
 function renderPanel() {
   panelEl.replaceChildren();
   Object.keys(synRefs).forEach((k) => delete synRefs[k]); Object.keys(macroRefs).forEach((k) => delete macroRefs[k]); Object.keys(fxMainRefs).forEach((k) => delete fxMainRefs[k]);
-  panelEl.appendChild(moderow());                                         // wiersz MODE:ENCODER / EDIT (zajmuje stałe miejsce, na zakładkach bez trybu jest niewidoczny)
-  if (isCtl()) { renderControllers(); return; }
+  // zakładka CTRL: kontrolery u góry, a wiersz MODE:CONTROLLER / EDIT pod nimi; na pozostałych zakładkach wiersz (routing na FX, na innych pusty) jest nad pokrętłami
+  if (isCtl()) { renderControllers(); panelEl.appendChild(moderow()); return; }
+  panelEl.appendChild(moderow());
   const grid = document.createElement('div'); grid.className = 'pgrid';
   const tab = tabSel[page], B = (o) => cellButton(grid, o), Kn = (...a) => grid.appendChild(synKnob(...a)), Sp = () => spacer(grid);
 
