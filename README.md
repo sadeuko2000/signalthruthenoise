@@ -19,7 +19,7 @@ Przycisk „widok” w nagłówku przełącza układ (wybór jest zapamiętywany
 - **Desktop:** sekwencer po lewej, pad, silniki, filtr i efekty po prawej; skróty klawiszowe.
 
 ## radarxxx: interfejs radarowy
-Osobna strona `docs/radar.html` (jeden układ jak aplikacja na telefon, na komputerze wyśrodkowany) (wersja do artefaktu: `node scripts/build-radar.mjs out.html`), ten sam silnik dźwięku, inny interfejs
+Osobna strona `docs/radar.html` (jeden układ jak aplikacja na telefon, na komputerze wyśrodkowany, proporcje zablokowane jak na telefonie) (wersja do artefaktu: `node scripts/build-radar.mjs out.html`), ten sam silnik dźwięku, inny interfejs
 zainspirowany radarem morskim:
 - **SEQ:** przemiatająca linia to głowica odtwarzania (jedno okrążenie = jeden obieg wzoru), nuty to echa na obwodzie
   (kąt = krok, odległość od środka = wysokość dźwięku), które gasną jak luminofor. Dotknięcie dodaje echo, przeciągnięcie je przesuwa,
