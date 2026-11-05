@@ -137,8 +137,10 @@ function drawCorners(G, defs) {
     g.beginPath(); g.arc(x, y, rd, 0, TAU);
     if (d.lit === false) { g.strokeStyle = `rgba(${ACC},${a})`; g.lineWidth = 2 * dpr; g.stroke(); }
     else { g.fillStyle = `rgba(${ACC},${a})`; g.fill(); }
-    const rMain = R * (top ? 0.79 : 0.9), rSub = R * (top ? 0.68 : 0.79);
-    arcText(d.label, cx, cy, rMain, ang[i], top, size, `rgba(${INK},${a})`);
+    const rSub = R * (top ? 0.79 : 0.9);
+    // główny napis stoi poza okręgiem, obok kropki (w wolnym rogu ekranu)
+    g.font = FONT(size); g.fillStyle = `rgba(${INK},${a})`; g.textBaseline = 'middle'; g.textAlign = left ? 'left' : 'right';
+    g.fillText(d.label, left ? x + rd + W * 0.025 : x - rd - W * 0.025, y);
     if (d.bar != null) {
       const span = 0.5, a0 = ang[i] - span / 2, a1 = ang[i] + span / 2, st = (v) => v - Math.PI / 2;
       g.lineCap = 'butt'; g.lineWidth = W * 0.012;
