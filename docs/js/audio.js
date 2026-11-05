@@ -83,6 +83,9 @@ export class Engine {
     this.eqIn.connect(lo).connect(md).connect(hi).connect(this.mix);
     this.eqNodes.forEach((n, k) => { n.gain.value = this.eq[k]; });
     this.voices = this.types.map((t) => new VOICES[t](c, this.p));
+    // pitch bend: jedno źródło stałe (cent) podłączone do detune wszystkich oscylatorów wszystkich silników
+    this.bendSrc = c.createConstantSource(); this.bendSrc.offset.value = 0; this.bendSrc.start();
+    this.voices.forEach((v) => this._wireBend(v));
     this.vgains = this.voices.map((v) => { const g = c.createGain(); g.connect(this.eqIn); return g; });
     // EQ każdego silnika (półka niskich i wysokich) między silnikiem a jego głośnością
     this.veq = this.voices.map((v, i) => {
@@ -124,12 +127,16 @@ export class Engine {
     const now = this.ctx.currentTime, old = this.voices[i];
     old.silence(now); old.out.disconnect();
     const nodes = Object.values(old).flatMap((x) => (Array.isArray(x) ? x : [x]));
-    setTimeout(() => nodes.forEach((n) => { if (n && n.stop && n.frequency) { try { n.stop(); } catch (e) { /* już zatrzymany */ } } }), 400);
+    setTimeout(() => nodes.forEach((n) => { if (n && n.stop && n.frequency) { try { n.stop(); this.bendSrc.disconnect(n.detune); } catch (e) { /* już zatrzymany */ } } }), 400);
     const v = new VOICES[t](this.ctx, this.p);
+    this._wireBend(v);
     v.out.connect(this.veq[i].lo);
     this.voices[i] = v;
   }
   setVoiceEq(i, band, db) { this.vEq[i][band] = db; if (this.veq) (band === 0 ? this.veq[i].lo : this.veq[i].hi).gain.setTargetAtTime(db, this.ctx.currentTime, 0.02); }
+  _oscillators(v) { const out = []; for (const x of Object.values(v)) (Array.isArray(x) ? x : [x]).forEach((o) => { if (o && typeof OscillatorNode !== 'undefined' && o instanceof OscillatorNode) out.push(o); }); return out; }
+  _wireBend(v) { this._oscillators(v).forEach((o) => this.bendSrc.connect(o.detune)); }
+  setBend(cents) { if (this.bendSrc) this.bendSrc.offset.setTargetAtTime(cents, this.ctx.currentTime, 0.015); }
   setMaster(v) { if (this.outGain) this.outGain.gain.setTargetAtTime(0.9 * v, this.ctx.currentTime, 0.02); }
   // COMP 0..1: próg i stosunek kompresji (0,5 = dotychczasowe ustawienie: -18 dB, 5:1)
   setComp(a) { if (!this.comp) return; const t = this.ctx.currentTime; this.comp.threshold.setTargetAtTime(-4 - 28 * a, t, 0.02); this.comp.ratio.setTargetAtTime(1 + 8 * a, t, 0.02); }

@@ -384,7 +384,7 @@ const snapshot = () => JSON.parse(JSON.stringify({
   pattern,
   state: { root: state.root, mode: state.mode, accent: state.accent, slide: state.slide, oct: state.oct, swing: state.swing, seed: state.seed, density: state.density, syncopation: state.syncopation, latch: state.latch, mixMode: state.mixMode },
   audio: { offs: { offFAtk: engine.p.offFAtk, offFRel: engine.p.offFRel, offAAtk: engine.p.offAAtk, offARel: engine.p.offARel }, bpm: engine.bpm, gate: engine.gateMul, human: engine.human, ghost: engine.ghost, velo: engine.velo, types: engine.types, enabled: engine.enabled, levels: engine.levels, solo: engine.solo, xy: engine.xy, eq: engine.eq, vOct: engine.vOct, vTune: engine.vTune, vEq: engine.vEq, params: engine.voices.map((v) => v.params) },
-  globals, ctl: fxCtl, warp: warpIdx,
+  globals, ctl: fxCtl, warp: warpIdx, ctrl,
   fx: [engine.fx.filter, engine.fx.fx, engine.fx.fx2].map((x) => ({ style: x.style, values: x.values, bypass: x.bypass })),
 }));
 function applyGlobals() {
@@ -406,6 +406,7 @@ function restore(sn) {
   setPad(a.xy[0], a.xy[1]);
   Object.assign(globals, sn.globals); applyGlobals();
   fxCtl = sn.ctl; warpIdx = sn.warp || 0;
+  if (sn.ctrl) { ctrl = { ...ctrlDefault(), ...sn.ctrl }; saveCtrl(); }
   sn.fx.forEach((x, j) => {
     const sec = fxSecs[j]; if (!sec) return;
     const slot = sec.slot;
@@ -616,6 +617,144 @@ function stepRow(parent, name, value, minus, plus) {
   upd(); parent.appendChild(r);
 }
 
+
+// ============================================================================
+// Tryb CONTROLLER: zestaw dwóch kontrolerów zamiast siatki pokręteł (przełącznik MODE w zakładkach).
+// Każdy z dwóch boksów to jeden z typów: XY PAD (oś X steruje dwoma parametrami, oś Y dwoma innymi), 4 PRZYCISKI, 4 SUWAKI albo PITCH + MOD.
+// Co steruje czym, wybiera się w okienku EDIT.
+// ============================================================================
+const modeSel = { seq: 'enc', mix: 'enc', syn: 'enc', fx: 'enc' };
+const hasMode = () => tabSel[page] === 0 || page === 'mix' || page === 'syn';
+const lin2 = (n, a, b) => a + n * (b - a);
+const envAll = (id) => (n) => { const sp = specOfType(engine.types[0], id); const v = Math.round(lin2(n, sp.min, sp.max) / sp.step) * sp.step; VOICE_NAMES.forEach((_, i) => engine.setParam(i, id, v)); };
+const fxIdx = (j, idx) => (n) => { const sec = fxSecs[j], sp = sec.styles[sec.slot.style].params[idx]; if (sp) setFxParam(sec, sp.id, n); };
+const offsetT = (key) => (n) => { engine.p[key] = n * 2 - 1; };
+const CONT = {
+  cutoff: ['CUTOFF', (n) => { globals.cutoff = n; engine.setCutoff(cutoffHz(n)); }],
+  reso: ['RESO', (n) => { globals.reso = n; engine.setResonance(1 + n * 22); }],
+  fenv: ['F.ENV', envAll('fEnv')], fdec: ['F.ZAN.', envAll('fDec')], adec: ['A.ZAN.', envAll('aDec')], asus: ['A.SUST.', envAll('aSus')],
+  offfatk: ['F.ATK', offsetT('offFAtk')], offfrel: ['F.REL', offsetT('offFRel')], offaatk: ['A.ATK', offsetT('offAAtk')], offarel: ['A.REL', offsetT('offARel')],
+  gate: ['GATE', (n) => { engine.gateMul = lin2(n, 0.4, 1.6); }],
+  accent: ['ACCENT', (n) => { state.accent = n; refin(); }],
+  slide: ['SLIDE', (n) => { state.slide = n; refin(); }],
+  swing: ['SWING', (n) => { state.swing = lin2(n, 0, 0.4); pattern = { ...pattern, swing: state.swing }; engine.pattern = pattern; }],
+  human: ['HUMAN', (n) => { engine.human = n; }], ghost: ['GHOST', (n) => { engine.ghost = n; }], velo: ['VELO', (n) => { engine.velo = lin2(n, 0.4, 1); }],
+  glide: ['GLIDE', (n) => { glideMs = n * 200; setGlideTime(glideMs / 1000); }],
+  tempo: ['TEMPO', (n) => setBpm(lin2(n, 70, 180))],
+  master: ['MASTER', (n) => { globals.master = lin2(n, 0, 1.2); engine.setMaster(globals.master); }],
+  comp: ['COMP', (n) => { globals.comp = n; engine.setComp(n); }], mdrive: ['DRIVE', (n) => { globals.mdrive = n; engine.setDrive(n); }],
+  eqlow: ['EQ LOW', (n) => engine.setEq(0, lin2(n, -12, 12))], eqmid: ['EQ MID', (n) => engine.setEq(1, lin2(n, -12, 12))], eqhigh: ['EQ HIGH', (n) => engine.setEq(2, lin2(n, -12, 12))],
+  fmix: ['FLT MIX', (n) => setFxParam(fxSecs[0], 'mix', n)], fx1mix: ['FX1 MIX', (n) => setFxParam(fxSecs[1], 'mix', n)], fx2mix: ['FX2 MIX', (n) => setFxParam(fxSecs[2], 'mix', n)],
+  flt1: ['FLT P1', fxIdx(0, 0)], flt2: ['FLT P2', fxIdx(0, 1)], fx1p1: ['FX1 P1', fxIdx(1, 0)], fx1p2: ['FX1 P2', fxIdx(1, 1)], fx2p1: ['FX2 P1', fxIdx(2, 0)], fx2p2: ['FX2 P2', fxIdx(2, 1)],
+  padx: ['PAD X', (n) => setPad(n, padPos.y)], pady: ['PAD Y', (n) => setPad(padPos.x, n)],
+  lv1: ['LEVEL 1', (n) => engine.setLevel(0, n * 1.5)], lv2: ['LEVEL 2', (n) => engine.setLevel(1, n * 1.5)], lv3: ['LEVEL 3', (n) => engine.setLevel(2, n * 1.5)], lv4: ['LEVEL 4', (n) => engine.setLevel(3, n * 1.5)],
+};
+const SW = {
+  fbyp: ['FLT BYP', () => fxSecs[0].slot.bypass, () => bypass(0)], f1byp: ['FX1 BYP', () => fxSecs[1].slot.bypass, () => bypass(1)], f2byp: ['FX2 BYP', () => fxSecs[2].slot.bypass, () => bypass(2)],
+  latch: ['LATCH', () => state.latch, actions.latch],
+  mute1: ['MUTE 1', () => !engine.enabled[0], () => engine.setEnabled(0, !engine.enabled[0])], mute2: ['MUTE 2', () => !engine.enabled[1], () => engine.setEnabled(1, !engine.enabled[1])],
+  mute3: ['MUTE 3', () => !engine.enabled[2], () => engine.setEnabled(2, !engine.enabled[2])], mute4: ['MUTE 4', () => !engine.enabled[3], () => engine.setEnabled(3, !engine.enabled[3])],
+  solo1: ['SOLO 1', () => engine.solo === 0, () => engine.setSolo(engine.solo === 0 ? null : 0)], solo2: ['SOLO 2', () => engine.solo === 1, () => engine.setSolo(engine.solo === 1 ? null : 1)],
+  solo3: ['SOLO 3', () => engine.solo === 2, () => engine.setSolo(engine.solo === 2 ? null : 2)], solo4: ['SOLO 4', () => engine.solo === 3, () => engine.setSolo(engine.solo === 3 ? null : 3)],
+  random: ['RANDOM', () => false, actions.random], mutate: ['MUTATE', () => false, actions.mut], warp: ['WARP', () => false, actions.warp],
+  reverse: ['REVERSE', () => false, actions.steps(reverseSteps)], invert: ['INVERT', () => false, actions.steps(invertSteps)],
+  rotl: ['ROT ←', () => false, actions.steps((st) => rotateSteps(st, -1))], rotr: ['ROT →', () => false, actions.steps((st) => rotateSteps(st, 1))],
+};
+const CTL_TYPES = { xy: 'XY PAD', pads: '4 PRZYCISKI', faders: '4 SUWAKI', wheels: 'PITCH + MOD' };
+const CTL_KEY = 'radarxxx.ctrl.v1';
+const ctrlDefault = () => ({ left: 'xy', right: 'pads', xy: ['cutoff', 'fx1mix', 'reso', 'fx1p1'], pads: ['fbyp', 'f1byp', 'latch', 'warp'], faders: ['cutoff', 'reso', 'send', 'master'].map((x) => (x === 'send' ? 'fx1mix' : x)), mod: 'cutoff' });
+let ctrl = ctrlDefault();
+try { const sv = JSON.parse(localStorage.getItem(CTL_KEY) || 'null'); if (sv && sv.left && sv.right) ctrl = { ...ctrl, ...sv }; } catch { /* brak zapisu */ }
+const saveCtrl = () => { try { localStorage.setItem(CTL_KEY, JSON.stringify(ctrl)); } catch { /* brak pamięci */ } };
+const ctrlVals = { x: 0.5, y: 0.5, faders: [0.5, 0.5, 0.5, 0.5], pitch: 0.5, mod: 0 };
+
+// pionowy suwak: value 0..1 od dołu; spring = wraca na środek po puszczeniu (pitch bend); bipolar = bez wypełnienia
+function vSlider({ label, value, onInput, spring }) {
+  const el0 = document.createElement('div'); el0.className = `vs${spring ? ' spring bipolar' : ''}`;
+  el0.innerHTML = '<div class="vt"><div class="vf"></div><div class="vk"></div></div><span class="vl"></span>';
+  const t = el0.querySelector('.vt'), f = el0.querySelector('.vf'), k = el0.querySelector('.vk'), l = el0.querySelector('.vl');
+  l.textContent = label;
+  let v = value; const paint = () => { f.style.height = `${v * 100}%`; k.style.top = `${(1 - v) * 100}%`; }; paint();
+  const from = (e) => { const r = t.getBoundingClientRect(); v = Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height)); paint(); onInput(v); };
+  let on = false;
+  el0.addEventListener('pointerdown', (e) => { on = true; el0.setPointerCapture(e.pointerId); from(e); });
+  el0.addEventListener('pointermove', (e) => { if (on) from(e); });
+  const end = () => { if (!on) return; on = false; if (spring) { v = 0.5; paint(); onInput(0.5); } else commitSoon(); };
+  el0.addEventListener('pointerup', end); el0.addEventListener('pointercancel', end);
+  return el0;
+}
+const nameOfC = (id) => (CONT[id] ? CONT[id][0] : id);
+function buildXY(box) {
+  box.classList.add('xy');
+  box.innerHTML = '<div class="hx"></div><div class="hy"></div><div class="puck"></div><span class="cname"></span>';
+  const puck = box.querySelector('.puck'), hx = box.querySelector('.hx'), hy = box.querySelector('.hy');
+  box.querySelector('.cname').textContent = `X ${nameOfC(ctrl.xy[0])}·${nameOfC(ctrl.xy[1])}  Y ${nameOfC(ctrl.xy[2])}·${nameOfC(ctrl.xy[3])}`;
+  const paint = () => { puck.style.left = `${ctrlVals.x * 100}%`; puck.style.top = `${(1 - ctrlVals.y) * 100}%`; hx.style.top = `${(1 - ctrlVals.y) * 100}%`; hy.style.left = `${ctrlVals.x * 100}%`; }; paint();
+  const apply = (e) => {
+    const r = box.getBoundingClientRect(); ctrlVals.x = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)); ctrlVals.y = Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height)); paint();
+    [ctrl.xy[0], ctrl.xy[1]].forEach((id) => CONT[id] && CONT[id][1](ctrlVals.x)); [ctrl.xy[2], ctrl.xy[3]].forEach((id) => CONT[id] && CONT[id][1](ctrlVals.y));
+  };
+  let on = false;
+  box.addEventListener('pointerdown', (e) => { on = true; box.setPointerCapture(e.pointerId); apply(e); });
+  box.addEventListener('pointermove', (e) => { if (on) apply(e); });
+  box.addEventListener('pointerup', () => { on = false; commitSoon(); }); box.addEventListener('pointercancel', () => { on = false; });
+}
+function buildPads(box) {
+  box.classList.add('pads');
+  ctrl.pads.forEach((id) => {
+    const d = SW[id], b = document.createElement('button'); if (!d) return;
+    b.textContent = d[0]; const upd = () => b.classList.toggle('lit', !!d[1]());
+    b.addEventListener('click', () => { d[2](); upd(); commitSoon(); }); upd(); box.appendChild(b);
+  });
+}
+function buildFaders(box) {
+  box.classList.add('sliders');
+  ctrl.faders.forEach((id, i) => box.appendChild(vSlider({ label: nameOfC(id), value: ctrlVals.faders[i], onInput: (v) => { ctrlVals.faders[i] = v; CONT[id] && CONT[id][1](v); } })));
+}
+function buildWheels(box) {
+  box.classList.add('sliders');
+  box.appendChild(vSlider({ label: 'PITCH', value: 0.5, spring: true, onInput: (v) => engine.setBend((v - 0.5) * 400) }));      // ±200 cent
+  box.appendChild(vSlider({ label: nameOfC(ctrl.mod), value: ctrlVals.mod, onInput: (v) => { ctrlVals.mod = v; CONT[ctrl.mod] && CONT[ctrl.mod][1](v); } }));
+}
+const CTL_BUILD = { xy: buildXY, pads: buildPads, faders: buildFaders, wheels: buildWheels };
+function renderControllers() {
+  const wrap = document.createElement('div'); wrap.className = 'ctlwrap';
+  ['left', 'right'].forEach((side) => { const box = document.createElement('div'); box.className = 'cbox'; CTL_BUILD[ctrl[side]](box); wrap.appendChild(box); });
+  panelEl.appendChild(wrap);
+}
+function moderow() {
+  const r = document.createElement('div'), on = hasMode(); r.className = `moderow${on ? '' : ' off'}`;
+  const m = document.createElement('button'), e = document.createElement('button');
+  m.textContent = `MODE:${modeSel[page] === 'ctl' ? 'CONTROLLER' : 'ENCODER'}`; e.textContent = 'EDIT';
+  m.addEventListener('click', () => { modeSel[page] = modeSel[page] === 'ctl' ? 'enc' : 'ctl'; renderPanel(); });
+  e.addEventListener('click', () => showCtl(true));
+  if (!on) { m.tabIndex = -1; e.tabIndex = -1; }
+  r.appendChild(m); r.appendChild(e); return r;
+}
+// okienko EDIT: typ obu boksów i przypisania parametrów (listy rozwijane)
+const ctlPop = el('ctl-pop');
+function renderCtlEdit() {
+  const body = el('ctl-body'); body.innerHTML = '';
+  const row = (lab, opts, cur, set) => {
+    const r = document.createElement('div'); r.className = 'crow'; const sp = document.createElement('span'); sp.textContent = lab;
+    const sel = document.createElement('select'); sel.setAttribute('aria-label', lab);
+    opts.forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; if (v === cur) o.selected = true; sel.appendChild(o); });
+    sel.addEventListener('change', () => { set(sel.value); saveCtrl(); renderCtlEdit(); renderPanel(); commitSoon(); });
+    r.appendChild(sp); r.appendChild(sel); body.appendChild(r);
+  };
+  const sec = (t) => { const d = document.createElement('div'); d.className = 'csec'; d.textContent = t; body.appendChild(d); };
+  const types = Object.entries(CTL_TYPES), cont = Object.entries(CONT).map(([k, v]) => [k, v[0]]), sw = Object.entries(SW).map(([k, v]) => [k, v[0]]);
+  row('LEWY', types, ctrl.left, (v) => { ctrl.left = v; }); row('PRAWY', types, ctrl.right, (v) => { ctrl.right = v; });
+  const used = new Set([ctrl.left, ctrl.right]);
+  if (used.has('xy')) { sec('XY PAD: OŚ X (2 PARAMETRY), OŚ Y (2 PARAMETRY)'); ['X1', 'X2', 'Y1', 'Y2'].forEach((n, i) => row(n, cont, ctrl.xy[i], (v) => { ctrl.xy[i] = v; })); }
+  if (used.has('pads')) { sec('4 PRZYCISKI'); [1, 2, 3, 4].forEach((n, i) => row(`P${n}`, sw, ctrl.pads[i], (v) => { ctrl.pads[i] = v; })); }
+  if (used.has('faders')) { sec('4 SUWAKI'); [1, 2, 3, 4].forEach((n, i) => row(`S${n}`, cont, ctrl.faders[i], (v) => { ctrl.faders[i] = v; })); }
+  if (used.has('wheels')) { sec('PITCH BEND (±2 PÓŁTONY) I MODULATION'); row('MOD', cont, ctrl.mod, (v) => { ctrl.mod = v; }); }
+}
+const showCtl = (on) => { ctlPop.hidden = !on; if (on) { renderCtlEdit(); el('ctl-ok').focus(); } };
+el('ctl-ok').addEventListener('click', () => showCtl(false));
+ctlPop.addEventListener('pointerdown', (e) => { if (e.target === ctlPop) showCtl(false); });
+
 // ---------- zawartość zakładek ----------
 const panelEl = el('panel');
 const tabNames = (p) => ({
@@ -640,6 +779,8 @@ const labOf = (sp) => SHORT_LAB[sp.id] || sp.label.toUpperCase();
 function renderPanel() {
   panelEl.replaceChildren();
   Object.keys(synRefs).forEach((k) => delete synRefs[k]); Object.keys(macroRefs).forEach((k) => delete macroRefs[k]); Object.keys(fxMainRefs).forEach((k) => delete fxMainRefs[k]);
+  panelEl.appendChild(moderow());                                         // wiersz MODE:ENCODER / EDIT (zajmuje stałe miejsce, na zakładkach bez trybu jest niewidoczny)
+  if (hasMode() && modeSel[page] === 'ctl') { renderControllers(); return; }
   const grid = document.createElement('div'); grid.className = 'pgrid';
   const tab = tabSel[page], B = (o) => cellButton(grid, o), Kn = (...a) => grid.appendChild(synKnob(...a)), Sp = () => spacer(grid);
 
@@ -802,6 +943,7 @@ setInterval(() => { if (!el('radar').hidden) updateInfo(); }, 250);
 // ---------- skróty (komputer) ----------
 window.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || el('radar').hidden || (e.target instanceof HTMLElement && e.target.classList.contains('knob'))) return;
+  if (!ctlPop.hidden) { if (e.code === 'Escape') { e.preventDefault(); showCtl(false); } return; }
   if (!menuPop.hidden) { if (e.code === 'Escape') { e.preventDefault(); showMenu(false); } return; }
   if (!bpmPop.hidden) { if (e.code === 'Escape') { e.preventDefault(); showBpm(false); } else if (e.code === 'ArrowUp') { e.preventDefault(); setBpm(engine.bpm + 1); } else if (e.code === 'ArrowDown') { e.preventDefault(); setBpm(engine.bpm - 1); } return; }
   const map = { Space: togglePlay, KeyR: () => { actions.random(); commitSoon(); }, KeyM: () => { actions.mut(); commitSoon(); },
