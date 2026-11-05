@@ -688,7 +688,7 @@ function buildXY(box) {
   box.classList.add('xy');
   box.innerHTML = '<div class="hx"></div><div class="hy"></div><div class="puck"></div><span class="cname"></span>';
   const puck = box.querySelector('.puck'), hx = box.querySelector('.hx'), hy = box.querySelector('.hy');
-  box.querySelector('.cname').textContent = `X ${nameOfC(ctrl.xy[0])}·${nameOfC(ctrl.xy[1])}  Y ${nameOfC(ctrl.xy[2])}·${nameOfC(ctrl.xy[3])}`;
+  box.querySelector('.cname').innerHTML = `X ${nameOfC(ctrl.xy[0])}·${nameOfC(ctrl.xy[1])}<br>Y ${nameOfC(ctrl.xy[2])}·${nameOfC(ctrl.xy[3])}`;   // dwie linie: oś X i oś Y
   const paint = () => { puck.style.left = `${ctrlVals.x * 100}%`; puck.style.top = `${(1 - ctrlVals.y) * 100}%`; hx.style.top = `${(1 - ctrlVals.y) * 100}%`; hy.style.left = `${ctrlVals.x * 100}%`; }; paint();
   const apply = (e) => {
     const r = box.getBoundingClientRect(); ctrlVals.x = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)); ctrlVals.y = Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height)); paint();

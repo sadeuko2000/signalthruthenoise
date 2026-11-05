@@ -140,7 +140,7 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .moderow.off{visibility:hidden}
 .ctlwrap{display:grid;grid-template-columns:1fr 1fr;gap:24px;height:130px}
 .cbox{position:relative;border:1px solid var(--ink);height:130px;touch-action:none;user-select:none;overflow:hidden}
-.cbox .cname{position:absolute;left:4px;bottom:2px;font-size:13px;letter-spacing:.08em;opacity:.7;pointer-events:none;max-width:95%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cbox .cname{position:absolute;left:4px;right:4px;bottom:2px;font-size:13px;letter-spacing:.04em;line-height:1.05;opacity:.75;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cbox.xy{cursor:crosshair}
 .cbox.xy .hx,.cbox.xy .hy{position:absolute;background:rgba(11,11,11,.25);pointer-events:none}
 .cbox.xy .hx{left:0;right:0;height:1px}.cbox.xy .hy{top:0;bottom:0;width:1px}
