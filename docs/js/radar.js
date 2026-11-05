@@ -1,6 +1,6 @@
 // radarxxx: ekran radarowy jako interfejs sekwencera i miksu silników basu.
 // Przemiatająca linia = głowica odtwarzania (jedno okrążenie = jeden obieg wzoru), nuty = echa z poświatą.
-import { generateBass, mutate, DEFAULTS } from './generator.js';
+import { generateBass, mutate, DEFAULTS, withAccent, withSlide } from './generator.js';
 import { Engine } from './audio.js';
 import { VOICE_NAMES, clampToDisc } from './engines.js';
 import { FILTER_STYLES, FX_STYLES } from './fx.js';
@@ -11,8 +11,10 @@ const el = (id) => document.getElementById(id);
 initKnobs();
 
 const engine = new Engine();
-const state = { ...DEFAULTS, seed: (Math.random() * 1e9) | 0, length: 16 };
-let pattern = generateBass(state);
+const state = { ...DEFAULTS, seed: (Math.random() * 1e9) | 0, length: 16, accent: 0.5, slide: 0.1 };
+// Akcenty i ślizgi są ustawiane pokrętłami i nakładane na każdy wzór (nowy, edytowany, zmutowany), bez generowania go od nowa.
+const finalize = (p) => withSlide(withAccent(p, state.accent), state.slide);
+let pattern = finalize(generateBass(state));
 engine.pattern = pattern;
 let page = 'seq';
 const hup = false;                            // tryb H-UP usunięty z interfejsu (zawsze N-UP)
@@ -26,8 +28,8 @@ const FONT = (px) => `${Math.round(px)}px 'Share Tech Mono', ui-monospace, Menlo
 const cutoffHz = (v) => 60 * Math.pow(100, v);
 
 // ---------- wzór ----------
-function setSteps(steps) { pattern = { ...pattern, steps }; engine.pattern = pattern; }
-function regen() { pattern = generateBass(state); engine.pattern = pattern; }
+function setSteps(steps) { pattern = finalize({ ...pattern, steps }); engine.pattern = pattern; }
+function regen() { pattern = finalize(generateBass(state)); engine.pattern = pattern; }
 
 // ---------- pozycja linii ----------
 function curPos() {
@@ -217,6 +219,8 @@ function mixFrom(p) {
 
 // ---------- pokrętła ----------
 el('gate').addEventListener('input', (e) => { engine.gateMul = +e.target.value; });
+el('accent').addEventListener('input', (e) => { state.accent = +e.target.value; pattern = finalize(pattern); engine.pattern = pattern; });
+el('slide').addEventListener('input', (e) => { state.slide = +e.target.value; pattern = finalize(pattern); engine.pattern = pattern; });
 // Swing zmienia tylko rytm (opóźnienie parzystych kroków), nuty zostają: wzór nie jest generowany od nowa.
 el('swing').addEventListener('input', (e) => { state.swing = +e.target.value; pattern = { ...pattern, swing: state.swing }; engine.pattern = pattern; });
 el('cutoff').addEventListener('input', (e) => engine.setCutoff(cutoffHz(+e.target.value)));
@@ -243,7 +247,7 @@ const actions = {
   key: () => { state.mode = MODE_CYCLE[(MODE_CYCLE.indexOf(state.mode) + 1) % MODE_CYCLE.length]; pattern = { ...pattern, mode: state.mode }; engine.pattern = pattern; },
   // RANDOM: nowy wzór z losową gęstością i synkopą w rozsądnych granicach (swing i nuta bazowa zostają).
   random: () => { state.seed = (Math.random() * 1e9) | 0; state.density = between(0.3, 0.7); state.syncopation = between(0.25, 0.75); regen(); },
-  mut: () => { pattern = mutate(pattern); engine.pattern = pattern; },
+  mut: () => { pattern = finalize(mutate(pattern)); engine.pattern = pattern; },
 };
 let wake = null;
 async function lockScreen() { try { if ('wakeLock' in navigator && !wake) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } } catch { /* odmowa */ } }
@@ -358,7 +362,8 @@ function updateInfo() {
     `BASE    ${baseLabel()}`,
     `KEY     ${MODE_LABEL[state.mode]}`,
     `STEPS   ${String(on.length).padStart(2, '0')}/${n}`,
-    `ACCENT  ${String(acc).padStart(2, '0')}`,
+    `ACCENT  ${Math.round(state.accent * 100)}% (${acc})`,
+    `SLIDE   ${Math.round(state.slide * 100)}% (${pattern.steps.filter((x) => x.on && x.tie).length})`,
     `GATE    ${engine.gateMul.toFixed(2)}×`,
     `SWING   ${Math.round(state.swing * 100)}%`,
     `BRG     ${String(brg).padStart(3, '0')}°`,

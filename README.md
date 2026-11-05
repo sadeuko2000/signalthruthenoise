@@ -27,6 +27,7 @@ zainspirowany radarem morskim:
   KEY (elektro / frygijska / moll), RANDOM, MUTATE. Zmiana nuty bazowej, oktawy i tonacji nie kasuje wzoru.
 - **MIX:** cztery silniki jako cele na obwodzie, krzyżyk to punkt miksu.
 - **FX:** filtr i efekty (4 style po 8 parametrów).
+- Pokrętła **ACCENT** (ile mocnych nut dostaje akcent) i **SLIDE** (ile ślizgów między sąsiednimi nutami o różnej wysokości) działają na żywo na wzorze, bez generowania go od nowa; RANDOM i edycja je zachowują.
 - Wzór generuje przycisk RANDOM (losowa gęstość i synkopa w rozsądnych granicach). SWING, KEY, BASE i OKTAWA zmieniają tylko rytm, tonację i wysokość toniki, nie kasują nut.
 - Dolny rząd przycisków kontekstowych zmienia się zależnie od strony. Geometria jest w `docs/js/radargeo.js` (testowana).
 

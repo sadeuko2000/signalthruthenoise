@@ -74,7 +74,7 @@ function generateClassic(p) {
       ratchet: rRat < p.ratchetProb ? 2 : 1,
     });
   }
-  return { steps, swing: p.swing, root: p.root, mode: p.mode };
+  return { steps, swing: p.swing, root: p.root, mode: p.mode, salt: p.seed };
 }
 
 // ---------- styl „electro”: generator oparty na modelu nauczonym z pętli ----------
@@ -155,7 +155,7 @@ function generateElectro(p) {
       ratchet: rr < p.ratchetProb ? 2 : 1,
     };
   });
-  return { steps, swing: p.swing, root: p.root, mode: p.mode, palette };
+  return { steps, swing: p.swing, root: p.root, mode: p.mode, palette, salt: p.seed };
 }
 
 export function generateBass(params = {}) {
@@ -188,5 +188,44 @@ export function mutate(pattern, rng = Math.random, kind) {
   }
   const steps = pattern.steps.slice();
   steps[i] = s;
+  return { ...pattern, steps };
+}
+
+// ---------- operacje na gotowym wzorze (działają na żywo, bez generowania od nowa) ----------
+// Stabilna „losowość” zależna tylko od numeru kroku i ziarna wzoru: ten sam krok ma zawsze ten sam los,
+// więc zmiana ilości akcentów czy ślizgów dodaje lub odejmuje nuty płynnie, a edycja innych kroków niczego nie tasuje.
+export function stepHash(i, salt = 0) {
+  let x = (Math.imul(i + 1, 2654435761) ^ Math.imul((salt | 0) + 40503, 2246822519)) >>> 0;
+  x = Math.imul(x ^ (x >>> 15), 2246822519) >>> 0;
+  x = Math.imul(x ^ (x >>> 13), 3266489917) >>> 0;
+  return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+}
+
+const FULL_VEL = 100, ACCENT_VEL = 120, PLAIN_FULL_VEL = 104;
+
+// ACCENT: ile mocnych nut dostaje akcent (głośność 120). Mocne kroki (co 4.) dostają go chętniej. Ciche i średnie nuty bez zmian.
+// amount 0 = brak akcentów, 1 = wszystkie mocne nuty z akcentem.
+export function withAccent(pattern, amount) {
+  const salt = pattern.salt || 0;
+  const steps = pattern.steps.map((s, i) => {
+    if (!s.on || s.vel < FULL_VEL) return s;
+    const p = Math.pow(Math.max(0, Math.min(1, amount)), i % 4 === 0 ? 0.7 : 1.3);
+    const vel = amount > 0 && stepHash(i, salt) < p ? ACCENT_VEL : PLAIN_FULL_VEL;
+    return vel === s.vel ? s : { ...s, vel };
+  });
+  return { ...pattern, steps };
+}
+
+// SLIDE: ile ślizgów (legato z glissando) między nutami. Tylko tam, gdzie następna nuta jest tuż obok (następny krok)
+// i ma inną wysokość: ślizg do tego samego dźwięku nic by nie dał, a zlałby dwie nuty w jedną.
+export function withSlide(pattern, amount) {
+  const salt = pattern.salt || 0, n = pattern.steps.length;
+  const steps = pattern.steps.map((s, i) => {
+    if (!s.on) return s.tie ? { ...s, tie: false } : s;
+    const next = pattern.steps[(i + 1) % n];
+    const eligible = next.on && next.degree !== s.degree && n > 1;
+    const tie = eligible && amount > 0 && stepHash(i, salt + 101) < Math.max(0, Math.min(1, amount));
+    return tie === !!s.tie ? s : { ...s, tie };
+  });
   return { ...pattern, steps };
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateBass, mutate, pitch, mulberry32, relToDegree, DEGREE_MIN, DEGREE_MAX, MODES } from '../docs/js/generator.js';
+import { generateBass, mutate, pitch, mulberry32, relToDegree, DEGREE_MIN, DEGREE_MAX, MODES, withAccent, withSlide, stepHash } from '../docs/js/generator.js';
 import { ELECTRO_MODEL as M } from '../docs/js/electro-model.js';
 
 const many = (n, params = {}) => Array.from({ length: n }, (_, seed) => generateBass({ ...params, seed: seed + 1 }));
@@ -145,4 +145,77 @@ test('styl classic nadal morfuje przy zmianie density (nuty z niższej gęstośc
   const a = generateBass({ seed: 9, density: 0.4, style: 'classic' });
   const b = generateBass({ seed: 9, density: 0.5, style: 'classic' });
   a.steps.forEach((s, i) => { if (s.on) assert.ok(b.steps[i].on); });
+});
+
+// ----- ACCENT i SLIDE: operacje na żywo na gotowym wzorze -----
+const accents = (p) => p.steps.map((s, i) => (s.on && s.vel >= 110 ? i : -1)).filter((i) => i >= 0);
+const slides = (p) => p.steps.map((s, i) => (s.on && s.tie ? i : -1)).filter((i) => i >= 0);
+const strip = (p) => p.steps.map((s) => ({ on: s.on, degree: s.degree, gate: s.gate }));
+
+test('ACCENT: 0 = brak akcentów, 1 = akcent na każdej mocnej nucie, ciche nuty bez zmian', () => {
+  for (const p of many(100)) {
+    const none = withAccent(p, 0), all = withAccent(p, 1);
+    assert.equal(accents(none).length, 0);
+    p.steps.forEach((s, i) => {
+      if (s.on && s.vel < 100) { assert.equal(none.steps[i].vel, s.vel); assert.equal(all.steps[i].vel, s.vel); }
+      if (s.on && s.vel >= 100) assert.equal(all.steps[i].vel, 120);
+    });
+  }
+});
+
+test('ACCENT: więcej na pokrętle = nadzbiór akcentów (stabilnie), mocne kroki chętniej', () => {
+  for (const p of many(60)) {
+    let prev = new Set();
+    for (const a of [0, 0.2, 0.4, 0.6, 0.8, 1]) {
+      const cur = new Set(accents(withAccent(p, a)));
+      prev.forEach((i) => assert.ok(cur.has(i)));
+      prev = cur;
+    }
+  }
+  const share = (strong) => {
+    let acc = 0, all = 0;
+    for (const p of many(400)) p.steps.forEach((s, i) => { if (s.on && s.vel >= 100 && (i % 4 === 0) === strong) { all++; if (withAccent(p, 0.4).steps[i].vel === 120) acc++; } });
+    return acc / all;
+  };
+  assert.ok(share(true) > share(false), `${share(true)} ${share(false)}`);
+});
+
+test('ACCENT i SLIDE nie zmieniają liczby nut, wysokości ani długości; są idempotentne', () => {
+  for (const p of many(60)) {
+    const q = withSlide(withAccent(p, 0.6), 0.5);
+    assert.deepEqual(strip(q), strip(p));
+    assert.deepEqual(withSlide(withAccent(q, 0.6), 0.5), q);
+  }
+});
+
+test('SLIDE: tylko między sąsiednimi nutami o różnej wysokości; 0 = brak, 1 = wszystkie takie pary', () => {
+  for (const p of many(100)) {
+    assert.equal(slides(withSlide(p, 0)).length, 0);
+    const all = withSlide(p, 1), n = p.steps.length;
+    p.steps.forEach((s, i) => {
+      const next = p.steps[(i + 1) % n];
+      const eligible = s.on && next.on && next.degree !== s.degree;
+      assert.equal(!!all.steps[i].tie, !!eligible, `krok ${i}`);
+    });
+  }
+});
+
+test('SLIDE: więcej na pokrętle = nadzbiór ślizgów', () => {
+  for (const p of many(60)) {
+    let prev = new Set();
+    for (const a of [0, 0.25, 0.5, 0.75, 1]) {
+      const cur = new Set(slides(withSlide(p, a)));
+      prev.forEach((i) => assert.ok(cur.has(i)));
+      prev = cur;
+    }
+  }
+});
+
+test('stabilność: los kroku zależy tylko od jego numeru i ziarna wzoru', () => {
+  assert.equal(stepHash(5, 7), stepHash(5, 7));
+  assert.notEqual(stepHash(5, 7), stepHash(5, 8));
+  assert.notEqual(stepHash(5, 7), stepHash(6, 7));
+  const v = Array.from({ length: 2000 }, (_, i) => stepHash(i, 3));
+  assert.ok(v.every((x) => x >= 0 && x < 1));
+  assert.ok(Math.abs(mean(v) - 0.5) < 0.03);
 });
