@@ -489,8 +489,15 @@ const actions = {
   key: (dir = 1) => { const n = MODE_CYCLE.length; state.mode = MODE_CYCLE[(MODE_CYCLE.indexOf(state.mode) + dir + n) % n]; pattern = { ...pattern, mode: state.mode }; engine.pattern = pattern; },
   // RANDOM: nowy wzór z losową gęstością i synkopą w rozsądnych granicach (swing i nuta bazowa zostają).
   random: () => { state.seed = (Math.random() * 1e9) | 0; state.density = between(0.3, 0.7); state.syncopation = between(0.25, 0.75); regen(); },
-  // MUTATE: losuje ustawienia syntezatorów (parametry i obwiednie włączonych silników, w rozsądnych granicach). Wzór nut zostaje.
-  mut: () => { engine.enabled.forEach((on, i) => { if (on) engine.randomizeVoice(i); }); renderPanel(); },
+  // MUTATE: losuje ustawienia syntezatorów (parametry i obwiednie włączonych silników, w rozsądnych granicach) i zmienia wysokość kilku nut.
+  // Oprócz brzmienia zmienia też wysokości: 2-3 nuty dostają nowy dźwięk z palety wzoru (albo o 1-2 stopnie skali obok).
+  mut: () => {
+    engine.enabled.forEach((on, i) => { if (on) engine.randomizeVoice(i); });
+    let p = pattern, changed = 0;
+    for (let t = 0; t < 24 && changed < 3; t++) { const q = mutate(p, Math.random, 'pitch'); if (q !== p) { p = q; changed++; } }
+    if (changed) { pattern = finalize(p); engine.pattern = pattern; }
+    renderPanel();
+  },
   latch: () => { state.latch = !state.latch; engine.latch = state.latch; toast(state.latch ? 'LATCH: WŁ.' : 'LATCH: WYŁ.'); },
   // WARP: kolejne dotknięcia przekształcają wzór: obrót o krok, odbicie wysokości, odwrócenie kolejności
   warp: () => { const [name, fn] = WARP_OPS[warpIdx % WARP_OPS.length]; warpIdx++; setSteps(fn(pattern.steps)); toast(`WARP: ${name}`); },
