@@ -17,7 +17,7 @@ export class Engine {
     this.blend = [1, 0, 0, 0];
     this.xy = [0.25, 0.75];       // pozycja na padzie
     this.enabled = [1, 1, 1, 1];  // które silniki biorą udział w miksie
-    this.types = [0, 1, 2, 3];    // rodzaj silnika w każdym z 4 miejsc (0 prophet, 1 ms-20, 2 dx, 3 wavetable); mogą się powtarzać
+    this.types = [1, 0, 2, 3];    // rodzaj silnika w każdym z 4 miejsc (0 prophet, 1 ms-20, 2 dx, 3 wavetable); mogą się powtarzać. Domyślnie jak w szkicu: MS20, PROPHET, DX, WAVE
     this.latch = false;           // LATCH: nuty trzymają się aż do następnej
     this.human = 0;               // 0..1: losowe drobne przesunięcia czasu i głośności
     this.ghost = 0;               // 0..1: ciche nuty-duchy w pustych krokach

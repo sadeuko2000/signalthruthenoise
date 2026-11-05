@@ -369,9 +369,11 @@ export class GlobalFx {
     this.input = ctx.createGain(); this.output = ctx.createGain();
     this.filter = new FxSlot(ctx, FILTER_STYLES, bpm);
     this.fx = new FxSlot(ctx, FX_STYLES, bpm);
+    this.fx2 = new FxSlot(ctx, FX_STYLES, bpm);       // drugi efekt (FX2), domyślnie bez miksu, więc niesłyszalny
     this.input.connect(this.filter.input);
     this.filter.output.connect(this.fx.input);
-    this.fx.output.connect(this.output);
+    this.fx.output.connect(this.fx2.input);
+    this.fx2.output.connect(this.output);
   }
-  refresh() { this.filter.refresh(); this.fx.refresh(); }   // np. po zmianie BPM (delay zsynchronizowany z tempem)
+  refresh() { this.filter.refresh(); this.fx.refresh(); this.fx2.refresh(); }   // np. po zmianie BPM (delay zsynchronizowany z tempem)
 }

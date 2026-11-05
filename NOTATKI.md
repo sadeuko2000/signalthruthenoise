@@ -62,3 +62,4 @@ Nazwy jako punkt odniesienia, bez kopiowania działania:
 - Zakładki: SEQ (MAIN, SEQ, SCALE, EXTRA), MIX (MAIN i po jednej na silnik), SYN (MAIN = makra na wszystkie silniki, potem silniki), FX (MAIN, FLT, FX).
 - Obsada pokręteł to propozycja z dokumentu „Obsada pokręteł”; można ją zmieniać w `renderPanel()` w `docs/js/radar.js`.
 - Dopisane w silniku: master, kompresja i drive wyjściowy, oktawa/strojenie/EQ każdego silnika, glide, velo, human, ghost, latch.
+- Dopasowanie do szkicu z Figmy: zakładki FX to MAIN, FLT, FX1, FX2, MSTR (drugi efekt w łańcuchu, MSTR = master, kompresja, drive), widok silnika w SYN ma komórkę MODEL po lewej i 4×2 pokrętła, domyślna kolejność silników MS20, PROPHET, DX, WAVE.

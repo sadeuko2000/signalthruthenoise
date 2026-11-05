@@ -88,8 +88,8 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .subtabs button{min-height:28px;font-size:20px;letter-spacing:.08em;border-right:1px solid var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
 .subtabs button:last-child{border-right:0}
 .subtabs button.on{background:var(--ink);color:var(--paper)}
-.panel{display:grid;gap:4px;padding-top:8px}
-.subtabs.five button{font-size:17px;letter-spacing:.04em}
+.panel{display:grid;gap:4px;padding-top:8px;min-height:138px;align-content:start}
+.subtabs.five button{letter-spacing:.06em}
 .pgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-auto-rows:63px;row-gap:4px}
 .pgrid .knob{--ks:40px}
 .cellbtn{display:grid;justify-items:center;align-content:start;gap:3px;padding:2px;min-width:0}
@@ -122,3 +122,9 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .menubody .mrow button.x{width:44px;min-height:44px;border-left:1px solid var(--ink);font-size:22px}
 .menubody .msub{font-size:15px;opacity:.75;padding:2px 2px 4px;letter-spacing:.05em}
 .menubody .mrow.dim{opacity:.55}
+
+/* SYN: widok silnika (komórka MODEL po lewej, 4x2 pokrętła) */
+.pgrid.model{grid-template-columns:75px repeat(4,minmax(0,1fr))}
+.modelcell{grid-row:span 2;display:grid;align-content:center;justify-items:start;gap:4px;padding:0 0 0 6px;text-align:left}
+.modelcell .cl{font-size:16px;letter-spacing:.08em;line-height:1}
+.modelcell b{font-weight:400;font-size:22px;letter-spacing:.06em;line-height:1}

@@ -164,11 +164,13 @@ function drawSeq() {
   drawCorners(G, dotDefs());
 }
 
+const PAD_R = 0.68;      // promień pada MIX (ułamek promienia radaru): diamenty silników stoją wewnątrz napisów w rogach
 const PAD_ANCHORS = [[-1, 1], [1, 1], [-1, -1], [1, -1]].map(([a, b]) => [a * Math.SQRT1_2, b * Math.SQRT1_2]);
-const SHORT = ['PROPHET', 'MS-20', 'DX', 'WAVETBL'];                 // nazwy rodzajów silnika
+const SHORT = ['PROPHET', 'MS20', 'DX', 'WAVE'];                     // nazwy rodzajów silnika
+const TAB_SHORT = ['PRO', 'MS20', 'DX', 'WAVE'];                     // krótkie nazwy na zakładkach
 const typeName = (i) => SHORT[engine.types[i]];                      // nazwa silnika w miejscu i (rodzaje mogą się powtarzać)
 function drawMix() {
-  const G = geo(), S = sweepState(), { cx, cy, R, dpr } = G, Rp = R * R_OUT;
+  const G = geo(), S = sweepState(), { cx, cy, R, dpr } = G, Rp = R * PAD_R;
   drawBase(G, S);
   drawSweepLine(G, S);
   const mx = cx + (2 * padPos.x - 1) * Rp, my = cy - (2 * padPos.y - 1) * Rp;
@@ -199,8 +201,8 @@ const MACRO = {
 let fxCtl = 0;                                                  // czym steruje ekran: 0 oba, 1 tylko filtr, 2 tylko efekt
 const CTL_LABEL = ['OBA', 'FILTR', 'EFEKT'];
 const driven = () => (fxCtl === 0 ? [0, 1] : fxCtl === 1 ? [0] : [1]);
-const macroOf = (j) => MACRO[j][fxSecs[j].slot.style];
-const polarIds = (j, si) => [MACRO[j][si].r[0], MACRO[j][si].a[0]];     // parametry pokazywane kursorem
+const macroOf = (j) => MACRO[Math.min(j, 1)][fxSecs[j].slot.style];         // drugi efekt (j = 2) ma te same makra co pierwszy
+const polarIds = (j, si) => [MACRO[Math.min(j, 1)][si].r[0], MACRO[Math.min(j, 1)][si].a[0]];     // parametry pokazywane kursorem
 const mixFromR = (rN) => 0.08 + 0.84 * rN;                              // mix efektu rośnie od środka ku brzegowi
 
 function drawFx(ts) {
@@ -323,7 +325,7 @@ function setPad(x0, y0) {
   padPos.x = x; padPos.y = y;
   engine.setBlend(x, y);
 }
-function mixFrom(p) { const Rp = p.R * R_OUT; setPad((p.dx / Rp + 1) / 2, (-p.dy / Rp + 1) / 2); }
+function mixFrom(p) { const Rp = p.R * PAD_R; setPad((p.dx / Rp + 1) / 2, (-p.dy / Rp + 1) / 2); }
 // Ustawia parametr aktywnej sekcji FX i odświeża jego pokrętło.
 function setFxParam(sec, id, nn) { sec.slot.setParam(id, nn); const k = sec.refs[id]; if (k) k.value = nn; }
 function fxFrom(p) {
@@ -386,7 +388,7 @@ const snapshot = () => JSON.parse(JSON.stringify({
   state: { root: state.root, mode: state.mode, accent: state.accent, slide: state.slide, oct: state.oct, swing: state.swing, seed: state.seed, density: state.density, syncopation: state.syncopation, latch: state.latch },
   audio: { bpm: engine.bpm, gate: engine.gateMul, human: engine.human, ghost: engine.ghost, velo: engine.velo, types: engine.types, enabled: engine.enabled, levels: engine.levels, solo: engine.solo, xy: engine.xy, eq: engine.eq, vOct: engine.vOct, vTune: engine.vTune, vEq: engine.vEq, params: engine.voices.map((v) => v.params) },
   globals, ctl: fxCtl, warp: warpIdx,
-  fx: [engine.fx.filter, engine.fx.fx].map((x) => ({ style: x.style, values: x.values, bypass: x.bypass })),
+  fx: [engine.fx.filter, engine.fx.fx, engine.fx.fx2].map((x) => ({ style: x.style, values: x.values, bypass: x.bypass })),
 }));
 function applyGlobals() {
   engine.setCutoff(cutoffHz(globals.cutoff)); engine.setResonance(1 + globals.reso * 22);
@@ -407,7 +409,8 @@ function restore(sn) {
   Object.assign(globals, sn.globals); applyGlobals();
   fxCtl = sn.ctl; warpIdx = sn.warp || 0;
   sn.fx.forEach((x, j) => {
-    const sec = fxSecs[j], slot = sec.slot;
+    const sec = fxSecs[j]; if (!sec) return;
+    const slot = sec.slot;
     if (slot.style !== x.style) slot.setStyle(x.style);
     slot.values = x.values.map((o) => ({ ...o })); slot.refresh(); slot.setBypass(x.bypass);
     sec.sec.classList.toggle('off', x.bypass); sec.render();
@@ -529,7 +532,7 @@ const fxSecs = [];
 const fxMainRefs = {};
 const short8 = (t) => (t.length > 8 ? `${t.slice(0, 7)}.` : t);
 function buildFx() {
-  [[engine.fx.filter, FILTER_STYLES], [engine.fx.fx, FX_STYLES]].forEach(([slot, styles], j) => {
+  [[engine.fx.filter, FILTER_STYLES], [engine.fx.fx, FX_STYLES], [engine.fx.fx2, FX_STYLES]].forEach(([slot, styles], j) => {
     const sec = document.createElement('section');
     sec.className = 'fxsec';
     const grid = document.createElement('div'); grid.className = 'pgrid'; sec.appendChild(grid);
@@ -558,7 +561,7 @@ function buildFx() {
 }
 function cycleStyle(j) { const s = fxSecs[j]; s.slot.setStyle((s.slot.style + 1) % s.styles.length); s.render(); if (page === 'fx') renderPanel(); }
 function bypass(j) { const s = fxSecs[j]; s.slot.setBypass(!s.slot.bypass); s.sec.classList.toggle('off', s.slot.bypass); }
-const fxStyleTarget = () => (tabSel.fx === 2 ? 1 : 0);
+const fxStyleTarget = () => (tabSel.fx === 2 ? 1 : tabSel.fx === 3 ? 2 : 0);
 
 // ---------- elementy siatki ----------
 const synRefs = {}, macroRefs = {};
@@ -591,9 +594,9 @@ function stepRow(parent, name, value, minus, plus) {
 const panelEl = el('panel');
 const tabNames = (p) => ({
   seq: ['MAIN', 'SEQ', 'SCALE', 'EXTRA'],
-  mix: ['MAIN', ...VOICE_NAMES.map((_, i) => typeName(i))],
-  syn: ['MAIN', ...VOICE_NAMES.map((_, i) => typeName(i))],
-  fx: ['MAIN', 'FLT', 'FX'],
+  mix: ['MAIN', ...VOICE_NAMES.map((_, i) => TAB_SHORT[engine.types[i]])],
+  syn: ['MAIN', ...VOICE_NAMES.map((_, i) => TAB_SHORT[engine.types[i]])],
+  fx: ['MAIN', 'FLT', 'FX1', 'FX2', 'MSTR'],
 })[p];
 function renderSub() {
   const host = el('subtabs'), names = tabNames(page);
@@ -650,9 +653,7 @@ function renderPanel() {
       Kn('SEND', 0, 1, 0.01, sec.slot.values[sec.slot.style].mix, 0, (v) => setFxParam(sec, 'mix', v));
       B({ kind: 'tog', label: () => 'FILTR', on: () => !fxSecs[0].slot.bypass, act: () => bypass(0) });
       Kn('MASTER', 0, 1.2, 0.01, globals.master, 1, (v) => { globals.master = v; engine.setMaster(v); });
-      Kn('COMP', 0, 1, 0.01, globals.comp, 0.5, (v) => { globals.comp = v; engine.setComp(v); });
-      Kn('DRIVE', 0, 1, 0.01, globals.mdrive, 0, (v) => { globals.mdrive = v; engine.setDrive(v); });
-      Sp(); B({ kind: 'act', label: () => 'RANDOM', act: () => { engine.enabled.forEach((on, i) => { if (on) engine.randomizeVoice(i); }); } });
+      Sp(); Sp(); Sp(); B({ kind: 'act', label: () => 'RANDOM', act: () => { engine.enabled.forEach((on, i) => { if (on) engine.randomizeVoice(i); }); } });
     } else {
       const i = tab - 1;
       Kn('LEVEL', 0, 1.5, 0.01, engine.levels[i], 1, (v) => engine.setLevel(i, v));
@@ -677,12 +678,16 @@ function renderPanel() {
       Sp(); B({ kind: 'act', label: () => 'RANDOM', act: () => { engine.enabled.forEach((on, i) => { if (on) engine.randomizeVoice(i); }); renderPanel(); } });
     } else {
       const i = synSel, t = engine.types[i], pv = engine.voices[i].params;
+      grid.classList.add('model');
+      // komórka MODEL po lewej (dotknięcie zmienia rodzaj silnika), obok osiem pokręteł w dwóch rzędach po cztery
+      const mc = document.createElement('button'); mc.className = 'modelcell';
+      mc.innerHTML = `<span class="cl">MODEL</span><b>${TAB_SHORT[t]}</b>`; mc.setAttribute('aria-label', 'Zmień rodzaj silnika');
+      mc.addEventListener('click', () => { engine.setType(i, (engine.types[i] + 1) % SHORT.length); renderSub(); renderPanel(); commitSoon(); });
+      grid.appendChild(mc);
       const own = PARAM_SPECS[t].filter((x) => x.group !== 'env').slice(0, 3);
       const add = (sp) => { const k = synKnob(labOf(sp), sp.min, sp.max, sp.step, pv[sp.id], sp.def, (v) => engine.setParam(i, sp.id, v)); synRefs[sp.id] = k; grid.appendChild(k); };
-      own.forEach(add);
-      Kn('CUTOFF', 0, 1, 0.001, globals.cutoff, 0.5, (v) => { globals.cutoff = v; engine.setCutoff(cutoffHz(v)); });
-      Kn('RESO', 0, 1, 0.01, globals.reso, 0.5, (v) => { globals.reso = v; engine.setResonance(1 + v * 22); });
-      ['fEnv', 'fDec', 'aDec', 'aRel'].forEach((id) => add(specOfType(t, id)));
+      own.forEach(add); add(specOfType(t, 'fEnv'));
+      ['fDec', 'aDec', 'aRel'].forEach((id) => add(specOfType(t, id)));
       B({ kind: 'act', label: () => 'RANDOM', act: () => { const vals = engine.randomizeVoice(i); for (const [id, v] of Object.entries(vals)) if (synRefs[id]) synRefs[id].value = v; } });
     }
   } else {
@@ -692,9 +697,14 @@ function renderPanel() {
       const fp = fxSecs[0].styles[fxSecs[0].slot.style].params.map((x) => x.id), ep = fxSecs[1].styles[fxSecs[1].slot.style].params.map((x) => x.id);
       [fp[0], fp[1], fp[2], 'mix', fp.includes('tone') ? 'tone' : fp[3]].forEach((id) => fk(0, id));
       [ep[0], ep[1], ep[2], 'mix'].forEach((id) => fk(1, id));
-      B({ kind: 'act', label: () => 'RANDOM', act: () => { fxSecs.forEach((x) => x.randomize()); renderPanel(); } });
+      B({ kind: 'act', label: () => 'RANDOM', act: () => { fxSecs.slice(0, 2).forEach((x) => x.randomize()); renderPanel(); } });
+    } else if (tab === 4) {
+      panelEl.appendChild(grid);
+      Kn('MASTER', 0, 1.2, 0.01, globals.master, 1, (v) => { globals.master = v; engine.setMaster(v); });
+      Kn('COMP', 0, 1, 0.01, globals.comp, 0.5, (v) => { globals.comp = v; engine.setComp(v); });
+      Kn('DRIVE', 0, 1, 0.01, globals.mdrive, 0, (v) => { globals.mdrive = v; engine.setDrive(v); });
     } else {
-      panelEl.appendChild(fxSecs[tab === 1 ? 0 : 1].sec);
+      panelEl.appendChild(fxSecs[tab - 1].sec);
     }
   }
 }
@@ -719,7 +729,7 @@ function dotList() {
   return [
     { label: 'FILTR', sub: hint(0), lit: !fxSecs[0].slot.bypass, dim: !driven().includes(0), act: () => bypass(0) },
     { label: 'EFEKT', sub: hint(1), lit: !fxSecs[1].slot.bypass, dim: !driven().includes(1), act: () => bypass(1) },
-    { label: `STEROW. ${ctlLabel[fxCtl]}`, act: () => { fxCtl = (fxCtl + 1) % 3; } },
+    { label: ctlLabel[fxCtl], sub: 'STEROW.', act: () => { fxCtl = (fxCtl + 1) % 3; } },
     { label: 'STYLE', sub: short8(fxSecs[fxStyleTarget()].styles[fxSecs[fxStyleTarget()].slot.style].name.toUpperCase()), act: () => cycleStyle(fxStyleTarget()) },
   ];
 }
