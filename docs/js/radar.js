@@ -383,7 +383,7 @@ function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('on'); cl
 const snapshot = () => JSON.parse(JSON.stringify({
   pattern,
   state: { root: state.root, mode: state.mode, accent: state.accent, slide: state.slide, oct: state.oct, swing: state.swing, seed: state.seed, density: state.density, syncopation: state.syncopation, latch: state.latch, mixMode: state.mixMode },
-  audio: { bpm: engine.bpm, gate: engine.gateMul, human: engine.human, ghost: engine.ghost, velo: engine.velo, types: engine.types, enabled: engine.enabled, levels: engine.levels, solo: engine.solo, xy: engine.xy, eq: engine.eq, vOct: engine.vOct, vTune: engine.vTune, vEq: engine.vEq, params: engine.voices.map((v) => v.params) },
+  audio: { offs: { offFAtk: engine.p.offFAtk, offFRel: engine.p.offFRel, offAAtk: engine.p.offAAtk, offARel: engine.p.offARel }, bpm: engine.bpm, gate: engine.gateMul, human: engine.human, ghost: engine.ghost, velo: engine.velo, types: engine.types, enabled: engine.enabled, levels: engine.levels, solo: engine.solo, xy: engine.xy, eq: engine.eq, vOct: engine.vOct, vTune: engine.vTune, vEq: engine.vEq, params: engine.voices.map((v) => v.params) },
   globals, ctl: fxCtl, warp: warpIdx,
   fx: [engine.fx.filter, engine.fx.fx, engine.fx.fx2].map((x) => ({ style: x.style, values: x.values, bypass: x.bypass })),
 }));
@@ -395,6 +395,7 @@ function restore(sn) {
   pattern = sn.pattern; engine.pattern = pattern;
   Object.assign(state, sn.state); engine.latch = state.latch;
   const a = sn.audio;
+  Object.assign(engine.p, a.offs || {});
   engine.setBpm(a.bpm); engine.gateMul = a.gate; engine.human = a.human; engine.ghost = a.ghost; engine.velo = a.velo;
   a.types.forEach((t, i) => { if (engine.types[i] !== t) engine.setType(i, t); });
   a.params.forEach((pr, i) => Object.entries(pr).forEach(([id, v]) => { if (id in engine.voices[i].params) engine.setParam(i, id, v); }));
@@ -645,30 +646,37 @@ function renderPanel() {
   if (page === 'seq') {
     panelEl.appendChild(grid);
     if (tab === 0) {
+      // MAIN: filtr globalny, globalne obwiednie (przesunięcie -100%…+100% względem ustawień każdego silnika), gate, accent, shift, oktawa
+      const off = (key) => (v) => { engine.p[key] = v; engine.voices.forEach((x) => x.refresh && x.refresh(engine.ctx.currentTime)); };
+      Kn('CUTOFF', 0, 1, 0.001, globals.cutoff, 0.5, (v) => { globals.cutoff = v; engine.setCutoff(cutoffHz(v)); });
+      Kn('RESO', 0, 1, 0.01, globals.reso, 0.5, (v) => { globals.reso = v; engine.setResonance(1 + v * 22); });
+      Kn('F.ATK', -1, 1, 0.01, engine.p.offFAtk, 0, off('offFAtk'));
+      Kn('F.REL', -1, 1, 0.01, engine.p.offFRel, 0, off('offFRel'));
+      Kn('A.ATK', -1, 1, 0.01, engine.p.offAAtk, 0, off('offAAtk'));
+      Kn('A.REL', -1, 1, 0.01, engine.p.offARel, 0, off('offARel'));
       Kn('GATE', 0.4, 1.6, 0.01, engine.gateMul, 1, (v) => { engine.gateMul = v; });
-      Kn('SWING', 0, 0.4, 0.01, state.swing, 0, (v) => { state.swing = v; pattern = { ...pattern, swing: v }; engine.pattern = pattern; });
       Kn('ACCENT', 0, 1, 0.01, state.accent, 0.5, (v) => { state.accent = v; refin(); });
-      Kn('SLIDE', 0, 1, 0.01, state.slide, 0.1, (v) => { state.slide = v; refin(); });
-      Kn('OKTAWA', -2, 2, 1, state.oct, 0, (v) => { state.oct = Math.round(v); refin(); engine.audition({ degree: 0, octave: 0, vel: 100 }); });
-      Kn('TEMPO', 70, 180, 1, engine.bpm, 130, (v) => setBpm(v));
-      Kn('LENGTH', 8, 32, 4, pattern.steps.length, 16, (v) => { const n = Math.round(v); if (n !== pattern.steps.length) setSteps(resizeSteps(pattern.steps, n)); });
       let last = 0; Kn('SHIFT', -4, 4, 1, 0, 0, (v) => { const d = Math.round(v) - last; last = Math.round(v); if (d) setSteps(rotateSteps(pattern.steps, d)); });
-      Kn('HUMAN', 0, 1, 0.01, engine.human, 0, (v) => { engine.human = v; });
-      B({ kind: 'act', label: () => 'RANDOM', act: actions.random });
+      Kn('OKTAWA', -2, 2, 1, state.oct, 0, (v) => { state.oct = Math.round(v); refin(); engine.audition({ degree: 0, octave: 0, vel: 100 }); });
     } else if (tab === 1) {
       const A = (name, ic, fn) => B({ kind: 'act', icon: ic, label: () => name, act: actions.steps(fn) });
       A('CLEAR', 'clear', clearSteps); A('REVERSE', 'reverse', reverseSteps); A('INVERT', 'invert', invertSteps); A('ROT ←', 'rotl', (st) => rotateSteps(st, -1)); A('ROT →', 'rotr', (st) => rotateSteps(st, 1));
       A('DOUBLE', 'double', doubleSteps); A('HALF', 'half', halveSteps);
-      Kn('GHOST', 0, 1, 0.01, engine.ghost, 0, (v) => { engine.ghost = v; });
-      Sp(); B({ kind: 'act', label: () => 'RANDOM', act: actions.random });
+      Sp(); Sp(); B({ kind: 'act', label: () => 'RANDOM', act: actions.random });
     } else if (tab === 2) {
       stepRow(grid, 'BASE', baseLabel, () => actions.base(-1), () => actions.base(1));
       stepRow(grid, 'KEY', () => MODE_LABEL[state.mode], () => actions.key(-1), () => actions.key(1));
     } else {
-      Kn('CUTOFF', 0, 1, 0.001, globals.cutoff, 0.5, (v) => { globals.cutoff = v; engine.setCutoff(cutoffHz(v)); });
-      Kn('RESO', 0, 1, 0.01, globals.reso, 0.5, (v) => { globals.reso = v; engine.setResonance(1 + v * 22); });
+      // EXTRA: czas i feeling (tempo, długość, swing, human, ghost), nuty (slide, glide, velo) i RANDOM
+      Kn('TEMPO', 70, 180, 1, engine.bpm, 130, (v) => setBpm(v));
+      Kn('LENGTH', 8, 32, 4, pattern.steps.length, 16, (v) => { const n = Math.round(v); if (n !== pattern.steps.length) setSteps(resizeSteps(pattern.steps, n)); });
+      Kn('SWING', 0, 0.4, 0.01, state.swing, 0, (v) => { state.swing = v; pattern = { ...pattern, swing: v }; engine.pattern = pattern; });
+      Kn('HUMAN', 0, 1, 0.01, engine.human, 0, (v) => { engine.human = v; });
+      Kn('GHOST', 0, 1, 0.01, engine.ghost, 0, (v) => { engine.ghost = v; });
+      Kn('SLIDE', 0, 1, 0.01, state.slide, 0.1, (v) => { state.slide = v; refin(); });
       Kn('GLIDE', 0, 200, 5, glideMs, 50, (v) => { glideMs = v; setGlideTime(v / 1000); });
       Kn('VELO', 0.4, 1, 0.01, engine.velo, 1, (v) => { engine.velo = v; });
+      Sp(); B({ kind: 'act', label: () => 'RANDOM', act: actions.random });
     }
   } else if (page === 'mix') {
     panelEl.appendChild(grid);

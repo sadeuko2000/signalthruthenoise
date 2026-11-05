@@ -63,3 +63,4 @@ Nazwy jako punkt odniesienia, bez kopiowania działania:
 - Obsada pokręteł to propozycja z dokumentu „Obsada pokręteł”; można ją zmieniać w `renderPanel()` w `docs/js/radar.js`.
 - Dopisane w silniku: master, kompresja i drive wyjściowy, oktawa/strojenie/EQ każdego silnika, glide, velo, human, ghost, latch.
 - Dopasowanie do szkicu z Figmy: zakładki FX to MAIN, FLT, FX1, FX2, MSTR (drugi efekt w łańcuchu, MSTR = master, kompresja, drive), widok silnika w SYN ma komórkę MODEL po lewej i 4×2 pokrętła, domyślna kolejność silników MS20, PROPHET, DX, WAVE.
+- SEQ MAIN: CUTOFF, RESO, F.ATK, F.REL, A.ATK, A.REL (globalne przesunięcia obwiedni -100%…+100% względem ustawień każdego silnika, `engine.p.off*` i `Voice.effParam`), GATE, ACCENT, SHIFT, OKTAWA. EXTRA: TEMPO, LENGTH, SWING, HUMAN, GHOST, SLIDE, GLIDE, VELO, RANDOM. Atak filtra to nowa rzecz: 0 = zryw od razu, +100% = 150 ms narastania (DX go nie używa).

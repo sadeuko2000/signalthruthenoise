@@ -90,3 +90,13 @@ test('każdy silnik ma interfejs wymagany przez Engine (refresh, apply, setParam
     }
   }
 });
+
+import { bip } from '../docs/js/engines.js';
+test('bip: przesunięcie globalne -1..+1 względem wartości silnika', () => {
+  assert.equal(bip(10, 0, 0, 40), 10);          // 0 = bez zmian
+  assert.equal(bip(10, 1, 0, 40), 40);          // +100% = maksimum zakresu
+  assert.equal(bip(10, -1, 0, 40), 0);          // -100% = minimum zakresu
+  assert.equal(bip(10, 0.5, 0, 40), 25);        // pół drogi do maksimum
+  assert.equal(bip(10, -0.5, 0, 40), 5);        // pół drogi do minimum
+  assert.equal(bip(3, -1, 3, 300), 3);          // wartość na minimum zostaje na minimum
+});

@@ -26,6 +26,8 @@ export function blendWeights(x, y, enabled = [1, 1, 1, 1]) {
 }
 
 const cl = (v, a, b) => Math.max(a, Math.min(b, v));
+// Globalne przesunięcie parametru silnika, -1..+1: 0 = bez zmian, +1 = maksimum zakresu, -1 = minimum zakresu.
+export const bip = (own, off, min, max) => (off >= 0 ? own + off * (max - own) : min + (own - min) * (1 + off));
 
 // Obwiednie wspólne dla wszystkich silników.
 // aAtk i aRel w milisekundach, pozostałe czasy w sekundach.
@@ -114,6 +116,14 @@ class Voice {
     this.params = defaultParams(this.constructor.specIndex);
   }
   setParam(id, v) { this.params[id] = v; this.apply(this.ctx.currentTime); }
+  // Wartość parametru obwiedni z uwzględnieniem globalnych przesunięć (pokrętła w SEQ MAIN): atak i release amp oraz zanik filtra.
+  effParam(id) {
+    const o = this.p, v = this.params[id];
+    if (id === 'aAtk') return bip(v, o.offAAtk || 0, 0, 40);
+    if (id === 'aRel') return bip(v, o.offARel || 0, 3, 300);
+    if (id === 'fDec') return bip(v, o.offFRel || 0, 0.03, 0.8);
+    return v;
+  }
   apply() {}
   refresh() {}   // silniki z filtrem nadpisują: przeliczenie cutoffu i rezonansu
   silence(t) { this.amp.gain.cancelScheduledValues(t); this.amp.gain.setTargetAtTime(0, t, 0.01); }
@@ -124,22 +134,24 @@ class Voice {
     const g = this.amp.gain, P = this.params;
     if (!slide) {
       holdAt(g, t);
-      g.linearRampToValueAtTime(peak, t + Math.max(0.001, P.aAtk / 1000));
-      g.linearRampToValueAtTime(peak * P.aSus, t + Math.max(0.001, P.aAtk / 1000) + P.aDec);
+      const atk = Math.max(0.001, this.effParam('aAtk') / 1000);
+      g.linearRampToValueAtTime(peak, t + atk);
+      g.linearRampToValueAtTime(peak * P.aSus, t + atk + P.aDec);
     }
     if (!hold) {
       holdAt(g, t + len);
-      g.linearRampToValueAtTime(0, t + len + Math.max(0.003, P.aRel / 1000));
+      g.linearRampToValueAtTime(0, t + len + Math.max(0.003, this.effParam('aRel') / 1000));
     }
   }
   // Obwiednia filtra: skok do cutoff + 2500 Hz * fEnv, potem zanik do cutoffu.
   filtEnv(fps, t, base, accent, mul = 1) {
     const top = cl((base + 2500 * mul * this.params.fEnv * (accent ? 1.5 : 1)), 30, 18000);
-    const d = this.params.fDec * (accent ? 1.3 : 1);
+    const d = this.effParam('fDec') * (accent ? 1.3 : 1);
+    const atk = Math.max(0, this.p.offFAtk || 0) * 0.15;               // atak filtra: 0 = zryw od razu, +100% = 150 ms narastania
     for (const fp of fps) {
       fp.cancelScheduledValues(t);
-      fp.setValueAtTime(top, t);
-      fp.exponentialRampToValueAtTime(cl(base, 30, 18000), t + d);
+      if (atk > 0.003) { fp.setValueAtTime(cl(base, 30, 18000), t); fp.exponentialRampToValueAtTime(top, t + atk); fp.exponentialRampToValueAtTime(cl(base, 30, 18000), t + atk + d); }
+      else { fp.setValueAtTime(top, t); fp.exponentialRampToValueAtTime(cl(base, 30, 18000), t + d); }
     }
   }
 }
@@ -255,7 +267,7 @@ export class DXVoice extends Voice {
       const start = I * (0.5 + 0.8 * P.fEnv) * (accent ? 1.4 : 1);
       this.mg.gain.cancelScheduledValues(t);
       this.mg.gain.setValueAtTime(Math.max(0.001, freq * start), t);
-      this.mg.gain.exponentialRampToValueAtTime(Math.max(0.001, freq * I * 0.3), t + P.fDec * 1.5);
+      this.mg.gain.exponentialRampToValueAtTime(Math.max(0.001, freq * I * 0.3), t + this.effParam('fDec') * 1.5);
     }
     this.ampEnv(t, this.peak(vel, accent), len, slide, hold);
   }
@@ -301,7 +313,7 @@ export class WavetableVoice extends Voice {
   note(t, freq, vel, accent, len, slide, hold) {
     for (const o of [this.oa, this.ob, this.bodyOsc]) slide ? glide(o.frequency, freq, t) : o.frequency.setValueAtTime(freq, t);
     if (!slide) {
-      const d = this.params.fDec * (accent ? 1.3 : 1) * 2;
+      const d = this.effParam('fDec') * (accent ? 1.3 : 1) * 2;
       const from = this.params.morph, to = cl(from + this.params.sweep * 0.8, 0, 1);   // przelot między tablicami
       this.gb.gain.cancelScheduledValues(t); this.ga.gain.cancelScheduledValues(t);
       this.gb.gain.setValueAtTime(from, t); this.gb.gain.linearRampToValueAtTime(to, t + d);

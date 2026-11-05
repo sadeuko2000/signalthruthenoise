@@ -13,7 +13,7 @@ export class Engine {
     this.bpm = 130;
     this.gateMul = 1;      // mnożnik długości nut (suwak „długość nut”)
     // parametry wspólne dla wszystkich silników (silniki trzymają referencję do tego obiektu)
-    this.p = { cutoff: 600, res: 12, bright: 0.35 };
+    this.p = { cutoff: 600, res: 12, bright: 0.35, offFAtk: 0, offFRel: 0, offAAtk: 0, offARel: 0 };   // + globalne przesunięcia obwiedni (-1..+1)
     this.blend = [1, 0, 0, 0];
     this.xy = [0.25, 0.75];       // pozycja na padzie
     this.enabled = [1, 1, 1, 1];  // które silniki biorą udział w miksie
