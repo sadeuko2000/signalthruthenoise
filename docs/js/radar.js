@@ -531,6 +531,10 @@ el('play').addEventListener('click', togglePlay);
 const fxSecs = [];
 const fxMainRefs = {};
 const short8 = (t) => (t.length > 8 ? `${t.slice(0, 7)}.` : t);
+// Nazwy pokręteł mieszczą się nad pokrętłem (najwyżej 8 znaków): znane długie nazwy mają własne skróty, reszta jest ucinana z kropką.
+const LABELS = { 'PING-PONG': 'PINGPONG', 'MOD TEMPO': 'M.TEMPO', 'MOD GŁĘBIA': 'M.GŁĘB.', 'LFO TEMPO': 'LFO TEM.', 'LFO GŁĘBIA': 'LFO GŁ.', 'LFO KSZT.': 'LFO KSZ.',
+  'OPÓŹNIENIE': 'OPÓŹN.', 'TŁUMIENIE': 'TŁUM.', 'SZEROKOŚĆ': 'SZEROK.', 'ASYMETRIA': 'ASYM.', 'HP CZĘST.': 'HP CZĘS.', 'LP CZĘST.': 'LP CZĘS.', 'TRYB LP-HP': 'TRYB' };
+const knobLabel = (t) => { const u = String(t).toUpperCase(); return LABELS[u] || short8(u); };
 function buildFx() {
   [[engine.fx.filter, FILTER_STYLES], [engine.fx.fx, FX_STYLES], [engine.fx.fx2, FX_STYLES]].forEach(([slot, styles], j) => {
     const sec = document.createElement('section');
@@ -546,7 +550,7 @@ function buildFx() {
       grid.innerHTML = ''; refs = {};
       for (const sp of styles[slot.style].params) {
         const k = document.createElement('div');
-        makeKnob(k, { label: sp.label.toUpperCase(), min: 0, max: 1, step: 0.001, value: slot.values[slot.style][sp.id], def: sp.def, show: (n) => sp.show(sp.map(n)) });
+        makeKnob(k, { label: knobLabel(sp.label), min: 0, max: 1, step: 0.001, value: slot.values[slot.style][sp.id], def: sp.def, show: (n) => sp.show(sp.map(n)) });
         k.addEventListener('input', () => slot.setParam(sp.id, k.value));
         grid.appendChild(k); refs[sp.id] = k;
       }
@@ -567,7 +571,7 @@ const fxStyleTarget = () => (tabSel.fx === 2 ? 1 : tabSel.fx === 3 ? 2 : 0);
 const synRefs = {}, macroRefs = {};
 function synKnob(label, min, max, step, value, def, onInput) {
   const k = document.createElement('div');
-  makeKnob(k, { label, min, max, step, value, def, fmt: 'num' });
+  makeKnob(k, { label: knobLabel(label), min, max, step, value, def, fmt: 'num' });
   k.addEventListener('input', () => onInput(k.value));
   return k;
 }
@@ -694,7 +698,7 @@ function renderPanel() {
   } else {
     if (tab === 0) {
       panelEl.appendChild(grid);
-      const fk = (j, id) => { const sec = fxSecs[j], si = sec.slot.style, sp = sec.styles[si].params.find((x) => x.id === id); if (!sp) return Sp(); const k = document.createElement('div'); makeKnob(k, { label: sp.label.toUpperCase(), min: 0, max: 1, step: 0.001, value: sec.slot.values[si][id], def: sp.def, show: (n) => sp.show(sp.map(n)) }); k.addEventListener('input', () => setFxParam(sec, id, k.value)); fxMainRefs[`${j}:${id}`] = k; grid.appendChild(k); };
+      const fk = (j, id) => { const sec = fxSecs[j], si = sec.slot.style, sp = sec.styles[si].params.find((x) => x.id === id); if (!sp) return Sp(); const k = document.createElement('div'); makeKnob(k, { label: knobLabel(sp.label), min: 0, max: 1, step: 0.001, value: sec.slot.values[si][id], def: sp.def, show: (n) => sp.show(sp.map(n)) }); k.addEventListener('input', () => setFxParam(sec, id, k.value)); fxMainRefs[`${j}:${id}`] = k; grid.appendChild(k); };
       const fp = fxSecs[0].styles[fxSecs[0].slot.style].params.map((x) => x.id), ep = fxSecs[1].styles[fxSecs[1].slot.style].params.map((x) => x.id);
       [fp[0], fp[1], fp[2], 'mix', fp.includes('tone') ? 'tone' : fp[3]].forEach((id) => fk(0, id));
       [ep[0], ep[1], ep[2], 'mix'].forEach((id) => fk(1, id));
