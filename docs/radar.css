@@ -41,9 +41,9 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .knob.drag .kl::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--acc);border:1px solid var(--ink);margin-right:4px;vertical-align:middle}
 
 /* strona FX: same pokrętła (nazwa + pokrętło), jedna sekcja naraz */
-#fxpage,#synpage{display:grid}
-#synpage{border-top:1px solid var(--ink);padding-top:8px;margin-top:2px}
-#synpage .knob{--ks:40px}
+#fxpage,#synpage,#mixpage{display:grid}
+#synpage,#mixpage{border-top:1px solid var(--ink);padding-top:8px;margin-top:2px}
+#synpage .knob,#mixpage .knob{--ks:40px}
 .fxsec{border:0;padding:0;background:none;border-top:1px solid var(--ink);padding-top:8px;margin-top:2px}
 .fxsec h2{display:none}
 #fxpage .knob{--ks:40px}
@@ -100,3 +100,9 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .keyrow button:last-child{border-left:1px solid var(--ink)}
 
 #knobs-seq{grid-template-columns:repeat(5,minmax(0,1fr))}
+
+/* MIX: wybór rodzaju silnika w 4 miejscach */
+.enggrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;border:1px solid var(--ink)}
+.engbtn{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:8px;min-height:56px;padding:0 10px;text-align:left;border-right:1px solid var(--ink);border-bottom:1px solid var(--ink)}
+.engbtn:nth-child(2n){border-right:0}.engbtn:nth-child(n+3){border-bottom:0}
+.engbtn span{font-size:14px;opacity:.6}.engbtn b{font-weight:400;font-size:22px;letter-spacing:.08em}

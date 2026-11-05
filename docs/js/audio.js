@@ -16,6 +16,8 @@ export class Engine {
     this.blend = [1, 0, 0, 0];
     this.xy = [0.25, 0.75];       // pozycja na padzie
     this.enabled = [1, 1, 1, 1];  // które silniki biorą udział w miksie
+    this.types = [0, 1, 2, 3];    // rodzaj silnika w każdym z 4 miejsc (0 prophet, 1 ms-20, 2 dx, 3 wavetable); mogą się powtarzać
+    this.eq = [0, 0, 0];          // korektor 3-pasmowy po miksie silników: niskie, środek, wysokie (dB)
     this.levels = [1, 1, 1, 1];   // głośność każdego silnika (niezależnie od pada)
     this.solo = null;             // indeks silnika solo albo null
     this.eff = [1, 0, 0, 0];      // efektywna waga = pad lub solo, razy głośność
@@ -60,8 +62,17 @@ export class Engine {
     this.fx = new GlobalFx(c, () => this.bpm);
     this.mix.connect(this.dry).connect(this.fx.input);
     this.fx.output.connect(this.master);
-    this.voices = VOICES.map((V) => new V(c, this.p));
-    this.vgains = this.voices.map((v) => { const g = c.createGain(); v.out.connect(g).connect(this.mix); return g; });
+    // korektor 3-pasmowy między silnikami a resztą toru
+    this.eqIn = c.createGain();
+    const lo = c.createBiquadFilter(), md = c.createBiquadFilter(), hi = c.createBiquadFilter();
+    lo.type = 'lowshelf'; lo.frequency.value = 150;
+    md.type = 'peaking'; md.frequency.value = 1000; md.Q.value = 0.8;
+    hi.type = 'highshelf'; hi.frequency.value = 4500;
+    this.eqNodes = [lo, md, hi];
+    this.eqIn.connect(lo).connect(md).connect(hi).connect(this.mix);
+    this.eqNodes.forEach((n, k) => { n.gain.value = this.eq[k]; });
+    this.voices = this.types.map((t) => new VOICES[t](c, this.p));
+    this.vgains = this.voices.map((v) => { const g = c.createGain(); v.out.connect(g).connect(this.eqIn); return g; });
     this.setBlend(0.25, 0.75);
   }
 
@@ -86,10 +97,23 @@ export class Engine {
     this.eff = base.map((w, i) => w * this.levels[i]);
     if (this.vgains) this.vgains.forEach((g, i) => g.gain.setTargetAtTime(this.eff[i], this.ctx.currentTime, 0.03));
   }
+  setEq(band, db) { this.eq[band] = db; if (this.eqNodes) this.eqNodes[band].gain.setTargetAtTime(db, this.ctx.currentTime, 0.02); }
+  // Zmiana rodzaju silnika w danym miejscu: stary cichnie i jest zatrzymany, nowy startuje z parametrami domyślnymi.
+  setType(i, t) {
+    this.types[i] = t;
+    if (!this.ctx || !this.voices) return;
+    const now = this.ctx.currentTime, old = this.voices[i];
+    old.silence(now); old.out.disconnect();
+    const nodes = Object.values(old).flatMap((x) => (Array.isArray(x) ? x : [x]));
+    setTimeout(() => nodes.forEach((n) => { if (n && n.stop && n.frequency) { try { n.stop(); } catch (e) { /* już zatrzymany */ } } }), 400);
+    const v = new VOICES[t](this.ctx, this.p);
+    v.out.connect(this.vgains[i]);
+    this.voices[i] = v;
+  }
   setParam(i, id, v) { this.voices[i].setParam(id, v); }
   // Losuje parametry jednego silnika w „rozsądnych” granicach i zwraca nowe wartości.
   randomizeVoice(i, rng = Math.random) {
-    const vals = randomizeParams(i, rng);
+    const vals = randomizeParams(this.types[i], rng);
     for (const [id, v] of Object.entries(vals)) this.voices[i].setParam(id, v);
     return vals;
   }

@@ -18,6 +18,7 @@ const finalize = (p) => withSlide(withAccent({ ...p, root: effRoot() }, state.ac
 let pattern = finalize(generateBass(state));
 engine.pattern = pattern;
 let page = 'seq';
+let mixView = null;                              // strona MIX: otwarte pod-menu pod radarem (null, 'eq', 'send', 'eng')
 let synSel = 0, synView = 0;                    // strona SYN: wybrany silnik (0..3) i widok (0 brzmienie, 1 obwiednie)
 let fxActive = 0;                              // sekcja FX, której pokrętła widać (0 filtr, 1 efekt)
 const padPos = { x: 0.25, y: 0.75 };
@@ -127,7 +128,8 @@ function drawSeq() {
 }
 
 const PAD_ANCHORS = [[-1, 1], [1, 1], [-1, -1], [1, -1]].map(([a, b]) => [a * Math.SQRT1_2, b * Math.SQRT1_2]);
-const SHORT = ['PROPHET', 'MS-20', 'DX', 'WAVETBL'];
+const SHORT = ['PROPHET', 'MS-20', 'DX', 'WAVETBL'];                 // nazwy rodzajów silnika
+const typeName = (i) => SHORT[engine.types[i]];                      // nazwa silnika w miejscu i (rodzaje mogą się powtarzać)
 function drawMix() {
   const G = geo(), S = sweepState(), { cx, cy, R, dpr } = G, Rp = R * R_OUT;
   drawBase(G, S);
@@ -144,7 +146,7 @@ function drawMix() {
     g.restore();
     g.textAlign = ax < 0 ? 'left' : 'right';
     g.fillStyle = on ? `rgba(${INK},1)` : `rgba(${INK},.4)`;
-    g.fillText(SHORT[i], ax < 0 ? cx - R * 0.97 : cx + R * 0.97, ay > 0 ? cy - R * 0.9 : cy + R * 0.9);
+    g.fillText(typeName(i), ax < 0 ? cx - R * 0.97 : cx + R * 0.97, ay > 0 ? cy - R * 0.9 : cy + R * 0.9);
   });
   g.strokeStyle = `rgba(${ACC},1)`; g.lineWidth = 1.6 * dpr;
   g.beginPath(); g.arc(mx, my, R * 0.05, 0, TAU); g.moveTo(mx - R * 0.09, my); g.lineTo(mx + R * 0.09, my); g.moveTo(mx, my - R * 0.09); g.lineTo(mx, my + R * 0.09); g.stroke();
@@ -243,7 +245,7 @@ function drawFx(ts) {
 // ---------- SYN: parametry silników na ekranie radarowym ----------
 // Dotyk ustawia „kształt dźwięku” wybranego silnika: odległość od środka = siła obwiedni filtra (zryw na początku nuty),
 // kąt = jej zanik. Na ekranie echa dostają kolec (siła) i ogon (zanik) odpowiadające tym wartościom.
-const specOf = (i, id) => PARAM_SPECS[i].find((x) => x.id === id);
+const specOf = (i, id) => PARAM_SPECS[engine.types[i]].find((x) => x.id === id);
 const normParam = (i, id) => { const sp = specOf(i, id); return clamp01((engine.voices[i].params[id] - sp.min) / (sp.max - sp.min)); };
 function setEngParam(i, id, nn) {
   const sp = specOf(i, id), raw = sp.min + clamp01(nn) * (sp.max - sp.min), v = Math.round(raw / sp.step) * sp.step;
@@ -273,7 +275,7 @@ function drawSyn() {
     const ty = topRow ? cy - R * 0.9 : cy + R * 0.9, by = topRow ? ty + R * 0.11 : ty - R * 0.11, bw = R * 0.5, bh = R * 0.045;
     g.textAlign = left ? 'left' : 'right';
     g.fillStyle = `rgba(${INK},${engine.enabled[i] ? 1 : 0.4})`;
-    g.fillText((i === synSel ? '▸' : '') + SHORT[i], x0, ty);
+    g.fillText((i === synSel ? '▸' : '') + typeName(i), x0, ty);
     const bx = left ? x0 : x0 - bw;
     g.strokeStyle = `rgba(${INK},.35)`; g.lineWidth = dpr; g.strokeRect(bx, by - bh / 2, bw, bh);
     g.fillStyle = i === lead && eff[i] > 0 ? `rgb(${ACC})` : `rgba(${INK},.8)`;
@@ -438,10 +440,14 @@ const KEYS = {
     { label: 'MUTATE', value: () => 'SYNTH', act: actions.mut },
   ],
   mix: [
-    { label: 'RND ENG', value: () => 'LOSUJ', act: () => { engine.enabled.forEach((on, i) => { if (on) rnd(i); }); } },
+    { label: 'EQ', value: () => 'LMH', lit: () => mixView === 'eq', act: () => toggleMixView('eq') },
+    { label: 'SEND', value: () => 'FX', lit: () => mixView === 'send', act: () => toggleMixView('send') },
+    { label: 'FILTR', value: () => (fxSecs[0].slot.bypass ? 'BYPASS' : 'ON'), lit: () => !fxSecs[0].slot.bypass, act: () => bypass(0) },
+    { label: 'SILNIKI', value: () => 'TYPY', lit: () => mixView === 'eng', act: () => toggleMixView('eng') },
+    { label: 'RND', value: () => 'LOSUJ', act: () => { engine.enabled.forEach((on, i) => { if (on) rnd(i); }); } },
   ],
   syn: [
-    { label: 'SILNIK', value: () => SHORT[synSel], act: () => { synSel = (synSel + 1) % 4; renderSyn(); } },
+    { label: 'SILNIK', value: () => typeName(synSel), act: () => { synSel = (synSel + 1) % 4; renderSyn(); } },
     { label: 'WIDOK', value: () => (synView === 0 ? 'SOUND' : 'ENV'), lit: () => synView === 1, act: () => { synView = 1 - synView; renderSyn(); } },
     { label: 'RND', value: () => 'LOSUJ', act: randomizeSyn },
     { label: 'SOLO', value: () => (engine.solo === synSel ? 'ON' : 'OFF'), lit: () => engine.solo === synSel, act: () => { engine.setSolo(engine.solo === synSel ? null : synSel); } },
@@ -485,7 +491,7 @@ function renderSyn() {
   const grid = el('syngrid'), holder = el('synstatic');
   [el('cutoff'), el('reso')].forEach((k) => holder.appendChild(k));            // wyjmij globalne pokrętła, zanim wyczyścimy siatkę
   grid.innerHTML = ''; Object.keys(synRefs).forEach((k) => delete synRefs[k]);
-  const i = synSel, pv = engine.voices[i].params, specs = PARAM_SPECS[i];
+  const i = synSel, pv = engine.voices[i].params, specs = PARAM_SPECS[engine.types[i]];
   const add = (sp) => { const k = synKnob(sp.label.toUpperCase(), sp.min, sp.max, sp.step, pv[sp.id], sp.def, (v) => engine.setParam(i, sp.id, v)); synRefs[sp.id] = k; grid.appendChild(k); };
   if (synView === 0) {
     specs.filter((x) => x.group !== 'env').forEach(add);
@@ -495,6 +501,30 @@ function renderSyn() {
 function randomizeSyn() {
   const vals = engine.randomizeVoice(synSel);
   for (const [id, v] of Object.entries(vals)) if (synRefs[id]) synRefs[id].value = v;
+}
+// ---------- strona MIX: pod-menu pod radarem ----------
+function toggleMixView(v) { mixView = mixView === v ? null : v; renderMix(); }
+function renderMix() {
+  const host = el('mixpage'), grid = el('mixgrid');
+  grid.innerHTML = '';
+  host.hidden = page !== 'mix' || !mixView;
+  if (host.hidden) return;
+  grid.className = mixView === 'eng' ? 'enggrid' : 'kgrid';
+  if (mixView === 'eq') {
+    ['LOW', 'MID', 'HIGH'].forEach((n, b) => grid.appendChild(synKnob(n, -12, 12, 0.5, engine.eq[b], 0, (v) => engine.setEq(b, v))));
+  } else if (mixView === 'send') {
+    // SEND na efekty: ilość sygnału kierowana do globalnego efektu (to samo, co MIX w sekcji EFEKT)
+    const sec = fxSecs[1], k = synKnob('SEND', 0, 1, 0.01, sec.slot.values[sec.slot.style].mix, 0, (v) => setFxParam(sec, 'mix', v));
+    grid.appendChild(k);
+  } else {
+    VOICE_NAMES.forEach((_, i) => {
+      const b = document.createElement('button');
+      b.className = 'engbtn';
+      b.innerHTML = `<span>${i + 1}</span><b>${typeName(i)}</b>`;
+      b.addEventListener('click', () => { engine.setType(i, (engine.types[i] + 1) % SHORT.length); renderMix(); if (synSel === i) renderSyn(); });
+      grid.appendChild(b);
+    });
+  }
 }
 // poziomy silników na stronie MIX
 VOICE_NAMES.forEach((n, i) => el(`lv${i}`).addEventListener('input', (e) => engine.setLevel(i, +e.target.value)));
@@ -541,6 +571,7 @@ function setPage(p) {
   el('knobs-seq').hidden = p !== 'seq';
   el('knobs-mix').hidden = true;                    // poziomy silników nie są potrzebne: zostają na 100%, bez pokręteł
   el('synpage').hidden = p !== 'syn';
+  renderMix();
   el('fxpage').hidden = p !== 'fx';
   if (p === 'syn') renderSyn();
   if (p === 'fx') showFxSection();
@@ -564,7 +595,7 @@ function updateInfo() {
     `SWING   ${Math.round(state.swing * 100)}%`,
     `BRG     ${String(brg).padStart(3, '0')}°`,
     `STEP    ${String(Math.floor(pos) + 1).padStart(2, '0')}`,
-    `ENG     ${engine.enabled.map((e, i) => (e ? SHORT[i][0] : '-')).join(' ')}`,
+    `ENG     ${engine.enabled.map((e, i) => (e ? typeName(i)[0] : '-')).join(' ')}`,
   ].join('\n');
 }
 setInterval(() => { if (!el('radar').hidden) updateInfo(); }, 120);
