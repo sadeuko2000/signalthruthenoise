@@ -91,7 +91,7 @@ class Voice {
     this.amp = ctx.createGain();
     this.amp.gain.value = 0;
     this.drv = ctx.createGain();                       // dosterowanie nasycenia
-    this.sat = ctx.createWaveShaper(); this.sat.curve = satCurve(satK);   // dokłada harmoniczne
+    this.sat = ctx.createWaveShaper(); this.sat.curve = satCurve(satK); this.sat.oversample = '4x';   // bez aliasingu   // dokłada harmoniczne
     this.amp.connect(this.drv).connect(this.sat).connect(this.out);
     this.params = defaultParams(this.constructor.specIndex);
   }
@@ -176,7 +176,7 @@ export class MS20Voice extends Voice {
     this.hp = ctx.createBiquadFilter(); this.hp.type = 'highpass'; this.hp.Q.value = 3;
     this.lp = ctx.createBiquadFilter(); this.lp.type = 'lowpass';
     this.pre = ctx.createGain();
-    const sh = ctx.createWaveShaper(); sh.curve = satCurve(3);
+    const sh = ctx.createWaveShaper(); sh.curve = satCurve(3); sh.oversample = '4x';
     this.o1.connect(this.g1).connect(this.hp); this.o2.connect(this.g2).connect(this.hp);
     this.hp.connect(this.lp).connect(this.pre).connect(sh).connect(this.amp);
     this.bodyOsc = ctx.createOscillator(); this.bodyOsc.type = 'sine';

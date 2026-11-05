@@ -7,7 +7,7 @@ export const MODES = {
 
 export const DEFAULTS = {
   length: 16, density: 0.6, syncopation: 0.5, accentBias: 0.5,
-  leapProb: 0.1, tieProb: 0.0, ratchetProb: 0.0, swing: 0.0, seed: 1,
+  leapProb: 0.1, tieProb: 0.12, ratchetProb: 0.0, swing: 0.0, seed: 1,
   root: 36, mode: 'minor',
 };
 
@@ -22,7 +22,7 @@ export function mulberry32(seed) {
   };
 }
 
-export const emptyStep = () => ({ on: false, degree: 0, octave: 0, vel: 90, gate: 0.35, tie: false, ratchet: 1 });
+export const emptyStep = () => ({ on: false, degree: 0, octave: 0, vel: 90, gate: 0.6, tie: false, ratchet: 1 });
 
 export function pitch(root, mode, degree, octave = 0) {
   const notes = MODES[mode];
@@ -61,7 +61,7 @@ export function generateBass(params = {}) {
     steps.push({
       on: true, degree: deg, octave: 0,
       vel: accent ? 120 : 70 + Math.floor(rVel * 26),
-      gate: accent ? 0.5 : 0.35,
+      gate: accent ? 0.85 : 0.6,
       tie: rTie < p.tieProb,
       ratchet: rRat < p.ratchetProb ? 2 : 1,
     });
@@ -77,7 +77,7 @@ export function mutate(pattern, rng = Math.random, kind) {
   const s = { ...pattern.steps[i] };
   if (kind === 'toggle') {
     s.on = !s.on;
-    if (s.on) { s.vel = 85; s.gate = 0.35; }
+    if (s.on) { s.vel = 85; s.gate = 0.6; }
   } else if (!s.on) {
     return pattern;
   } else if (kind === 'pitch') {
@@ -85,7 +85,7 @@ export function mutate(pattern, rng = Math.random, kind) {
   } else if (kind === 'accent') {
     s.vel = s.vel >= 110 ? 85 : 120;
   } else if (kind === 'gate') {
-    s.gate = [0.25, 0.35, 0.5, 0.75][Math.floor(rng() * 4)];
+    s.gate = [0.4, 0.6, 0.8, 0.95][Math.floor(rng() * 4)];
   }
   const steps = pattern.steps.slice();
   steps[i] = s;

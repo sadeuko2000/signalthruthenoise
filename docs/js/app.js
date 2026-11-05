@@ -36,7 +36,7 @@ function toggleStep(i) {
   const steps = pattern.steps.slice();
   const s = { ...steps[i] };
   s.on = !s.on;
-  if (s.on) { s.vel = 85; s.gate = 0.35; }
+  if (s.on) { s.vel = 85; s.gate = 0.6; }
   steps[i] = s;
   setPattern({ ...pattern, steps });
 }
@@ -71,6 +71,8 @@ function setPad(x, y) {
   engine.blend.forEach((w, i) => { corners[i].style.color = `rgba(57,255,176,${0.3 + 0.7 * w})`; });
 }
 $('density').addEventListener('input', (e) => { state.density = +e.target.value; regen(); });
+$('gate').addEventListener('input', (e) => { engine.gateMul = +e.target.value; });
+$('swing').addEventListener('input', (e) => { state.swing = +e.target.value; regen(); });
 $('cutoff').addEventListener('input', (e) => engine.setCutoff(cutoffHz(+e.target.value)));
 function padFromEvent(e) {
   const r = pad.getBoundingClientRect();

@@ -9,6 +9,7 @@ export class Engine {
   constructor() {
     this.ctx = null;
     this.bpm = 130;
+    this.gateMul = 1;      // mnożnik długości nut (suwak „długość nut”)
     // parametry wspólne dla wszystkich silników (silniki trzymają referencję do tego obiektu)
     this.p = { cutoff: 600, res: 12, bright: 0.35 };
     this.blend = [1, 0, 0, 0];
@@ -46,7 +47,7 @@ export class Engine {
     const clip = c.createWaveShaper();
     const cc = new Float32Array(2048), k = 1.3;
     for (let i = 0; i < cc.length; i++) cc[i] = Math.tanh(k * ((i / 2047) * 2 - 1)) / Math.tanh(k);
-    clip.curve = cc;
+    clip.curve = cc; clip.oversample = '4x';
     const outGain = c.createGain(); outGain.gain.value = 0.9;
     this.master.connect(comp).connect(makeup).connect(clip).connect(outGain).connect(c.destination);
 
@@ -148,7 +149,7 @@ export class Engine {
     const part = dur / r;
     for (let k = 0; k < r; k++) {
       const t0 = tt + k * part;
-      const len = r === 1 ? dur * s.gate : part * 0.5;
+      const len = r === 1 ? dur * Math.min(1, s.gate * this.gateMul) : part * 0.5;
       const slide = k === 0 && this.lastTied;
       const hold = tiedOut && k === r - 1;
       this.voices.forEach((v, vi) => { if (this.eff[vi] > 0.02) v.note(t0, freq, s.vel, accent, len, slide, hold); });
