@@ -450,8 +450,6 @@ const KEYS = {
     { label: 'SILNIK', value: () => typeName(synSel), act: () => { synSel = (synSel + 1) % 4; renderSyn(); } },
     { label: 'WIDOK', value: () => (synView === 0 ? 'SOUND' : 'ENV'), lit: () => synView === 1, act: () => { synView = 1 - synView; renderSyn(); } },
     { label: 'RND', value: () => 'LOSUJ', act: randomizeSyn },
-    { label: 'SOLO', value: () => (engine.solo === synSel ? 'ON' : 'OFF'), lit: () => engine.solo === synSel, act: () => { engine.setSolo(engine.solo === synSel ? null : synSel); } },
-    { label: 'STAN', value: () => (engine.enabled[synSel] ? 'ON' : 'OFF'), lit: () => !!engine.enabled[synSel], act: () => { engine.setEnabled(synSel, !engine.enabled[synSel]); } },
   ],
   fx: [
     { label: 'SEKCJA', value: () => (fxActive === 0 ? 'FILTR' : 'EFEKT'), act: () => { fxActive = 1 - fxActive; showFxSection(); } },
