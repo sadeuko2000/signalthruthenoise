@@ -11,9 +11,10 @@ const el = (id) => document.getElementById(id);
 initKnobs();
 
 const engine = new Engine();
-const state = { ...DEFAULTS, seed: (Math.random() * 1e9) | 0, length: 16, accent: 0.5, slide: 0.1 };
+const state = { ...DEFAULTS, seed: (Math.random() * 1e9) | 0, length: 16, accent: 0.5, slide: 0.1, oct: 0 };
 // Akcenty i ślizgi są ustawiane pokrętłami i nakładane na każdy wzór (nowy, edytowany, zmutowany), bez generowania go od nowa.
-const finalize = (p) => withSlide(withAccent(p, state.accent), state.slide);
+const effRoot = () => Math.max(12, Math.min(83, state.root + 12 * (state.oct || 0)));   // tonika + przesunięcie oktawowe z pokrętła OKTAWA (−2..+2)
+const finalize = (p) => withSlide(withAccent({ ...p, root: effRoot() }, state.accent), state.slide);
 let pattern = finalize(generateBass(state));
 engine.pattern = pattern;
 let page = 'seq';
@@ -357,6 +358,7 @@ el('gate').addEventListener('input', (e) => { engine.gateMul = +e.target.value; 
 el('accent').addEventListener('input', (e) => { state.accent = +e.target.value; pattern = finalize(pattern); engine.pattern = pattern; });
 el('slide').addEventListener('input', (e) => { state.slide = +e.target.value; pattern = finalize(pattern); engine.pattern = pattern; });
 // Swing zmienia tylko rytm (opóźnienie parzystych kroków), nuty zostają: wzór nie jest generowany od nowa.
+el('oct').addEventListener('input', (e) => { state.oct = Math.round(+e.target.value); pattern = finalize(pattern); engine.pattern = pattern; engine.audition({ degree: 0, octave: 0, vel: 100 }); });
 el('swing').addEventListener('input', (e) => { state.swing = +e.target.value; pattern = { ...pattern, swing: state.swing }; engine.pattern = pattern; });
 el('cutoff').addEventListener('input', (e) => engine.setCutoff(cutoffHz(+e.target.value)));
 el('reso').addEventListener('input', (e) => engine.setResonance(1 + e.target.value * 22));
@@ -368,13 +370,13 @@ const MODE_LABEL = { electro: 'ELEKTRO', phrygian: 'FRYG', minor: 'MOLL' };
 const MODE_SHORT = { electro: 'ELEK', phrygian: 'FRYG', minor: 'MOLL' };
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const ROOT_MIN = 24, ROOT_MAX = 59;                           // tonika od C1 do B3 (36 półtonów)
-const rootParts = () => ({ pc: state.root % 12, oct: Math.floor(state.root / 12) - 1 });
+const rootParts = () => ({ pc: effRoot() % 12, oct: Math.floor(effRoot() / 12) - 1 });
 const baseLabel = () => { const r = rootParts(); return `${NOTE_NAMES[r.pc]}${r.oct}`; };
 const wrapRoot = (r) => (r > ROOT_MAX ? r - 36 : r < ROOT_MIN ? r + 36 : r);   // zawijanie w całym zakresie, nuta zostaje
 // Zmiana nuty bazowej działa na żywo: wzór (stopnie skali) zostaje, zmienia się tylko wysokość toniki. Słychać ją od razu.
 function setRoot(r) {
   state.root = r;
-  pattern = { ...pattern, root: r }; engine.pattern = pattern;
+  pattern = finalize(pattern); engine.pattern = pattern;
   engine.audition({ degree: 0, octave: 0, vel: 100 });
 }
 const actions = {
@@ -383,7 +385,8 @@ const actions = {
   key: () => { state.mode = MODE_CYCLE[(MODE_CYCLE.indexOf(state.mode) + 1) % MODE_CYCLE.length]; pattern = { ...pattern, mode: state.mode }; engine.pattern = pattern; },
   // RANDOM: nowy wzór z losową gęstością i synkopą w rozsądnych granicach (swing i nuta bazowa zostają).
   random: () => { state.seed = (Math.random() * 1e9) | 0; state.density = between(0.3, 0.7); state.syncopation = between(0.25, 0.75); regen(); },
-  mut: () => { pattern = finalize(mutate(pattern)); engine.pattern = pattern; },
+  // MUTATE: losuje ustawienia syntezatorów (parametry i obwiednie włączonych silników, w rozsądnych granicach). Wzór nut zostaje.
+  mut: () => { engine.enabled.forEach((on, i) => { if (on) engine.randomizeVoice(i); }); if (page === 'syn') renderSyn(); },
 };
 let wake = null;
 async function lockScreen() { try { if ('wakeLock' in navigator && !wake) { wake = await navigator.wakeLock.request('screen'); wake.addEventListener('release', () => { wake = null; }); } } catch { /* odmowa */ } }
@@ -431,9 +434,8 @@ const short8 = (t) => (t.length > 8 ? `${t.slice(0, 7)}.` : t);       // napis w
 const KEYS = {
   seq: [
     { label: 'BASE/KEY', value: () => `${baseLabel()} ${MODE_SHORT[state.mode]}`, act: () => showKey(true) },
-    { label: 'OKTAWA', value: () => String(rootParts().oct), act: () => actions.octave(1), alt: () => actions.octave(-1) },
     { label: 'RANDOM', value: () => 'LOSUJ', act: actions.random },
-    { label: 'MUTATE', value: () => '1 KROK', act: actions.mut },
+    { label: 'MUTATE', value: () => 'SYNTH', act: actions.mut },
   ],
   mix: [
     ...VOICE_NAMES.map((n, i) => ({ label: SHORT[i], value: () => (engine.enabled[i] ? 'ON' : 'OFF'), lit: () => !!engine.enabled[i], act: () => { engine.setEnabled(i, !engine.enabled[i]); } })),

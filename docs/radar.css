@@ -98,3 +98,5 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .keyrow b{font-weight:400;font-size:34px;text-align:center;line-height:1}
 .keyrow button{min-height:56px;font-size:28px;border-left:1px solid var(--ink)}
 .keyrow button:last-child{border-left:1px solid var(--ink)}
+
+#knobs-seq{grid-template-columns:repeat(5,minmax(0,1fr))}
