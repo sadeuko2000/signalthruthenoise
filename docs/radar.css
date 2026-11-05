@@ -128,3 +128,8 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .modelcell{grid-row:span 2;display:grid;align-content:center;justify-items:start;gap:4px;padding:0 0 0 6px;text-align:left}
 .modelcell .cl{font-size:16px;letter-spacing:.08em;line-height:1}
 .modelcell b{font-weight:400;font-size:22px;letter-spacing:.06em;line-height:1}
+
+/* przyciski z ikonami (narzędzia wzoru): kontur w kolorze tuszu zamiast pomarańczowego wypełnienia */
+.cellbtn.ico button{display:grid;place-items:center;background:transparent;border:2px solid var(--ink);color:var(--ink);padding:0}
+.cellbtn.ico svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linejoin:miter;stroke-linecap:square}
+.cellbtn.ico button:active{background:var(--ink);color:var(--paper);transform:none}

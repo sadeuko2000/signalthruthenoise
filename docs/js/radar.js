@@ -575,10 +575,22 @@ function synKnob(label, min, max, step, value, def, onInput) {
   k.addEventListener('input', () => onInput(k.value));
   return k;
 }
+// Ikony przycisków narzędzi wzoru (zakładka SEQ): proste piktogramy w duchu OP-1 i Elektrona, siatka 24 px, kreska 2 px, ostre rogi.
+const ICONS = {
+  clear: '<rect x="4" y="4" width="16" height="16"/><path d="M8 8l8 8M16 8l-8 8"/>',
+  reverse: '<path d="M11 5v14L3 12z" fill="currentColor"/><path d="M21 5v14l-8-7z" fill="currentColor"/>',
+  invert: '<path d="M12 3l7 7H5z" fill="currentColor"/><path d="M12 21l-7-7h14z"/><path d="M2 12h20" stroke-dasharray="2 3"/>',
+  rotl: '<path d="M3 5h4v4H3zM10 5h4v4h-4zM17 5h4v4h-4z" fill="currentColor"/><path d="M20 17H5M9 13l-4 4 4 4"/>',
+  rotr: '<path d="M3 5h4v4H3zM10 5h4v4h-4zM17 5h4v4h-4z" fill="currentColor"/><path d="M4 17h15M15 13l4 4-4 4"/>',
+  double: '<rect x="3" y="8" width="12" height="12"/><rect x="9" y="4" width="12" height="12" fill="var(--paper)"/>',
+  half: '<rect x="3" y="6" width="18" height="12"/><rect x="3" y="6" width="9" height="12" fill="currentColor"/>',
+};
+const icon = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
+
 // Okrągły przycisk z nazwą nad nim. kind: 'act' (pomarańczowy, jednorazowy) albo 'tog' (zapalony = włączony).
-function cellButton(parent, { kind, label, on, act }) {
+function cellButton(parent, { kind, label, on, act, icon: ic }) {
   const c = document.createElement('div'), b = document.createElement('button'), l = document.createElement('span');
-  c.className = `cellbtn ${kind === 'tog' ? 'tog' : 'act'}`; l.className = 'cl'; c.appendChild(l); c.appendChild(b);
+  c.className = `cellbtn ${ic ? 'ico' : kind === 'tog' ? 'tog' : 'act'}`; if (ic) b.innerHTML = icon(ic); l.className = 'cl'; c.appendChild(l); c.appendChild(b);
   const refresh = () => { l.textContent = label(); b.setAttribute('aria-label', label()); if (kind === 'tog') c.classList.toggle('on', !!on()); };
   b.addEventListener('click', () => { act(); refresh(); commitSoon(); });
   refresh(); parent.appendChild(c); return c;
@@ -635,9 +647,9 @@ function renderPanel() {
       Kn('HUMAN', 0, 1, 0.01, engine.human, 0, (v) => { engine.human = v; });
       B({ kind: 'act', label: () => 'RANDOM', act: actions.random });
     } else if (tab === 1) {
-      const A = (name, fn) => B({ kind: 'act', label: () => name, act: actions.steps(fn) });
-      A('CLEAR', clearSteps); A('REVERSE', reverseSteps); A('INVERT', invertSteps); A('ROT ←', (st) => rotateSteps(st, -1)); A('ROT →', (st) => rotateSteps(st, 1));
-      A('DOUBLE', doubleSteps); A('HALF', halveSteps);
+      const A = (name, ic, fn) => B({ kind: 'act', icon: ic, label: () => name, act: actions.steps(fn) });
+      A('CLEAR', 'clear', clearSteps); A('REVERSE', 'reverse', reverseSteps); A('INVERT', 'invert', invertSteps); A('ROT ←', 'rotl', (st) => rotateSteps(st, -1)); A('ROT →', 'rotr', (st) => rotateSteps(st, 1));
+      A('DOUBLE', 'double', doubleSteps); A('HALF', 'half', halveSteps);
       Kn('GHOST', 0, 1, 0.01, engine.ghost, 0, (v) => { engine.ghost = v; });
       Sp(); B({ kind: 'act', label: () => 'RANDOM', act: actions.random });
     } else if (tab === 2) {
