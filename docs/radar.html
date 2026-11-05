@@ -19,7 +19,7 @@
       <button data-page="mix">MIX</button>
       <button data-page="fx">FX</button>
     </nav>
-    <div class="bpm"><button id="bpm-" aria-label="wolniej">−</button><b id="bpm">130</b><button id="bpm+" aria-label="szybciej">+</button></div>
+    <button id="bpm-open" class="bpmchip" aria-haspopup="dialog" aria-label="Tempo, otwórz ustawienie"><b id="bpm">130</b> BPM</button>
     <button id="play" class="play" aria-label="play / stop">▶</button>
   </header>
   <div class="info" id="info"></div>
@@ -43,6 +43,20 @@
   </main>
 
   <nav class="softkeys" id="softkeys" aria-label="Przyciski kontekstowe"></nav>
+
+  <div id="bpm-pop" class="pop" hidden role="dialog" aria-label="Tempo">
+    <div class="popcard">
+      <div class="poplabel">TEMPO</div>
+      <div class="popval"><b id="bpm-v">130</b><span>BPM</span></div>
+      <div class="poprow">
+        <button id="bpm-5" aria-label="o 5 wolniej">−5</button>
+        <button id="bpm-" aria-label="wolniej">−</button>
+        <button id="bpm+" aria-label="szybciej">+</button>
+        <button id="bpm+5" aria-label="o 5 szybciej">+5</button>
+      </div>
+      <button id="bpm-ok" class="popok">OK</button>
+    </div>
+  </div>
 </div>
 
 <div id="start">

@@ -3,9 +3,9 @@
 import { generateBass, mutate, DEFAULTS, withAccent, withSlide } from './generator.js';
 import { Engine } from './audio.js';
 import { VOICE_NAMES, clampToDisc } from './engines.js';
-import { FILTER_STYLES, FX_STYLES } from './fx.js';
+import { FILTER_STYLES, FX_STYLES, mapValues } from './fx.js';
 import { makeKnob, initKnobs } from './knob.js';
-import { TAU, DEG_MIN, DEG_MAX, R_OUT, degToR, rToDeg, angleOfStep, polar, stepFromAngle, sweepPos, echoAlpha, echoes, placeNote, clearNote, moveNote, resizeSteps } from './radargeo.js';
+import { TAU, DEG_MIN, DEG_MAX, R_OUT, degToR, rToDeg, angleOfStep, polar, stepFromAngle, sweepPos, echoAlpha, echoes, placeNote, clearNote, moveNote, resizeSteps, nFromR, rFromN, nFromTheta, thetaFromN, delayCopies, bandPass } from './radargeo.js';
 
 const el = (id) => document.getElementById(id);
 initKnobs();
@@ -17,10 +17,10 @@ const finalize = (p) => withSlide(withAccent(p, state.accent), state.slide);
 let pattern = finalize(generateBass(state));
 engine.pattern = pattern;
 let page = 'seq';
-const hup = false;                            // tryb H-UP usunięty z interfejsu (zawsze N-UP)
+let fxActive = 0, fxView = true;               // aktywna sekcja FX (0 filtr, 1 efekt) i podgląd działania efektu na ekranie
 const padPos = { x: 0.25, y: 0.75 };
 const cv = el('scope'), g = cv.getContext('2d');
-let lastStep = { i: 0, t: 0 }, heldPos = 0, lastRot = 0;
+let lastStep = { i: 0, t: 0 }, heldPos = 0;
 engine.onStep = (i, t) => { lastStep = { i, t }; };
 
 const GREEN = '125,255,90', AMBER = '255,207,74', WHITE = '230,255,220';
@@ -40,6 +40,8 @@ function curPos() {
 }
 
 // ---------- rysowanie ----------
+// Wszystkie strony (SEQ, MIX, FX) rysują na tym samym ekranie w tym samym miejscu i rozmiarze. Wspólny rdzeń to tło, pierścienie,
+// obrzeże z kreskami, przemiatająca linia z poświatą i echa wzoru; każda strona dokłada swoje elementy.
 function fit() {
   const r = cv.getBoundingClientRect(), d = Math.min(devicePixelRatio || 1, 2);
   const w = Math.max(1, Math.round(r.width * d));
@@ -52,119 +54,178 @@ function circle(cx, cy, r, stroke, lw, dash) {
   g.setLineDash(dash || []); g.lineWidth = lw; g.strokeStyle = stroke; g.stroke(); g.setLineDash([]);
 }
 const polarXY = (cx, cy, r, a) => [cx + Math.sin(a) * r, cy - Math.cos(a) * r];
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
-let touch = null;   // aktywny dotyk: { i, deg, x, y } do rysowania linii namiaru (EBL)
+let touch = null;   // aktywny dotyk na SEQ: { i, deg } do rysowania linii namiaru (EBL)
 
-function drawSeq() {
-  const W = cv.width, cx = W / 2, cy = W / 2, R = W / 2, dpr = W / Math.max(1, cv.clientWidth);
-  const n = pattern.steps.length, pos = curPos(), sw = (pos / n) * TAU;
-  const rot = touch && hup ? lastRot : hup ? -sw : 0;
-  lastRot = rot;
+const geo = () => { const W = cv.width; return { W, cx: W / 2, cy: W / 2, R: W / 2, dpr: W / Math.max(1, cv.clientWidth) }; };
+function sweepState() { const n = pattern.steps.length, pos = curPos(); return { n, pos, sw: (pos / n) * TAU }; }
 
-  // tło
+function drawBase(G, S) {
+  const { W, cx, cy, R, dpr } = G;
   const bg = g.createRadialGradient(cx, cy, 0, cx, cy, R);
   bg.addColorStop(0, '#07210f'); bg.addColorStop(1, '#020604');
   g.fillStyle = bg; g.fillRect(0, 0, W, W);
-
-  // pierścienie zakresu (bez opisów liczbowych)
+  // pierścienie zakresu (bez opisów liczbowych): co drugi stopień skali, oktawa i tonika mocniej
   for (let d = DEG_MIN; d <= DEG_MAX - 1; d++) {
-    if (d % 2 !== 0 && d !== 7) continue;                       // co drugi stopień; oktawa (7) osobno
+    if (d % 2 !== 0 && d !== 7) continue;
     circle(cx, cy, degToR(d) * R, d === 0 || d === 7 ? 'rgba(125,255,90,.4)' : 'rgba(125,255,90,.14)', dpr);
   }
   circle(cx, cy, R * (R_OUT + 0.075), 'rgba(125,255,90,.28)', dpr, [3 * dpr, 5 * dpr]);
-
-  // obrzeże: kreski kroków
+  // obrzeże: kreski kroków i bieżący krok
   circle(cx, cy, R * 0.985, 'rgba(125,255,90,.55)', 1.5 * dpr);
-  const hot = Math.floor(pos) % n;
+  const { n, pos } = S, hot = Math.floor(pos) % n;
   for (let k = 0; k < n * 4; k++) {
-    const a = (k / (n * 4)) * TAU + rot, major = k % 4 === 0;
+    const a = (k / (n * 4)) * TAU, major = k % 4 === 0;
     const [x0, y0] = polarXY(cx, cy, R * (major ? 0.935 : 0.96), a), [x1, y1] = polarXY(cx, cy, R * 0.985, a);
     g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1);
     g.strokeStyle = major ? 'rgba(125,255,90,.8)' : 'rgba(125,255,90,.35)'; g.lineWidth = dpr; g.stroke();
   }
-  // bieżący krok: wyraźniejsza, bursztynowa kreska na obrzeżu (zamiast numerów)
-  { const a = angleOfStep(hot, n) + rot, [x0, y0] = polarXY(cx, cy, R * 0.9, a), [x1, y1] = polarXY(cx, cy, R * 0.985, a);
+  { const a = angleOfStep(hot, n), [x0, y0] = polarXY(cx, cy, R * 0.9, a), [x1, y1] = polarXY(cx, cy, R * 0.985, a);
     g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.strokeStyle = `rgba(${AMBER},1)`; g.lineWidth = 3 * dpr; g.stroke(); }
-  // znacznik północy (krok 1)
-  { const a = rot, [x, y] = polarXY(cx, cy, R * 0.985, a), [x2, y2] = polarXY(cx, cy, R * 0.94, a - 0.045), [x3, y3] = polarXY(cx, cy, R * 0.94, a + 0.045);
+  { const [x, y] = polarXY(cx, cy, R * 0.985, 0), [x2, y2] = polarXY(cx, cy, R * 0.94, -0.045), [x3, y3] = polarXY(cx, cy, R * 0.94, 0.045);
     g.beginPath(); g.moveTo(x, y); g.lineTo(x2, y2); g.lineTo(x3, y3); g.closePath(); g.fillStyle = `rgba(${AMBER},1)`; g.fill(); }
-
   // poświata za linią (luminofor)
   for (let k = 0; k < 30; k++) {
-    const a = sw + rot - k * (TAU / 240) - Math.PI / 2;
+    const a = S.sw - k * (TAU / 240) - Math.PI / 2;
     g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, R * 0.93, a - TAU / 240, a); g.closePath();
     g.fillStyle = `rgba(${GREEN},${(0.2 * Math.pow(1 - k / 30, 2)).toFixed(3)})`; g.fill();
   }
+}
 
-  // echa
+// Jedno echo. o: r (promień w px zamiast wzorowego), da (przesunięcie kąta), lw (mnożnik grubości), col, noGlow.
+function drawEcho(G, e, alpha, o = {}) {
+  const { cx, cy, R, dpr } = G, a = clamp01(alpha);
+  if (a < 0.01) return;
+  const col = o.col || (e.accent ? AMBER : GREEN);
+  const a0 = e.a0 + (o.da || 0) - Math.PI / 2, rad = o.r ?? e.r * R, lw = e.w * dpr * (R / (170 * dpr)) * 0.9 * (o.lw || 1);
+  const fresh = a > 0.9 && !o.noGlow;
   g.lineCap = 'round';
-  for (const e of echoes(pattern.steps)) {
-    const alpha = echoAlpha(e.i, pos, n), col = e.accent ? AMBER : GREEN;
-    const a0 = e.a0 + rot - Math.PI / 2, lw = e.w * dpr * (R / (170 * dpr)) * 0.9;
-    const fresh = alpha > 0.9;
-    g.shadowColor = `rgba(${col},.9)`; g.shadowBlur = fresh ? 14 * dpr : alpha > 0.5 ? 6 * dpr : 0;
-    g.beginPath(); g.arc(cx, cy, e.r * R, a0, a0 + e.len);
-    g.strokeStyle = `rgba(${col},${alpha.toFixed(3)})`; g.lineWidth = lw; g.stroke();
-    if (fresh) { g.shadowBlur = 0; g.beginPath(); g.arc(cx, cy, e.r * R, a0, a0 + e.len); g.strokeStyle = `rgba(${WHITE},${((alpha - 0.9) * 8).toFixed(3)})`; g.lineWidth = lw * 0.45; g.stroke(); }
-  }
+  g.shadowColor = `rgba(${col},.9)`; g.shadowBlur = o.noGlow ? 0 : fresh ? 14 * dpr : a > 0.5 ? 6 * dpr : 0;
+  g.beginPath(); g.arc(cx, cy, rad, a0, a0 + e.len);
+  g.strokeStyle = `rgba(${col},${a.toFixed(3)})`; g.lineWidth = lw; g.stroke();
+  if (fresh) { g.shadowBlur = 0; g.beginPath(); g.arc(cx, cy, rad, a0, a0 + e.len); g.strokeStyle = `rgba(${WHITE},${((a - 0.9) * 8).toFixed(3)})`; g.lineWidth = lw * 0.45; g.stroke(); }
   g.shadowBlur = 0; g.lineCap = 'butt';
+}
 
-  // linia przemiatająca
-  const [lx, ly] = polarXY(cx, cy, R * 0.94, sw + rot);
+function drawSweepLine(G, S) {
+  const { cx, cy, R, dpr } = G, [lx, ly] = polarXY(cx, cy, R * 0.94, S.sw);
   g.shadowColor = `rgba(${GREEN},1)`; g.shadowBlur = 10 * dpr;
-  g.beginPath(); g.moveTo(cx, cy); g.lineTo(lx, ly); g.strokeStyle = `rgba(200,255,180,.95)`; g.lineWidth = 2 * dpr; g.stroke();
+  g.beginPath(); g.moveTo(cx, cy); g.lineTo(lx, ly); g.strokeStyle = 'rgba(200,255,180,.95)'; g.lineWidth = 2 * dpr; g.stroke();
   g.shadowBlur = 0;
+  circle(cx, cy, R * 0.035, 'rgba(200,255,180,.9)', 1.5 * dpr);
+}
 
+function drawSeq() {
+  const G = geo(), S = sweepState(), { cx, cy, R, dpr } = G;
+  drawBase(G, S);
+  for (const e of echoes(pattern.steps)) drawEcho(G, e, echoAlpha(e.i, S.pos, S.n));
+  drawSweepLine(G, S);
   // namiar dotyku (EBL): linia od środka i znacznik w punkcie dotyku
   if (touch) {
-    const a = angleOfStep(touch.i, n) + rot, r = degToR(touch.deg) * R;
-    const [tx, ty] = polarXY(cx, cy, R * 0.94, a), [mx, my] = polarXY(cx, cy, r, a);
+    const a = angleOfStep(touch.i, S.n), [tx, ty] = polarXY(cx, cy, R * 0.94, a), [mx, my] = polarXY(cx, cy, degToR(touch.deg) * R, a);
     g.setLineDash([4 * dpr, 4 * dpr]); g.beginPath(); g.moveTo(cx, cy); g.lineTo(tx, ty); g.strokeStyle = `rgba(${AMBER},.7)`; g.lineWidth = dpr; g.stroke(); g.setLineDash([]);
     g.beginPath(); g.arc(mx, my, 9 * dpr, 0, TAU); g.strokeStyle = `rgba(${AMBER},.95)`; g.lineWidth = 1.5 * dpr; g.stroke();
   }
-  // środek
-  circle(cx, cy, R * 0.035, 'rgba(200,255,180,.9)', 1.5 * dpr);
 }
 
 const PAD_ANCHORS = [[-1, 1], [1, 1], [-1, -1], [1, -1]].map(([a, b]) => [a * Math.SQRT1_2, b * Math.SQRT1_2]);
 const SHORT = ['PROPHET', 'MS-20', 'DX', 'WAVETBL'];
-function drawMix(ts) {
-  const W = cv.width, cx = W / 2, cy = W / 2, R = W / 2, dpr = W / Math.max(1, cv.clientWidth), Rp = R * 0.74;
-  const bg = g.createRadialGradient(cx, cy, 0, cx, cy, R);
-  bg.addColorStop(0, '#07210f'); bg.addColorStop(1, '#020604');
-  g.fillStyle = bg; g.fillRect(0, 0, W, W);
-  for (let k = 1; k <= 4; k++) circle(cx, cy, Rp * (k / 4), k === 4 ? 'rgba(125,255,90,.5)' : 'rgba(125,255,90,.2)', dpr);
-  g.strokeStyle = 'rgba(125,255,90,.15)'; g.lineWidth = dpr;
-  g.beginPath(); g.moveTo(cx - R * 0.97, cy); g.lineTo(cx + R * 0.97, cy); g.moveTo(cx, cy - R * 0.97); g.lineTo(cx, cy + R * 0.97); g.stroke();
-  // wolna linia przemiatająca dla klimatu
-  const a = ((ts / 4000) % 1) * TAU;
-  for (let k = 0; k < 24; k++) {
-    const b = a - k * (TAU / 200) - Math.PI / 2;
-    g.beginPath(); g.moveTo(cx, cy); g.arc(cx, cy, R * 0.97, b - TAU / 200, b); g.closePath();
-    g.fillStyle = `rgba(${GREEN},${(0.1 * Math.pow(1 - k / 24, 2)).toFixed(3)})`; g.fill();
-  }
+function drawMix() {
+  const G = geo(), S = sweepState(), { cx, cy, R, dpr } = G, Rp = R * R_OUT;
+  drawBase(G, S);
+  for (const e of echoes(pattern.steps)) drawEcho(G, e, echoAlpha(e.i, S.pos, S.n) * 0.3, { noGlow: true });   // wzór blado w tle
+  drawSweepLine(G, S);
   const mx = cx + (2 * padPos.x - 1) * Rp, my = cy - (2 * padPos.y - 1) * Rp;
   g.font = FONT(R * 0.055); g.textBaseline = 'middle';
   PAD_ANCHORS.forEach(([ax, ay], i) => {
     const x = cx + ax * Rp, y = cy - ay * Rp, w = engine.blend[i] || 0, on = engine.enabled[i];
     if (on) { g.beginPath(); g.moveTo(mx, my); g.lineTo(x, y); g.strokeStyle = `rgba(${AMBER},${(0.15 + 0.7 * w).toFixed(3)})`; g.lineWidth = (1 + 2 * w) * dpr; g.setLineDash([5 * dpr, 4 * dpr]); g.stroke(); g.setLineDash([]); }
-    const s = R * (0.04 + 0.03 * w);
+    const sz = R * (0.04 + 0.03 * w);
     g.save(); g.translate(x, y); g.rotate(Math.PI / 4);
-    g.strokeStyle = on ? `rgba(${GREEN},1)` : 'rgba(79,122,72,.8)'; g.lineWidth = 1.6 * dpr; g.strokeRect(-s, -s, 2 * s, 2 * s);
-    if (on) { g.fillStyle = `rgba(${GREEN},${(0.25 + 0.6 * w).toFixed(3)})`; g.fillRect(-s, -s, 2 * s, 2 * s); }
+    g.strokeStyle = on ? `rgba(${GREEN},1)` : 'rgba(79,122,72,.8)'; g.lineWidth = 1.6 * dpr; g.strokeRect(-sz, -sz, 2 * sz, 2 * sz);
+    if (on) { g.fillStyle = `rgba(${GREEN},${(0.25 + 0.6 * w).toFixed(3)})`; g.fillRect(-sz, -sz, 2 * sz, 2 * sz); }
     g.restore();
     g.textAlign = ax < 0 ? 'left' : 'right';
     g.fillStyle = on ? `rgba(${GREEN},.95)` : 'rgba(79,122,72,.9)';
     g.fillText(SHORT[i], ax < 0 ? cx - R * 0.97 : cx + R * 0.97, ay > 0 ? cy - R * 0.9 : cy + R * 0.9);
   });
-  // krzyżyk miksu
   g.strokeStyle = `rgba(${AMBER},1)`; g.lineWidth = 1.6 * dpr;
   g.beginPath(); g.arc(mx, my, R * 0.05, 0, TAU); g.moveTo(mx - R * 0.09, my); g.lineTo(mx + R * 0.09, my); g.moveTo(mx, my - R * 0.09); g.lineTo(mx, my + R * 0.09); g.stroke();
 }
 
+// ---------- FX na ekranie radarowym ----------
+// Dotyk ustawia dwa parametry aktywnego efektu naraz (odległość od środka i kąt). Nuty ze wzoru pokazują, jak efekt na nie działa:
+// filtr „maskuje” echa poza pasmem, delay dokłada kolejne powtórzenia, pogłos rozchodzi się falami od echa, chorus podwaja echa,
+// dystorsja spłaszcza je do pierścienia.
+const POLAR = {
+  0: [['cutoff', 'reso'], ['cutoff', 'mode'], ['lpCut', 'lpRes'], ['freq', 'feedback']],        // filtr: [odległość, kąt] dla stylów 0..3
+  1: [['feedback', 'time'], ['size', 'mix'], ['depth', 'rate'], ['drive', 'curve']],            // efekt
+};
+const polarIds = (j, si) => POLAR[j][si];
+
+function drawFx(ts) {
+  const G = geo(), S = sweepState(), { cx, cy, R, dpr } = G, { n, pos } = S;
+  drawBase(G, S);
+  const sec = fxSecs[fxActive], si = sec.slot.style, style = sec.styles[si], nv = sec.slot.values[si], m = mapValues(style, nv);
+  const mix = clamp01(m.mix ?? 1), on = fxView && !sec.slot.bypass;
+  const E = echoes(pattern.steps);
+  const base = (e, mul = 1, o = {}) => drawEcho(G, e, echoAlpha(e.i, pos, n) * mul, o);
+  const rp = (nn) => rFromN(nn) * R;
+  const ring = (r, glow, a = 1) => { g.shadowColor = `rgba(${AMBER},.9)`; g.shadowBlur = 8 * dpr; circle(cx, cy, r, `rgba(${AMBER},${a})`, (1.5 + glow * 5) * dpr); g.shadowBlur = 0; };
+
+  if (!on) E.forEach((e) => base(e));
+  else if (fxActive === 0) {
+    // filtr: promień = częstotliwość. Echa (wysokość dźwięku = promień) poza pasmem są przytłumione.
+    const soft = 0.14 * R, blend = (k) => (1 - mix) + mix * k;
+    let pass = () => 1, rings = [], glow = 0;
+    if (si === 0) { const c = rp(nv.cutoff); pass = (r) => bandPass(r, 0, c, soft); rings = [c]; glow = nv.reso; }
+    else if (si === 1) {
+      const c = rp(nv.cutoff), md = nv.mode, lp = Math.max(0, 1 - 2 * md), bp = 1 - Math.abs(2 * md - 1), hp = Math.max(0, 2 * md - 1);
+      pass = (r) => lp * bandPass(r, 0, c, soft) + bp * bandPass(r, c - 0.1 * R, c + 0.1 * R, soft) + hp * bandPass(r, c, 2 * R, soft);
+      rings = [c]; glow = 0.3;
+    } else if (si === 2) { let lo = rp(nv.hpCut), hi = rp(nv.lpCut); if (lo > hi) [lo, hi] = [hi, lo]; pass = (r) => bandPass(r, lo, hi, soft); rings = [lo, hi]; glow = nv.lpRes; }
+    else { const c = rp(nv.freq); for (let k = -2; k <= 2; k++) ring(c + k * 0.09 * R, 0, (1 - Math.abs(k) * 0.3) * (0.25 + 0.75 * nv.feedback)); }
+    E.forEach((e) => base(e, blend(pass(e.r * R))));
+    rings.forEach((r) => ring(r, glow));
+  } else if (si === 0) {                           // delay: kolejne, coraz cichsze powtórzenia echa o `time` kroków dalej
+    E.forEach((e) => base(e));
+    const copies = delayCopies(m.time, m.feedback, 4), f = 0.2 + 0.8 * mix;
+    E.forEach((e) => copies.forEach((c) => drawEcho(G, e, echoAlpha(e.i + c.shift, pos, n) * c.gain * f, { da: (c.shift / n) * TAU, noGlow: true, lw: 0.8, col: GREEN })));
+  } else if (si === 1) {                           // pogłos: fala rozchodzi się od echa po jego przemiataniu
+    E.forEach((e) => base(e));
+    const life = n * (0.25 + 0.5 * nv.size), f = 0.15 + 0.7 * mix;
+    E.forEach((e) => {
+      const delta = (((pos - e.i) % n) + n) % n;
+      if (delta > life) return;
+      const t = delta / life, a = e.a0 + e.len / 2 - Math.PI / 2;
+      circle(cx + Math.cos(a) * e.r * R, cy + Math.sin(a) * e.r * R, t * R * (0.12 + 0.5 * nv.size), `rgba(${GREEN},${((1 - t) * f).toFixed(3)})`, 1.2 * dpr);
+    });
+  } else if (si === 2) {                           // chorus: echa podwojone i lekko rozstrojone, wahające się z tempem LFO
+    const off = nv.depth * 0.07 * Math.sin((ts / 1000) * TAU * Math.min(m.rate, 4) * 0.5), f = 0.2 + 0.8 * mix;
+    E.forEach((e) => { base(e); base(e, 0.55 * f, { da: off, noGlow: true, lw: 0.85 }); base(e, 0.4 * f, { da: -off * 1.3, noGlow: true, lw: 0.85 }); });
+  } else {                                         // dystorsja: echa spłaszczone do pierścienia obcięcia (od miękkiej do „fold”)
+    const dr = nv.drive, rc = R * (R_OUT - 0.4 * dr), f = 0.25 + 0.75 * mix;
+    circle(cx, cy, rc, `rgba(${AMBER},.6)`, dpr, [4 * dpr, 4 * dpr]);
+    E.forEach((e) => {
+      base(e, 1 - 0.6 * f);
+      const r0 = e.r * R, r1 = r0 > rc ? (nv.curve > 0.5 ? rc - (r0 - rc) * 0.7 : rc) : r0;
+      base(e, f, { r: r1, lw: 1 + dr * 0.9, col: AMBER, noGlow: true });
+    });
+  }
+
+  drawSweepLine(G, S);
+  // kursor: pozycja = aktualne wartości dwóch sterowanych parametrów (zawsze zgodna z pokrętłami)
+  const ids = polarIds(fxActive, si), cr = rp(nv[ids[0]]), ca = thetaFromN(nv[ids[1]]);
+  const [bx, by] = polarXY(cx, cy, R * 0.94, ca), [kx, ky] = polarXY(cx, cy, cr, ca);
+  g.setLineDash([4 * dpr, 4 * dpr]); g.beginPath(); g.moveTo(cx, cy); g.lineTo(bx, by); g.strokeStyle = `rgba(${AMBER},.55)`; g.lineWidth = dpr; g.stroke(); g.setLineDash([]);
+  g.strokeStyle = `rgba(${AMBER},1)`; g.lineWidth = 1.6 * dpr;
+  g.beginPath(); g.arc(kx, ky, R * 0.045, 0, TAU); g.moveTo(kx - R * 0.08, ky); g.lineTo(kx + R * 0.08, ky); g.moveTo(kx, ky - R * 0.08); g.lineTo(kx, ky + R * 0.08); g.stroke();
+}
+
 let raf = 0;
 function loop(ts) {
-  if (!el('radar').hidden && page !== 'fx') { if (page === 'mix') drawMix(ts); else drawSeq(); }
+  if (!el('radar').hidden) { if (page === 'mix') drawMix(); else if (page === 'fx') drawFx(ts); else drawSeq(); }
   raf = requestAnimationFrame(loop);
 }
 
@@ -180,12 +241,20 @@ function setPad(x0, y0) {
   padPos.x = x; padPos.y = y;
   engine.setBlend(x, y);
 }
+function mixFrom(p) { const Rp = p.R * R_OUT; setPad((p.dx / Rp + 1) / 2, (-p.dy / Rp + 1) / 2); }
+// Ustawia parametr aktywnej sekcji FX i odświeża jego pokrętło.
+function setFxParam(sec, id, nn) { sec.slot.setParam(id, nn); const k = sec.refs[id]; if (k) k.value = nn; }
+function fxFrom(p) {
+  const sec = fxSecs[fxActive], ids = polarIds(fxActive, sec.slot.style);
+  setFxParam(sec, ids[0], nFromR(p.rn)); setFxParam(sec, ids[1], nFromTheta(p.theta));
+}
 cv.addEventListener('pointerdown', (e) => {
   const p = pointerPolar(e);
   cv.setPointerCapture(e.pointerId);
   if (page === 'mix') { drag = { mode: 'mix' }; mixFrom(p); return; }
+  if (page === 'fx') { drag = { mode: 'fx' }; fxFrom(p); return; }
   if (p.rn < 0.09 || p.rn > 0.98) return;
-  const n = pattern.steps.length, i = stepFromAngle(p.theta - lastRot, n), deg = rToDeg(p.rn);
+  const n = pattern.steps.length, i = stepFromAngle(p.theta, n), deg = rToDeg(p.rn);
   const st = pattern.steps[i];
   const grabbed = st.on && Math.abs(st.degree - deg) <= 1;
   drag = { mode: 'seq', i, deg, grabbed, moved: false };
@@ -197,8 +266,9 @@ cv.addEventListener('pointermove', (e) => {
   if (!drag) return;
   const p = pointerPolar(e);
   if (drag.mode === 'mix') { mixFrom(p); return; }
+  if (drag.mode === 'fx') { fxFrom(p); return; }
   if (p.rn < 0.09) return;
-  const n = pattern.steps.length, i = stepFromAngle(p.theta - lastRot, n), deg = rToDeg(Math.min(p.rn, 0.96));
+  const n = pattern.steps.length, i = stepFromAngle(p.theta, n), deg = rToDeg(Math.min(p.rn, 0.96));
   touch = { i, deg };
   if (i !== drag.i || deg !== drag.deg) {
     setSteps(moveNote(pattern.steps, drag.i, i, deg));
@@ -212,10 +282,6 @@ function endDrag() {
 }
 cv.addEventListener('pointerup', endDrag);
 cv.addEventListener('pointercancel', () => { drag = null; touch = null; });
-function mixFrom(p) {
-  const Rp = p.R * 0.74;
-  setPad((p.dx / Rp + 1) / 2, (-p.dy / Rp + 1) / 2);
-}
 
 // ---------- pokrętła ----------
 el('gate').addEventListener('input', (e) => { engine.gateMul = +e.target.value; });
@@ -258,9 +324,23 @@ function togglePlay() {
   el('play').textContent = engine.playing ? '■' : '▶';
   el('play').classList.toggle('on', engine.playing);
 }
-const setBpm = (v) => { engine.setBpm(Math.max(70, Math.min(180, v))); el('bpm').textContent = engine.bpm; };
-el('bpm-').addEventListener('click', () => setBpm(engine.bpm - 2));
-el('bpm+').addEventListener('click', () => setBpm(engine.bpm + 2));
+const setBpm = (v) => { engine.setBpm(Math.max(70, Math.min(180, Math.round(v)))); el('bpm').textContent = engine.bpm; el('bpm-v').textContent = engine.bpm; };
+// Tempo: na ekranie mały napis „xxx BPM”, po dotknięciu okienko z dużą wartością i przyciskami − / + (przytrzymanie powtarza).
+const bpmPop = el('bpm-pop');
+const showBpm = (on) => { bpmPop.hidden = !on; if (on) el('bpm-ok').focus(); };
+el('bpm-open').addEventListener('click', () => showBpm(true));
+el('bpm-ok').addEventListener('click', () => showBpm(false));
+bpmPop.addEventListener('pointerdown', (e) => { if (e.target === bpmPop) showBpm(false); });   // dotknięcie tła zamyka
+function holdRepeat(btn, step) {
+  let t = 0, iv = 0;
+  const stop = () => { clearTimeout(t); clearInterval(iv); };
+  btn.addEventListener('pointerdown', () => { setBpm(engine.bpm + step); t = setTimeout(() => { iv = setInterval(() => setBpm(engine.bpm + step), 70); }, 400); });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => btn.addEventListener(ev, stop));
+  btn.addEventListener('click', (e) => { if (e.detail === 0) setBpm(engine.bpm + step); });   // klawiatura (Enter / spacja)
+}
+holdRepeat(el('bpm-'), -1); holdRepeat(el('bpm+'), 1);
+el('bpm-5').addEventListener('click', () => setBpm(engine.bpm - 5));
+el('bpm+5').addEventListener('click', () => setBpm(engine.bpm + 5));
 el('play').addEventListener('click', togglePlay);
 
 // ---------- przyciski kontekstowe (zależne od strony) ----------
@@ -278,11 +358,11 @@ const KEYS = {
     { label: 'RND ENG', value: () => 'LOSUJ', act: () => { engine.enabled.forEach((on, i) => { if (on) rnd(i); }); } },
   ],
   fx: [
-    { label: 'FLT STYLE', value: () => FILTER_STYLES[engine.fx.filter.style].name.toUpperCase(), act: () => cycleStyle(0) },
-    { label: 'FX STYLE', value: () => FX_STYLES[engine.fx.fx.style].name.toUpperCase(), act: () => cycleStyle(1) },
-    { label: 'FLT', value: () => (engine.fx.filter.bypass ? 'BYPASS' : 'ON'), lit: () => !engine.fx.filter.bypass, act: () => bypass(0) },
-    { label: 'FX', value: () => (engine.fx.fx.bypass ? 'BYPASS' : 'ON'), lit: () => !engine.fx.fx.bypass, act: () => bypass(1) },
-    { label: 'RND', value: () => 'FLT+FX', act: () => { fxSecs.forEach((s) => s.randomize()); } },
+    { label: 'SEKCJA', value: () => (fxActive === 0 ? 'FILTR' : 'EFEKT'), act: () => { fxActive = 1 - fxActive; showFxSection(); } },
+    { label: 'STYLE', value: () => fxSecs[fxActive].styles[fxSecs[fxActive].slot.style].name.toUpperCase(), act: () => cycleStyle(fxActive) },
+    { label: 'STAN', value: () => (fxSecs[fxActive].slot.bypass ? 'BYPASS' : 'ON'), lit: () => !fxSecs[fxActive].slot.bypass, act: () => bypass(fxActive) },
+    { label: 'RND', value: () => 'LOSUJ', act: () => fxSecs[fxActive].randomize() },
+    { label: 'WIDOK', value: () => (fxView ? 'ON' : 'OFF'), lit: () => fxView, act: () => { fxView = !fxView; } },
   ],
 };
 function renderKeys() {
@@ -326,11 +406,13 @@ function buildFx() {
     render();
     fxSecs.push({
       slot, styles, sec, render,
+      get refs() { return refs; },
       randomize() { const v = slot.randomize(); for (const [id, n] of Object.entries(v)) refs[id].value = n; },
     });
     host.appendChild(sec);
   });
 }
+function showFxSection() { fxSecs.forEach((x, j) => { x.sec.hidden = j !== fxActive; }); }
 function cycleStyle(j) { const s = fxSecs[j]; s.slot.setStyle((s.slot.style + 1) % s.styles.length); s.render(); }
 function bypass(j) { const s = fxSecs[j]; s.slot.setBypass(!s.slot.bypass); s.sec.classList.toggle('off', s.slot.bypass); }
 
@@ -338,23 +420,29 @@ function bypass(j) { const s = fxSecs[j]; s.slot.setBypass(!s.slot.bypass); s.se
 function setPage(p) {
   page = p;
   document.querySelectorAll('#pages button').forEach((b) => b.classList.toggle('on', b.dataset.page === p));
-  el('scopewrap').hidden = p === 'fx';
+  el('scopewrap').hidden = false;
   el('side').hidden = p === 'fx';
   el('knobs-seq').hidden = p !== 'seq';
   el('knobs-mix').hidden = p !== 'mix';
   el('fxpage').hidden = p !== 'fx';
+  if (p === 'fx') showFxSection();
   fit(); renderKeys(); updateInfo();
 }
 document.querySelectorAll('#pages button').forEach((b) => b.addEventListener('click', () => setPage(b.dataset.page)));
 
 // ---------- odczyty ----------
+function fxInfo() {
+  const sec = fxSecs[fxActive], st = sec.styles[sec.slot.style], ids = polarIds(fxActive, sec.slot.style);
+  const lab = (id) => st.params.find((x) => x.id === id).label.toUpperCase();
+  return ['FX', fxActive === 0 ? 'FILTR' : 'EFEKT', st.name.toUpperCase(), `R:${lab(ids[0])}`, `∠:${lab(ids[1])}`];
+}
 function updateInfo() {
   const n = pattern.steps.length, pos = curPos(), brg = Math.floor((pos / n) * 360) % 360;
   const on = pattern.steps.filter((s) => s.on), acc = on.filter((s) => s.vel >= 110).length;
   const info = page === 'seq'
     ? [`SEQ ${n}ST`, `BASE ${baseLabel()}`, MODE_LABEL[state.mode], `BRG ${String(brg).padStart(3, '0')}°`]
     : page === 'mix' ? ['MIX', `X ${(padPos.x * 100) | 0}`, `Y ${(padPos.y * 100) | 0}`, `FLT ${(cutoffHz(+el('cutoff').value) | 0)} Hz`]
-      : ['FX', `FLT ${FILTER_STYLES[engine.fx.filter.style].name.toUpperCase()}`, `FX ${FX_STYLES[engine.fx.fx.style].name.toUpperCase()}`];
+      : fxInfo();
   el('info').innerHTML = info.map((t, i) => `<span${i === 0 ? ' class="amb"' : ''}>${t}</span>`).join('');
   el('readout').textContent = [
     'RADARXXX', '',
@@ -376,6 +464,7 @@ setInterval(() => { if (!el('radar').hidden) updateInfo(); }, 120);
 // ---------- skróty (komputer) ----------
 window.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey || el('radar').hidden || (e.target instanceof HTMLElement && e.target.classList.contains('knob'))) return;
+  if (!bpmPop.hidden) { if (e.code === 'Escape') { e.preventDefault(); showBpm(false); } else if (e.code === 'ArrowUp') { e.preventDefault(); setBpm(engine.bpm + 1); } else if (e.code === 'ArrowDown') { e.preventDefault(); setBpm(engine.bpm - 1); } return; }
   const map = { Space: togglePlay, KeyR: () => { actions.random(); renderKeys(); }, KeyM: () => { actions.mut(); },
     Digit1: () => setPage('seq'), Digit2: () => setPage('mix'), Digit3: () => setPage('fx'),
     ArrowUp: () => setBpm(engine.bpm + 2), ArrowDown: () => setBpm(engine.bpm - 2) };

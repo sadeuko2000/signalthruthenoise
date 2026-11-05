@@ -97,3 +97,28 @@ export function resizeSteps(steps, n) {
   if (n < steps.length) return steps.slice(0, n);
   return Array.from({ length: n }, (_, i) => ({ ...steps[i % steps.length] }));
 }
+
+// ---------- sterowanie efektami na ekranie (strona FX) ----------
+// Pozycja dotyku na ekranie to dwa parametry naraz: odległość od środka = pierwszy (0..1), kąt od góry = drugi (0..1).
+export const nFromR = (rn) => clampN((rn - R_IN) / (R_OUT - R_IN), 0, 1);
+export const rFromN = (n) => R_IN + clampN(n, 0, 1) * (R_OUT - R_IN);
+export const nFromTheta = (theta) => clampN(theta / TAU, 0, 1);
+export const thetaFromN = (n) => clampN(n, 0, 1) * TAU;
+
+// Kopie echa dla delaya: każde kolejne powtórzenie leży o `timeSteps` kroków dalej i jest cichsze o `feedback`.
+// Powtórzenia ciszej niż 4% są pomijane. Zwraca przesunięcie w krokach i wzmocnienie.
+export function delayCopies(timeSteps, feedback, count = 4) {
+  const out = [];
+  for (let k = 1; k <= count; k++) {
+    const gain = Math.pow(clampN(feedback, 0, 0.98), k);
+    if (gain < 0.04) break;
+    out.push({ shift: k * timeSteps, gain });
+  }
+  return out;
+}
+
+// Maska pasma: 1 wewnątrz [lo, hi], poza nim szybko gaśnie do 0,1 na odległości `soft` (w tych samych jednostkach co r).
+export function bandPass(r, lo, hi, soft) {
+  const d = r < lo ? lo - r : r > hi ? r - hi : 0;
+  return 0.1 + 0.9 * Math.max(0, 1 - d / soft);
+}

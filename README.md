@@ -25,8 +25,10 @@ zainspirowany radarem morskim:
   (kąt = krok, odległość od środka = wysokość dźwięku), które gasną jak luminofor. Dotknięcie dodaje echo, przeciągnięcie je przesuwa,
   dotknięcie istniejącego usuwa. Przyciski kontekstowe: BASE (nuta bazowa, tap = +1 półton, przytrzymanie = −1), OKTAWA (tap = w górę, przytrzymanie = w dół),
   KEY (elektro / frygijska / moll), RANDOM, MUTATE. Zmiana nuty bazowej, oktawy i tonacji nie kasuje wzoru.
-- **MIX:** cztery silniki jako cele na obwodzie, krzyżyk to punkt miksu.
-- **FX:** filtr i efekty (4 style po 8 parametrów).
+- **MIX:** cztery silniki jako cele na obwodzie, krzyżyk to punkt miksu; wzór blado w tle.
+- Wszystkie trzy strony (SEQ, MIX, FX) rysują na tym samym ekranie, w tym samym miejscu i rozmiarze, z jedną wspólną przemiatającą linią (tempo skanowania wynika z BPM i długości wzoru).
+- Tempo: mały napis „xxx BPM” w nagłówku, po dotknięciu okienko z dużą wartością i przyciskami −5 / − / + / +5.
+- **FX:** filtr i efekty (4 style po 8 parametrów), jedna sekcja naraz (przycisk SEKCJA). Dotyk w ekran ustawia dwa parametry naraz (odległość od środka i kąt), a nuty ze wzoru pokazują działanie efektu: filtr maskuje echa poza pasmem, delay dokłada powtórzenia, pogłos rozchodzi się falami, chorus podwaja echa, dystorsja spłaszcza je do pierścienia.
 - Pokrętła **ACCENT** (ile mocnych nut dostaje akcent) i **SLIDE** (ile ślizgów między sąsiednimi nutami o różnej wysokości) działają na żywo na wzorze, bez generowania go od nowa; RANDOM i edycja je zachowują.
 - Wzór generuje przycisk RANDOM (losowa gęstość i synkopa w rozsądnych granicach). SWING, KEY, BASE i OKTAWA zmieniają tylko rytm, tonację i wysokość toniki, nie kasują nut.
 - Dolny rząd przycisków kontekstowych zmienia się zależnie od strony. Geometria jest w `docs/js/radargeo.js` (testowana).

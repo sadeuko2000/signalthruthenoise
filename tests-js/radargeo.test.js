@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TAU, degToR, rToDeg, polar, stepFromAngle, sweepPos, echoAlpha, echoes, placeNote, clearNote, moveNote, resizeSteps, R_IN, R_OUT, DEG_MIN, DEG_MAX } from '../docs/js/radargeo.js';
+import { TAU, degToR, rToDeg, polar, stepFromAngle, sweepPos, echoAlpha, echoes, placeNote, clearNote, moveNote, resizeSteps, nFromR, rFromN, nFromTheta, thetaFromN, delayCopies, bandPass, R_IN, R_OUT, DEG_MIN, DEG_MAX } from '../docs/js/radargeo.js';
 
 const near = (a, b, e = 1e-9) => assert.ok(Math.abs(a - b) < e, `${a} != ${b}`);
 
@@ -84,4 +84,27 @@ test('skala promienia jest rosnąca, a pierwsza oktawa dostaje więcej miejsca n
   assert.ok(first > second * 1.05, `${first} ${second}`);
   assert.equal(rToDeg(degToR(0) + 0.005), 0);            // dokładność odczytu z dotyku w pobliżu toniki
   assert.equal(rToDeg(degToR(1) - 0.005), 1);
+});
+
+test('dotyk -> parametry efektu: odległość i kąt są odwracalne i obcinane do 0..1', () => {
+  for (const n of [0, 0.25, 0.5, 0.75, 1]) { near(nFromR(rFromN(n)), n); near(nFromTheta(thetaFromN(n)), n); }
+  assert.equal(nFromR(0), 0); assert.equal(nFromR(5), 1);
+  assert.equal(nFromTheta(0), 0); near(nFromTheta(TAU / 2), 0.5);
+  assert.ok(rFromN(0) >= R_IN && rFromN(1) <= R_OUT + 1e-9);
+});
+
+test('kopie delaya: kolejne powtórzenia dalej i cichsze, zanikają przy małym feedbacku', () => {
+  const c = delayCopies(3, 0.5);
+  assert.deepEqual(c.map((x) => x.shift), [3, 6, 9, 12]);
+  for (let i = 1; i < c.length; i++) assert.ok(c[i].gain < c[i - 1].gain);
+  near(c[0].gain, 0.5);
+  assert.equal(delayCopies(2, 0.1).length, 1);          // 0,1^2 = 0,01 < 0,04
+  assert.equal(delayCopies(2, 0).length, 0);
+});
+
+test('maska pasma: 1 w środku, gaśnie poza pasmem, nigdy poniżej 0,1', () => {
+  assert.equal(bandPass(0.5, 0.4, 0.6, 0.1), 1);
+  assert.ok(bandPass(0.65, 0.4, 0.6, 0.1) < 1 && bandPass(0.65, 0.4, 0.6, 0.1) > 0.1);
+  assert.ok(bandPass(0.3, 0.4, 0.6, 0.1) < bandPass(0.35, 0.4, 0.6, 0.1));
+  assert.equal(bandPass(2, 0.4, 0.6, 0.1), 0.1);
 });

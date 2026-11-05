@@ -12,14 +12,13 @@ button{font:inherit;color:inherit;background:var(--panel);border:1px solid var(-
 button:active{filter:brightness(1.6)}
 button:focus-visible,.knob:focus-visible{outline:2px solid var(--g);outline-offset:2px}
 
-#radar{display:flex;flex-direction:column;height:100dvh;max-width:430px;margin:0 auto}
+#radar{position:relative;display:flex;flex-direction:column;height:100dvh;max-width:430px;margin:0 auto}
 .bar{display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top,0px) + 8px) max(16px,env(safe-area-inset-right,0px)) 6px max(16px,env(safe-area-inset-left,0px))}
 .pages{display:flex;gap:4px;flex:1}
 .pages button{min-width:48px;min-height:46px;padding:0 8px;color:var(--dim)}
 .pages button.on{color:var(--bg);background:var(--g);border-color:var(--g);font-weight:700}
-.bpm{display:flex;align-items:center;gap:4px}
-.bpm button{width:46px;height:46px;padding:0;font-size:18px}
-.bpm b{min-width:3.2ch;text-align:center;font-size:20px;font-weight:400;color:var(--g)}
+.bpmchip{min-width:64px;min-height:46px;padding:0 10px;font-size:11px;letter-spacing:.14em;color:var(--dim);background:transparent;border-color:var(--line);white-space:nowrap}
+.bpmchip b{font-weight:400;font-size:14px;color:var(--g);letter-spacing:.04em;margin-right:2px}
 .play{width:56px;height:46px;font-size:18px;color:var(--g);border-color:var(--gd)}
 .play.on{background:var(--g);color:var(--bg)}
 .info{padding:0 max(16px,env(safe-area-inset-right,0px)) 6px max(16px,env(safe-area-inset-left,0px));font-size:12px;letter-spacing:.08em;color:var(--g);display:flex;gap:14px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:6px}
@@ -28,7 +27,7 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--g);outline-offs
 
 .stage{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:10px max(16px,env(safe-area-inset-right,0px)) 12px max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:10px}
 .scopewrap{display:grid;place-items:center}
-#scope{display:block;width:min(100%,calc(100dvh - 330px));min-width:240px;aspect-ratio:1;touch-action:none;cursor:crosshair;border-radius:50%}
+#scope{display:block;width:min(100%,360px);min-width:240px;aspect-ratio:1;touch-action:none;cursor:crosshair;border-radius:50%}
 .side{display:flex;flex-direction:column;gap:8px}
 #readout{margin:0;font:inherit;font-size:12px;line-height:1.55;color:var(--txt);white-space:pre;display:none}
 
@@ -47,8 +46,9 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--g);outline-offs
 
 /* strona FX */
 #fxpage{display:grid;gap:14px}
-.fxsec{border:1px solid var(--line);border-radius:8px;padding:10px;background:var(--panel)}
-.fxsec h2{margin:0 0 8px;font-size:12px;font-weight:400;letter-spacing:.14em;color:var(--g);display:flex;justify-content:space-between;gap:8px}
+.fxsec{border:1px solid var(--line);border-radius:8px;padding:6px 10px 8px;background:var(--panel)}
+#fxpage .knob{--ks:40px}
+.fxsec h2{margin:0 0 4px;font-size:12px;font-weight:400;letter-spacing:.14em;color:var(--g);display:flex;justify-content:space-between;gap:8px}
 .fxsec h2 b{font-weight:400;color:var(--amber)}
 .fxsec.off{opacity:.45}
 .kgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px 6px}
@@ -79,3 +79,15 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--g);outline-offs
   body{display:grid;place-items:center}
   #radar{height:clamp(680px,100dvh,745px);aspect-ratio:920/1594;width:auto;max-width:none;margin:0;border:1px solid var(--line);border-radius:24px;overflow:hidden;background:var(--bg)}
 }
+
+/* okienko tempa */
+.pop{position:absolute;inset:0;z-index:30;display:grid;place-items:center;background:rgba(0,4,2,.72)}
+.popcard{width:min(86%,320px);padding:18px 16px 16px;border:1px solid var(--gd);border-radius:14px;background:#04100a;display:grid;gap:12px;justify-items:center}
+.poplabel{font-size:11px;letter-spacing:.2em;color:var(--dim)}
+.popval{display:flex;align-items:baseline;gap:8px}
+.popval b{font-weight:400;font-size:56px;line-height:1;color:var(--g);font-variant-numeric:tabular-nums}
+.popval span{font-size:12px;letter-spacing:.16em;color:var(--dim)}
+.poprow{display:grid;grid-template-columns:1fr 1.3fr 1.3fr 1fr;gap:8px;width:100%}
+.poprow button{min-height:56px;font-size:22px;padding:0;color:var(--g)}
+.poprow button:nth-child(1),.poprow button:nth-child(4){font-size:14px;color:var(--txt)}
+.popok{width:100%;min-height:48px;background:var(--g);color:var(--bg);border-color:var(--g);font-weight:700;letter-spacing:.2em}
