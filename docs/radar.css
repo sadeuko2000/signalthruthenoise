@@ -21,11 +21,11 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .tabs4 button.on{background:var(--ink);color:var(--paper)}
 .play{width:34px;height:30px;display:grid;place-items:center;background:transparent;color:var(--ink);font-size:16px}
 
-.stage{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:16px max(16px,env(safe-area-inset-right,0px)) 28px max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;justify-content:space-between;gap:10px}
+.stage{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:16px max(16px,env(safe-area-inset-right,0px)) 28px max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;justify-content:flex-start;gap:10px}
 .scopewrap{display:grid;place-items:center}
 #scope{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
-.scopebox{position:relative;width:min(100%,340px);min-width:240px;aspect-ratio:1}
-@supports (width:1cqh){.scopebox{width:min(100%,340px,max(240px,calc(100cqh - 423px)))}}
+.scopebox{position:relative;width:min(100%,380px);min-width:240px;aspect-ratio:1}
+@supports (width:1cqh){.scopebox{width:min(100%,380px,max(240px,calc(100cqh - 394px)))}}
 .side{display:flex;flex-direction:column;gap:8px}
 #readout{margin:0;font:inherit;font-size:14px;line-height:1.3;white-space:pre;display:none}
 
@@ -88,9 +88,10 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .subtabs button{min-height:28px;font-size:20px;letter-spacing:.08em;border-right:1px solid var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
 .subtabs button:last-child{border-right:0}
 .subtabs button.on{background:var(--ink);color:var(--paper)}
-.panel{display:grid;gap:4px;padding-top:8px;min-height:184px;align-content:start}
+.panel{display:grid;gap:4px;padding-top:8px;align-content:start}
 .subtabs.five button{letter-spacing:.06em}
 .pgrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-auto-rows:63px;row-gap:4px}
+@supports (height:1cqh){.pgrid{grid-auto-rows:clamp(58px,calc(63px + (100cqh - 780px) * .25),84px)}.pgrid .knob{--ks:clamp(40px,calc(40px + (100cqh - 780px) * .2),54px)}}
 .pgrid .knob{--ks:40px}
 .cellbtn{display:grid;justify-items:center;align-content:start;gap:3px;padding:2px;min-width:0}
 .cellbtn .cl{order:-1;font-size:16px;letter-spacing:.08em;line-height:1;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
@@ -137,7 +138,7 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 /* tryb ENCODER / CONTROLLER */
 .moderow{display:flex;justify-content:space-between;align-items:center;height:22px;font-size:20px;letter-spacing:.1em;line-height:1}
 .moderow button{font-size:20px;letter-spacing:.1em;padding:0}
-.moderow button:nth-child(2):not(:last-child){color:var(--acc)}
+.moderow .rnd{color:var(--acc)}
 .moderow.off{visibility:hidden}
 .ctlwrap{display:grid;grid-template-columns:1fr 1fr;gap:24px;height:130px}
 .cbox{position:relative;border:1px solid var(--ink);height:130px;touch-action:none;user-select:none;overflow:hidden}
@@ -185,7 +186,7 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 @media (max-height:700px){
   .stage{padding-top:8px;padding-bottom:10px;gap:6px}
   .scopebox{min-width:190px}
-  @supports (width:1cqh){.scopebox{width:min(100%,340px,max(190px,calc(100cqh - 423px)))}}
+  @supports (width:1cqh){.scopebox{width:min(100%,340px,max(190px,calc(100cqh - 394px)))}}
   .bar{margin-bottom:calc(env(safe-area-inset-bottom,0px) + 10px)}
   .pgrid{grid-auto-rows:58px}
   .head{padding-top:calc(env(safe-area-inset-top,0px) + 6px);padding-bottom:4px}

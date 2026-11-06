@@ -907,32 +907,22 @@ const FX_NAMES = ['FLT', 'FX1', 'FX2'];
 const PERMS = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
 const routeText = () => `ROUTING:${engine.fx.order.map((i) => FX_NAMES[i]).join('-')}`;
 function moderow() {
-  const ctl = isCtl(), fxp = page === 'fx', asg = isAssign(), on = fxp || ctl || asg;
-  const r = document.createElement('div'); r.className = `moderow${on ? '' : ' off'}`;
-  const m = document.createElement('button'), e = document.createElement('button');
-  let rnd = null;
-  e.textContent = 'EDIT';
+  // wiersz tylko tam, gdzie ma pracę: CTRL (powrót do pokręteł + RANDOM) i FX (kolejność efektów); reszta zakładek ma same pokrętła
+  const ctl = isCtl(), fxp = page === 'fx';
+  if (!ctl && !fxp) return null;
+  const r = document.createElement('div'), m = document.createElement('button'); r.className = 'moderow';
+  r.appendChild(m);
   if (ctl) {
-    // zakładka CTRL: napis MODE:CONTROLLER (dotknięcie wraca na MAIN), RANDOM losuje przypisania, EDIT otwiera przypisania kontrolerów
     m.textContent = 'MODE:CONTROLLER'; m.setAttribute('aria-label', 'Wróć do pokręteł');
     m.addEventListener('click', () => { tabSel[page] = 0; renderSub(); renderPanel(); });
-    rnd = document.createElement('button'); rnd.textContent = 'RANDOM'; rnd.setAttribute('aria-label', 'Losuj przypisania kontrolerów');
+    const rnd = document.createElement('button'); rnd.className = 'rnd'; rnd.textContent = 'RANDOM'; rnd.setAttribute('aria-label', 'Losuj przypisania kontrolerów');
     rnd.addEventListener('click', () => { randomizeCtrl(); renderPanel(); commitSoon(); toast('LOSOWO PRZYPISANO'); });
-    e.addEventListener('click', () => showCtl(true));
-  } else if (fxp) {
-    // strona FX: kolejność sekcji w łańcuchu; dotknięcie napisu przełącza kolejne układy, EDIT otwiera okienko (na MAIN także przypisania)
+    r.appendChild(rnd);
+  } else {
     m.textContent = routeText(); m.setAttribute('aria-label', 'Zmień kolejność efektów');
     m.addEventListener('click', () => { const k = PERMS.findIndex((p) => p.join() === engine.fx.order.join()); engine.fx.route(PERMS[(k + 1) % PERMS.length]); m.textContent = routeText(); commitSoon(); });
-    e.addEventListener('click', () => showCtl(true, 'route'));
-  } else {
-    // przypisywalna zakładka: MODE przełącza 10 pokręteł (ENCODER) i 10 suwaków (SLIDER)
-    const kind = asg ? getAssign().kind : 'knob';
-    m.textContent = `MODE:${kind === 'slider' ? 'SLIDER' : 'ENCODER'}`; m.setAttribute('aria-label', 'Przełącz pokrętła i suwaki');
-    m.addEventListener('click', () => { const a = getAssign(); a.kind = a.kind === 'slider' ? 'knob' : 'slider'; saveAssign(); renderPanel(); commitSoon(); });
-    e.addEventListener('click', () => showCtl(true, 'assign'));
   }
-  if (!on) { m.tabIndex = -1; e.tabIndex = -1; }
-  r.appendChild(m); if (rnd) r.appendChild(rnd); r.appendChild(e); return r;
+  return r;
 }
 // ============================================================================
 // Przypisywalne zakładki (SEQ MAIN, SEQ EXTRA, MIX MAIN, SYN MAIN, FX MAIN): dziesięć miejsc, każde ma wybrany parametr albo przycisk.
@@ -954,7 +944,7 @@ const assignKey = () => `${page}:${tabSel[page]}`;
 const isAssign = () => ASSIGN_DEFAULT[assignKey()] !== undefined;
 const getAssign = () => {
   const k = assignKey(), cur = assign[k], def = ASSIGN_DEFAULT[k];
-  if (!cur || !Array.isArray(cur.slots) || cur.slots.length !== 10) assign[k] = { kind: 'knob', slots: def.slice() };
+  if (!cur || !Array.isArray(cur.slots) || cur.slots.length !== 10) assign[k] = { slots: def.slice() };
   return assign[k];
 };
 const resetAssign = () => { delete assign[assignKey()]; saveAssign(); };
@@ -976,29 +966,15 @@ function syncAssign() {
 }
 function renderAssign() {
   const a = getAssign(), grid = document.createElement('div'); assignRefs.length = 0;
-  if (a.kind === 'slider') {
-    grid.className = 'sliderrow';
-    a.slots.forEach((id) => {
-      if (!id) { const e0 = document.createElement('div'); e0.className = 'vs empty'; grid.appendChild(e0); return; }
-      if (SW[id]) {
-        const w = document.createElement('div'); w.className = 'vs vsw'; w.innerHTML = '<button class="vsb"></button><span class="vl"></span>';
-        const b = w.querySelector('.vsb'), l = w.querySelector('.vl'); const upd = () => { l.innerHTML = ''; const parts = nameOfSW(id).split(' '); l.appendChild(document.createTextNode(parts[0])); if (parts.length > 1) { l.appendChild(document.createElement('br')); l.appendChild(document.createTextNode(parts.slice(1).join(' '))); } b.classList.toggle('lit', !!SW[id][1]()); }; upd();
-        b.addEventListener('click', () => { SW[id][2](); upd(); commitSoon(); }); grid.appendChild(w); return;
-      }
-      const sl = vSlider({ label: knobLabel(nameOfC(id)), value: CONTG[id] ? clamp01(CONTG[id]()) : 0, onInput: (v) => { CONT[id][1](v); }, compact: true });
-      assignRefs.push({ id, el: sl, kind: 'slider' }); grid.appendChild(sl);
-    });
-  } else {
-    grid.className = 'pgrid';
-    a.slots.forEach((id) => {
-      if (!id) { spacer(grid); return; }
-      if (SW[id]) { cellButton(grid, { kind: TOGGLES.has(id) ? 'tog' : 'act', label: () => knobLabel(nameOfSW(id)), on: () => !!SW[id][1](), act: () => SW[id][2]() }); return; }
-      const step = CSTEP[id] || 0.001, k = document.createElement('div');
-      makeKnob(k, { label: knobLabel(nameOfC(id)), min: 0, max: 1, step, value: CONTG[id] ? clamp01(CONTG[id]()) : 0, def: CONTG[id] ? clamp01(CONTG[id]()) : 0, fmt: 'pct' });
-      k.addEventListener('input', () => CONT[id][1](k.value));
-      assignRefs.push({ id, el: k, kind: 'knob' }); grid.appendChild(k);
-    });
-  }
+  grid.className = 'pgrid';
+  a.slots.forEach((id) => {
+    if (!id) { spacer(grid); return; }
+    if (SW[id]) { cellButton(grid, { kind: TOGGLES.has(id) ? 'tog' : 'act', label: () => knobLabel(nameOfSW(id)), on: () => !!SW[id][1](), act: () => SW[id][2]() }); return; }
+    const step = CSTEP[id] || 0.001, k = document.createElement('div');
+    makeKnob(k, { label: knobLabel(nameOfC(id)), min: 0, max: 1, step, value: CONTG[id] ? clamp01(CONTG[id]()) : 0, def: CONTG[id] ? clamp01(CONTG[id]()) : 0, fmt: 'pct' });
+    k.addEventListener('input', () => CONT[id][1](k.value));
+    assignRefs.push({ id, el: k, kind: 'knob' }); grid.appendChild(k);
+  });
   panelEl.appendChild(grid);
   const rt = document.createElement('div'); rt.className = 'randrow';
   const rb = document.createElement('button'); rb.className = 'randtext'; rb.textContent = 'RANDOM'; rb.setAttribute('aria-label', 'Losuj przypisania');
@@ -1132,8 +1108,9 @@ function renderPanel() {
   panelEl.replaceChildren();
   Object.keys(synRefs).forEach((k) => delete synRefs[k]); Object.keys(macroRefs).forEach((k) => delete macroRefs[k]); Object.keys(fxMainRefs).forEach((k) => delete fxMainRefs[k]);
   // zakładka CTRL: kontrolery u góry, a wiersz MODE:CONTROLLER / EDIT pod nimi; na pozostałych zakładkach wiersz (routing na FX, na innych pusty) jest nad pokrętłami
-  if (isCtl()) { renderControllers(); panelEl.appendChild(moderow()); return; }
-  panelEl.appendChild(moderow());
+  const mr = moderow();
+  if (isCtl()) { renderControllers(); panelEl.appendChild(mr); return; }
+  if (mr) panelEl.appendChild(mr);
   const grid = document.createElement('div'); grid.className = 'pgrid';
   const tab = tabSel[page], B = (o) => cellButton(grid, o), Kn = (...a) => grid.appendChild(synKnob(...a)), Sp = () => spacer(grid);
 
