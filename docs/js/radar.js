@@ -1208,40 +1208,46 @@ function renderPanel() {
 // ---------- kropki w rogach ----------
 const ctlLabel = ['OBA', 'FILTR', 'EFEKT'];
 function dotList() {
-  if (page === 'drum') return [
-    { label: 'RANDOM', act: drumRandom },
-    { label: DRUM_KITS[engine.drum.kit], sub: 'KIT', act: () => { engine.drum.kit = (engine.drum.kit + 1) % DRUM_KITS.length; engine.auditionDrum(0); } },
-    { label: DRUM_STYLES[engine.drum.style], sub: 'STYLE', act: () => { engine.drum.style = (engine.drum.style + 1) % DRUM_STYLES.length; drumRandom(); } },
-    { label: 'SC', sub: 'SIDECHAIN', lit: engine.drum.sc, act: () => { engine.drum.sc = !engine.drum.sc; toast(engine.drum.sc ? 'SIDECHAIN: WŁ.' : 'SIDECHAIN: WYŁ.'); } },
-  ];
+  // say: komunikat po dotknięciu kropki (co robi i w jakim jest stanie); na stronie DRUM opisy są też widoczne przy kropkach
+  if (page === 'drum') {
+    const d = engine.drum;
+    return [
+      { label: 'RANDOM', sub: 'NOWY WZÓR', act: drumRandom, say: () => 'RANDOM: nowy losowy wzór perkusji' },
+      { label: `KIT ${DRUM_KITS[d.kit]}`, sub: 'ZMIEŃ ZESTAW', act: () => { d.kit = (d.kit + 1) % DRUM_KITS.length; engine.auditionDrum(0); }, say: () => `KIT: zestaw brzmień ${DRUM_KITS[d.kit]}` },
+      { label: `STYLE ${DRUM_STYLES[d.style]}`, sub: 'ZMIEŃ STYL', act: () => { d.style = (d.style + 1) % DRUM_STYLES.length; drumRandom(); }, say: () => `STYLE: ${DRUM_STYLES[d.style]}, nowy wzór w tym stylu` },
+      { label: `SIDECH. ${d.sc ? 'WŁ.' : 'WYŁ.'}`, sub: 'STOPA PRZYCINA BAS', lit: d.sc, act: () => { d.sc = !d.sc; }, say: () => `SIDECHAIN ${d.sc ? 'WŁ.' : 'WYŁ.'}: stopa ${d.sc ? 'przycina' : 'nie przycina'} syntezator` },
+    ];
+  }
   if (page === 'seq') return [
-    { label: 'RANDOM', act: actions.random }, { label: 'MUTATE', act: actions.mut },
-    { label: 'LATCH', lit: state.latch, act: actions.latch }, { label: 'WARP', sub: `› ${WARP_OPS[warpIdx % WARP_OPS.length][0]}`, act: actions.warp },
+    { label: 'RANDOM', act: actions.random, say: () => 'RANDOM: nowy losowy wzór basu' },
+    { label: 'MUTATE', act: actions.mut, say: () => 'MUTATE: nowe brzmienie i wysokość części nut' },
+    { label: 'LATCH', lit: state.latch, act: actions.latch, say: () => `LATCH ${state.latch ? 'WŁ.' : 'WYŁ.'}: nuty trzymają się do następnej` },
+    { label: 'WARP', sub: `› ${WARP_OPS[warpIdx % WARP_OPS.length][0]}`, act: actions.warp, say: () => `WARP: ${WARP_OPS[(warpIdx + WARP_OPS.length - 1) % WARP_OPS.length][0]} (przekształcenie wzoru)` },
   ];
   if (page === 'mix') {
     // kropki na MIX działają jako SOLO albo MUTE (przełącznik na zakładce MAIN)
     const solo = state.mixMode === 'solo';
     return VOICE_NAMES.map((_, i) => solo
-      ? { label: typeName(i), lit: engine.solo == null ? !!engine.enabled[i] : engine.solo === i, dim: engine.solo != null && engine.solo !== i, act: () => engine.setSolo(engine.solo === i ? null : i) }
-      : { label: typeName(i), lit: !!engine.enabled[i], dim: !engine.enabled[i], act: () => engine.setEnabled(i, !engine.enabled[i]) });
+      ? { label: typeName(i), lit: engine.solo == null ? !!engine.enabled[i] : engine.solo === i, dim: engine.solo != null && engine.solo !== i, act: () => engine.setSolo(engine.solo === i ? null : i), say: () => (engine.solo === i ? `SOLO ${typeName(i)}: gra tylko ten silnik` : 'SOLO wyłączone: grają wszystkie silniki') }
+      : { label: typeName(i), lit: !!engine.enabled[i], dim: !engine.enabled[i], act: () => engine.setEnabled(i, !engine.enabled[i]), say: () => `MUTE ${typeName(i)}: ${engine.enabled[i] ? 'silnik gra' : 'silnik wyciszony'}` });
   }
   if (page === 'syn') {
     const eff = engine.eff.map((v, i) => (engine.enabled[i] ? v : 0)), top = Math.max(...eff, 1e-6), lead = eff.indexOf(Math.max(...eff));
-    return VOICE_NAMES.map((_, i) => ({ label: typeName(i), lit: tabSel.syn !== 0 && i === synSel, dim: !engine.enabled[i], bar: eff[i] / top, barHot: i === lead && eff[i] > 0, act: () => { synSel = i; tabSel.syn = i + 1; renderSub(); renderPanel(); } }));
+    return VOICE_NAMES.map((_, i) => ({ label: typeName(i), lit: tabSel.syn !== 0 && i === synSel, dim: !engine.enabled[i], bar: eff[i] / top, barHot: i === lead && eff[i] > 0, act: () => { synSel = i; tabSel.syn = i + 1; renderSub(); renderPanel(); }, say: () => `${typeName(i)}: edycja tego silnika` }));
   }
   const nameOf = (j, id) => (fxSecs[j].styles[fxSecs[j].slot.style].params.find((sp) => sp.id === id)?.label || id).toUpperCase();
   const hint = (j) => { const m = macroOf(j); return `r ${m.r.map((id) => nameOf(j, id)).join('+')} ∠ ${m.a.map((id) => nameOf(j, id)).join('+')}`; };
   return [
-    { label: 'FILTR', sub: hint(0), lit: !fxSecs[0].slot.bypass, dim: !driven().includes(0), act: () => bypass(0) },
-    { label: 'EFEKT', sub: hint(1), lit: !fxSecs[1].slot.bypass, dim: !driven().includes(1), act: () => bypass(1) },
-    { label: ctlLabel[fxCtl], sub: 'STEROW.', act: () => { fxCtl = (fxCtl + 1) % 3; } },
-    { label: 'STYLE', sub: short8(fxSecs[fxStyleTarget()].styles[fxSecs[fxStyleTarget()].slot.style].name.toUpperCase()), act: () => cycleStyle(fxStyleTarget()) },
+    { label: 'FILTR', sub: hint(0), lit: !fxSecs[0].slot.bypass, dim: !driven().includes(0), act: () => bypass(0), say: () => `FILTR ${fxSecs[0].slot.bypass ? 'omijany (bypass)' : 'włączony'}` },
+    { label: 'EFEKT', sub: hint(1), lit: !fxSecs[1].slot.bypass, dim: !driven().includes(1), act: () => bypass(1), say: () => `EFEKT FX1 ${fxSecs[1].slot.bypass ? 'omijany (bypass)' : 'włączony'}` },
+    { label: ctlLabel[fxCtl], sub: 'STEROW.', act: () => { fxCtl = (fxCtl + 1) % 3; }, say: () => `STEROW.: dotyk na radarze zmienia ${fxCtl === 0 ? 'filtr i efekt' : fxCtl === 1 ? 'tylko filtr' : 'tylko efekt'}` },
+    { label: 'STYLE', sub: short8(fxSecs[fxStyleTarget()].styles[fxSecs[fxStyleTarget()].slot.style].name.toUpperCase()), act: () => cycleStyle(fxStyleTarget()), say: () => `STYLE: ${['filtr', 'FX1', 'FX2'][fxStyleTarget()]} ${fxSecs[fxStyleTarget()].styles[fxSecs[fxStyleTarget()].slot.style].name}` },
   ];
 }
 function dotDefs() { return dotList(); }
 el('dots').addEventListener('click', (e) => {
   const b = e.target.closest('.dot'); if (!b) return;
-  dotList()[+b.dataset.i].act(); commitSoon();
+  const d = dotList()[+b.dataset.i]; d.act(); const m = d.say && d.say(); if (m) toast(m); commitSoon();
 });
 el('dots').addEventListener('pointerdown', (e) => e.stopPropagation());
 

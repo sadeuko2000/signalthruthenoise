@@ -112,7 +112,7 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .bar button:disabled{opacity:.3;cursor:default}
 .bar .rec{justify-self:center;width:53px;height:52px;border-radius:50%;background:var(--acc);border:0;padding:0}
 .bar .rec.on{box-shadow:0 0 0 4px rgba(255,75,31,.35)}
-.toast{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 86px);transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:6px 12px;font-size:17px;letter-spacing:.08em;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .18s;z-index:40}
+.toast{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 86px);transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:6px 12px;font-size:17px;letter-spacing:.06em;white-space:normal;text-align:center;max-width:88%;line-height:1.1;opacity:0;pointer-events:none;transition:opacity .18s;z-index:40}
 .toast.on{opacity:1}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
 .menucard{width:min(92%,340px)}
