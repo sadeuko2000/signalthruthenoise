@@ -747,9 +747,10 @@ function vSlider({ label, value, onInput, spring, rest = 0.5, compact }) {
   const el0 = document.createElement('div'); el0.className = `vs${spring ? ' spring' : ''}${spring && rest === 0.5 ? ' bipolar' : ''}${compact ? ' cmp' : ''}`;
   el0.innerHTML = '<div class="vt"><div class="vf"></div><div class="vk"></div></div><span class="vl"></span>';
   const t = el0.querySelector('.vt'), f = el0.querySelector('.vf'), k = el0.querySelector('.vk'), l = el0.querySelector('.vl');
-  l.textContent = label;
+  const setLabel = (t) => { l.textContent = ''; String(t).split(' ').forEach((part, i, arr) => { l.appendChild(document.createTextNode(part)); if (i < arr.length - 1 && (i === 0)) l.appendChild(document.createElement('br')); else if (i < arr.length - 1) l.appendChild(document.createTextNode(' ')); }); };
+  setLabel(label);
   let v = value; const paint = () => { f.style.height = `${v * 100}%`; k.style.top = `${(1 - v) * 100}%`; }; paint();
-  const say = (r) => { if (typeof r === 'string') l.textContent = r || label; };      // onInput może zwrócić nowy podpis (np. długość pętli)
+  const say = (r) => { if (typeof r === 'string') setLabel(r || label); };      // onInput może zwrócić nowy podpis (np. długość pętli)
   const from = (e) => { const r = t.getBoundingClientRect(); v = Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height)); paint(); say(onInput(v)); };
   el0.setValue = (nv) => { v = nv; paint(); };                           // ustawienie z kodu (odświeżenie), bez zdarzenia
   let on = false;
@@ -883,7 +884,7 @@ function renderAssign() {
       if (!id) { const e0 = document.createElement('div'); e0.className = 'vs empty'; grid.appendChild(e0); return; }
       if (SW[id]) {
         const w = document.createElement('div'); w.className = 'vs vsw'; w.innerHTML = '<button class="vsb"></button><span class="vl"></span>';
-        const b = w.querySelector('.vsb'), l = w.querySelector('.vl'); const upd = () => { l.textContent = nameOfSW(id); b.classList.toggle('lit', !!SW[id][1]()); }; upd();
+        const b = w.querySelector('.vsb'), l = w.querySelector('.vl'); const upd = () => { l.innerHTML = ''; const parts = nameOfSW(id).split(' '); l.appendChild(document.createTextNode(parts[0])); if (parts.length > 1) { l.appendChild(document.createElement('br')); l.appendChild(document.createTextNode(parts.slice(1).join(' '))); } b.classList.toggle('lit', !!SW[id][1]()); }; upd();
         b.addEventListener('click', () => { SW[id][2](); upd(); commitSoon(); }); grid.appendChild(w); return;
       }
       const sl = vSlider({ label: knobLabel(nameOfC(id)), value: CONTG[id] ? clamp01(CONTG[id]()) : 0, onInput: (v) => { CONT[id][1](v); }, compact: true });

@@ -169,7 +169,7 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 
 /* 10 suwaków w jednym rzędzie, tekst RANDOM pod siatką, przycisk DEFAULT */
 .sliderrow{display:flex;justify-content:space-between;height:130px}
-.vs.cmp{width:34px}.vs.cmp .vl{font-size:12px;max-width:36px}
+.vs.cmp{width:34px}.vs.cmp .vl,.vs.vsw .vl{font-size:11px;letter-spacing:.02em;line-height:1.05;height:24px;max-width:36px;text-align:center;white-space:nowrap;overflow:visible}
 .vs.empty{visibility:hidden}
 .vs.vsw{grid-template-rows:auto auto;align-content:start;justify-items:center;gap:6px;padding-top:4px}
 .vs.vsw .vsb{width:26px;height:26px;border:2px solid var(--ink);border-radius:50%}
