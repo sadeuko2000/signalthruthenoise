@@ -38,7 +38,7 @@ function regen() { pattern = finalize(generateBass(state)); engine.pattern = pat
 function curPos() {
   const n = pattern.steps.length;
   if (!engine.playing || !engine.ctx) return heldPos;
-  heldPos = sweepPos(lastStep.i, lastStep.t, engine.ctx.currentTime, 60 / engine.bpm / 4, n);
+  heldPos = sweepPos(lastStep.i, lastStep.t, engine.ctx.currentTime, 60 / engine.effBpm / 4, n);
   return heldPos;
 }
 
@@ -384,7 +384,7 @@ function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('on'); cl
 const snapshot = () => JSON.parse(JSON.stringify({
   pattern,
   state: { root: state.root, mode: state.mode, accent: state.accent, slide: state.slide, oct: state.oct, swing: state.swing, seed: state.seed, density: state.density, syncopation: state.syncopation, latch: state.latch, mixMode: state.mixMode },
-  audio: { offs: { offFAtk: engine.p.offFAtk, offFRel: engine.p.offFRel, offAAtk: engine.p.offAAtk, offARel: engine.p.offARel }, bpm: engine.bpm, gate: engine.gateMul, human: engine.human, ghost: engine.ghost, velo: engine.velo, types: engine.types, enabled: engine.enabled, levels: engine.levels, solo: engine.solo, xy: engine.xy, eq: engine.eq, vOct: engine.vOct, vTune: engine.vTune, vEq: engine.vEq, params: engine.voices.map((v) => v.params) },
+  audio: { offs: { offFAtk: engine.p.offFAtk, offFRel: engine.p.offFRel, offAAtk: engine.p.offAAtk, offARel: engine.p.offARel }, bpm: engine.bpm, tmul: engine.tempoMul, gate: engine.gateMul, human: engine.human, ghost: engine.ghost, velo: engine.velo, types: engine.types, enabled: engine.enabled, levels: engine.levels, solo: engine.solo, xy: engine.xy, eq: engine.eq, vOct: engine.vOct, vTune: engine.vTune, vEq: engine.vEq, params: engine.voices.map((v) => v.params) },
   globals, ctl: fxCtl, warp: warpIdx, ctrl, assign, route: engine.fx.order,
   fx: [engine.fx.filter, engine.fx.fx, engine.fx.fx2].map((x) => ({ style: x.style, values: x.values, bypass: x.bypass })),
 }));
@@ -398,7 +398,7 @@ function restore(sn) {
   Object.assign(state, sn.state); engine.latch = state.latch;
   const a = sn.audio;
   Object.assign(engine.p, a.offs || {});
-  engine.setBpm(a.bpm); engine.gateMul = a.gate; engine.human = a.human; engine.ghost = a.ghost; engine.velo = a.velo;
+  engine.setBpm(a.bpm); engine.setTempoMul(a.tmul || 1); engine.gateMul = a.gate; engine.human = a.human; engine.ghost = a.ghost; engine.velo = a.velo;
   a.types.forEach((t, i) => { if (engine.types[i] !== t) engine.setType(i, t); });
   a.params.forEach((pr, i) => Object.entries(pr).forEach(([id, v]) => { if (id in engine.voices[i].params) engine.setParam(i, id, v); }));
   a.enabled.forEach((on, i) => engine.setEnabled(i, on)); a.levels.forEach((v, i) => engine.setLevel(i, v)); engine.setSolo(a.solo);
@@ -630,6 +630,10 @@ function stepRow(parent, name, value, minus, plus) {
 // Kontrolery to ostatnia zakładka każdej strony (CTRL).
 const isCtl = () => tabSel[page] === tabNames(page).length - 1;
 const lin2 = (n, a, b) => a + n * (b - a);
+// TEMPO to mnożnik tempa wyznaczonego w oknie tempa: ½×, ⅔×, ¾×, 1×, 4⁄3×, 1,5× i 2× (krokowo, zawsze w prostej relacji do tempa)
+const TEMPO_MULS = [[0.5, '½×'], [2 / 3, '⅔×'], [0.75, '¾×'], [1, '1×'], [4 / 3, '4⁄3×'], [1.5, '1,5×'], [2, '2×']];
+const tempoIdx = (n) => Math.max(0, Math.min(TEMPO_MULS.length - 1, Math.round(n * (TEMPO_MULS.length - 1))));
+const tempoN = () => { const i = TEMPO_MULS.findIndex(([m]) => Math.abs(m - engine.tempoMul) < 1e-6); return (i < 0 ? 3 : i) / (TEMPO_MULS.length - 1); };
 const envAll = (id) => (n) => { const sp = specOfType(engine.types[0], id); const v = Math.round(lin2(n, sp.min, sp.max) / sp.step) * sp.step; VOICE_NAMES.forEach((_, i) => engine.setParam(i, id, v)); };
 const fxIdx = (j, idx) => (n) => { const sec = fxSecs[j], sp = sec.styles[sec.slot.style].params[idx]; if (sp) setFxParam(sec, sp.id, n); };
 const offsetT = (key) => (n) => { engine.p[key] = n * 2 - 1; };
@@ -645,7 +649,7 @@ const CONT = {
   swing: ['SWING', (n) => { state.swing = lin2(n, 0, 0.4); pattern = { ...pattern, swing: state.swing }; engine.pattern = pattern; }],
   human: ['HUMAN', (n) => { engine.human = n; }], ghost: ['GHOST', (n) => { engine.ghost = n; }], velo: ['VELO', (n) => { engine.velo = lin2(n, 0.4, 1); }],
   glide: ['GLIDE', (n) => { glideMs = n * 200; setGlideTime(glideMs / 1000); }],
-  tempo: ['TEMPO', (n) => setBpm(lin2(n, 70, 180))],
+  tempo: ['TEMPO', (n) => { const i = tempoIdx(n), [m, t] = TEMPO_MULS[i]; if (m !== engine.tempoMul) { engine.setTempoMul(m); toast(`TEMPO ${t}`); } }],
   master: ['MASTER', (n) => { globals.master = lin2(n, 0, 1.2); engine.setMaster(globals.master); }],
   comp: ['COMP', (n) => { globals.comp = n; engine.setComp(n); }], mdrive: ['DRIVE', (n) => { globals.mdrive = n; engine.setDrive(n); }],
   eqlow: ['EQ LOW', (n) => engine.setEq(0, lin2(n, -12, 12))], eqmid: ['EQ MID', (n) => engine.setEq(1, lin2(n, -12, 12))], eqhigh: ['EQ HIGH', (n) => engine.setEq(2, lin2(n, -12, 12))],
@@ -698,7 +702,7 @@ const CONTG = {
   fenv: envN('fEnv'), fdec: envN('fDec'), adec: envN('aDec'), asus: envN('aSus'), aatk: envN('aAtk'), arel: envN('aRel'),
   offfatk: () => (engine.p.offFAtk + 1) / 2, offfrel: () => (engine.p.offFRel + 1) / 2, offaatk: () => (engine.p.offAAtk + 1) / 2, offarel: () => (engine.p.offARel + 1) / 2,
   gate: () => (engine.gateMul - 0.4) / 1.2, accent: () => state.accent, slide: () => state.slide, swing: () => state.swing / 0.4,
-  human: () => engine.human, ghost: () => engine.ghost, velo: () => (engine.velo - 0.4) / 0.6, glide: () => glideMs / 200, tempo: () => (engine.bpm - 70) / 110,
+  human: () => engine.human, ghost: () => engine.ghost, velo: () => (engine.velo - 0.4) / 0.6, glide: () => glideMs / 200, tempo: tempoN,
   master: () => globals.master / 1.2, comp: () => globals.comp, mdrive: () => globals.mdrive,
   eqlow: () => (engine.eq[0] + 12) / 24, eqmid: () => (engine.eq[1] + 12) / 24, eqhigh: () => (engine.eq[2] + 12) / 24,
   fmix: mixN(0), fx1mix: mixN(1), fx2mix: mixN(2),
@@ -711,7 +715,7 @@ for (let i = 0; i < 4; i++) {
   CONTG[`vlo${i + 1}`] = () => (engine.vEq[i][0] + 12) / 24; CONTG[`vhi${i + 1}`] = () => (engine.vEq[i][1] + 12) / 24;
 }
 [['flt', 0], ['fx1p', 1], ['fx2p', 2]].forEach(([pre, j]) => { for (let i = 0; i < 8; i++) CONTG[`${pre}${i + 1}`] = fxN(j, i); });
-const CSTEP = { oct: 0.25, shift: 0.125, length: 1 / 6, oct1: 0.25, oct2: 0.25, oct3: 0.25, oct4: 0.25 };      // wartości dyskretne
+const CSTEP = { tempo: 1 / 6, oct: 0.25, shift: 0.125, length: 1 / 6, oct1: 0.25, oct2: 0.25, oct3: 0.25, oct4: 0.25 };      // wartości dyskretne
 const TOGGLES = new Set(['fbyp', 'f1byp', 'f2byp', 'latch', 'dotmode', 'mute1', 'mute2', 'mute3', 'mute4', 'solo1', 'solo2', 'solo3', 'solo4']);
 const nameOfSW = (id) => { if (!SW[id]) return id; const l = SW[id][0]; return typeof l === 'function' ? l() : l; };
 const CTL_TYPES = { xy: 'XY PAD', pads: '4 PRZYCISKI', faders: '4 SUWAKI', wheels: 'PITCH + MOD' };
@@ -931,7 +935,7 @@ const DESC = {
   offfatk: 'atak obwiedni filtra, −100…+100%', offfrel: 'release (zanik) obwiedni filtra, −100…+100%', offaatk: 'atak obwiedni głośności, −100…+100%', offarel: 'release obwiedni głośności, −100…+100%',
   gate: 'długość wszystkich nut', accent: 'ile nut dostaje akcent', slide: 'ile ślizgów między nutami', swing: 'opóźnienie parzystych kroków',
   human: 'losowe drobne wahania czasu i siły', ghost: 'ciche nuty-duchy w pustych krokach', velo: 'siła uderzenia nut', glide: 'czas ślizgu przy SLIDE',
-  tempo: 'tempo w BPM (70–180)', shift: 'obrót wzoru o kroki', oct: 'oktawa całego wzoru (−2…+2)', length: 'długość wzoru w krokach (8–32)',
+  tempo: 'mnożnik tempa: ½×, ⅔×, ¾×, 1×, 4⁄3×, 1,5×, 2× (krokowo)', shift: 'obrót wzoru o kroki', oct: 'oktawa całego wzoru (−2…+2)', length: 'długość wzoru w krokach (8–32)',
   master: 'głośność wyjścia', comp: 'siła kompresji na wyjściu', mdrive: 'przester wyjściowy', eqlow: 'EQ: niskie tony', eqmid: 'EQ: środek', eqhigh: 'EQ: wysokie tony',
   fmix: 'filtr: ile sygnału przechodzi przez filtr', fx1mix: 'FX1: ilość efektu (send)', fx2mix: 'FX2: ilość efektu',
   djf: 'DJ filtr: w lewo dolnoprzepustowy, w prawo górnoprzepustowy', tape: 'taśma: nasycenie, ciemniejsza góra, szum', wow: 'taśma: wahanie wysokości', chorusm: 'chorus: ilość efektu',

@@ -11,6 +11,7 @@ export class Engine {
   constructor() {
     this.ctx = null;
     this.bpm = 130;
+    this.tempoMul = 1;     // mnożnik tempa (½×…2×, krokowo): realne tempo = bpm * tempoMul
     this.gateMul = 1;      // mnożnik długości nut (suwak „długość nut”)
     // parametry wspólne dla wszystkich silników (silniki trzymają referencję do tego obiektu)
     this.p = { cutoff: 600, res: 12, bright: 0.35, offFAtk: 0, offFRel: 0, offAAtk: 0, offARel: 0 };   // + globalne przesunięcia obwiedni (-1..+1)
@@ -70,7 +71,7 @@ export class Engine {
     this.dry = c.createGain();
     this.mix = c.createGain();
     // po miksie silników: globalny filtr -> globalny efekt -> wyjście
-    this.fx = new GlobalFx(c, () => this.bpm);
+    this.fx = new GlobalFx(c, () => this.effBpm);
     this.mix.connect(this.dry).connect(this.fx.input);
     const mfx = this._buildMasterFx(c);             // efekty master: DJ filter, tape, chorus, beat repeat
     this.fx.output.connect(mfx.input); mfx.output.connect(this.master);
@@ -151,7 +152,7 @@ export class Engine {
     const m = this.mfx, t = this.ctx.currentTime, on = v > 0.02;
     if (on) {
       const DIV = [['1/2', 2], ['1/4', 1], ['1/8', 0.5], ['1/16', 0.25], ['1/32', 0.125]], d = DIV[Math.min(DIV.length - 1, Math.floor(v * DIV.length))];
-      m.rdel.delayTime.setTargetAtTime(Math.min(2.9, (60 / this.bpm) * d[1]), t, 0.01);
+      m.rdel.delayTime.setTargetAtTime(Math.min(2.9, (60 / this.effBpm) * d[1]), t, 0.01);
       if (!this._rep) { m.rin.gain.setTargetAtTime(0, t, 0.004); m.rfb.gain.setTargetAtTime(0.999, t, 0.004); m.rdry.gain.setTargetAtTime(0, t, 0.006); m.rwet.gain.setTargetAtTime(1, t, 0.006); this._rep = true; }
       return d[0];
     }
@@ -240,7 +241,9 @@ export class Engine {
     this.voices.forEach((v, vi) => { if (this.eff[vi] > 0.02) v.note(t, this._voiceFreq(vi, freq), step.vel || 100, false, 0.16, false, false); });
   }
 
+  get effBpm() { return this.bpm * this.tempoMul; }
   setBpm(v) { this.bpm = v; if (this.fx) this.fx.refresh(); }   // delay zsynchronizowany z tempem
+  setTempoMul(m) { this.tempoMul = m; if (this.fx) this.fx.refresh(); }
 
   play() {
     if (this.timer || !this.ctx) return;
@@ -265,13 +268,13 @@ export class Engine {
       this._scheduleStep(this.step, this.nextTime);
       const n = this.pattern.steps.length;
       this.step = (this.step + 1) % n;
-      this.nextTime += 60 / this.bpm / 4;
+      this.nextTime += 60 / this.effBpm / 4;
     }
   }
 
   _scheduleStep(i, t) {
     const pat = this.pattern, n = pat.steps.length;
-    const dur = 60 / this.bpm / 4;
+    const dur = 60 / this.effBpm / 4;
     const s = pat.steps[i];
     const jitter = this.human > 0 ? (Math.random() - 0.5) * dur * 0.3 * this.human : 0;
     const tt = t + (i % 2 === 1 ? pat.swing * dur : 0) + Math.max(-0.01, jitter);

@@ -75,3 +75,4 @@ Nazwy jako punkt odniesienia, bez kopiowania działania:
 ## 10. Pomysły na później
 
 - **Presety jako kod QR.** Preset (wzór, silniki, efekty, przypisania, ustawienia globalne) zapisany w zwartej postaci (same wartości, bez domyślnych), skompresowany deflate i zakodowany tekstowo, najlepiej jako link do aplikacji z presetem w adresie (szacunek: kilkaset bajtów do ok. 1 KB, mieści się w czytelnym QR). Do rozstrzygnięcia: wersjonowanie formatu, skanowanie kamerą (wymaga dostępu do kamery, w artefakcie zablokowane, działałoby na GitHub Pages albo przez aparat telefonu) oraz prostsza alternatywa, czyli eksport presetu jako link albo tekst.
+- TEMPO w przypisaniach to mnożnik tempa z okna tempa: ½×, ⅔×, ¾×, 1×, 4⁄3×, 1,5×, 2× (krokowo, `Engine.tempoMul`, realne tempo = `effBpm`). Mnożnik działa też na delay zsynchronizowany z tempem, beat repeat i ruch linii radaru.
