@@ -258,7 +258,8 @@ function drawFx(ts) {
       });
     }
     };
-  stage(X, 1); stage(X2, 0.7);
+  // kolejność efektów jak w ROUTING: pierwszy w łańcuchu rysowany pełną mocą, drugi słabiej
+  engine.fx.order.filter((i) => i > 0).forEach((i, k) => stage(i === 1 ? X : X2, k ? 0.7 : 1));
   rings.forEach((r) => ring(r, glow));
   drawSweepLine(G, S);
 
@@ -1215,7 +1216,7 @@ function dotList() {
       { label: 'RANDOM', sub: 'NOWY WZÓR', act: drumRandom, say: () => 'RANDOM: nowy losowy wzór perkusji' },
       { label: `KIT ${DRUM_KITS[d.kit]}`, sub: 'ZMIEŃ ZESTAW', act: () => { d.kit = (d.kit + 1) % DRUM_KITS.length; engine.auditionDrum(0); }, say: () => `KIT: zestaw brzmień ${DRUM_KITS[d.kit]}` },
       { label: `STYLE ${DRUM_STYLES[d.style]}`, sub: 'ZMIEŃ STYL', act: () => { d.style = (d.style + 1) % DRUM_STYLES.length; drumRandom(); }, say: () => `STYLE: ${DRUM_STYLES[d.style]}, nowy wzór w tym stylu` },
-      { label: `SIDECH. ${d.sc ? 'WŁ.' : 'WYŁ.'}`, sub: 'STOPA PRZYCINA BAS', lit: d.sc, act: () => { d.sc = !d.sc; }, say: () => `SIDECHAIN ${d.sc ? 'WŁ.' : 'WYŁ.'}: stopa ${d.sc ? 'przycina' : 'nie przycina'} syntezator` },
+      { label: `SIDECH. ${d.sc ? 'WŁ.' : 'WYŁ.'}`, sub: 'STOPA PRZYCINA BAS', lit: d.sc, act: () => { d.sc = !d.sc; }, say: () => `SIDECHAIN ${d.sc ? 'WŁ.' : 'WYŁ.'}: stopa ${d.sc ? 'przycina syntezator' : 'nie przycina syntezatora'}` },
     ];
   }
   if (page === 'seq') return [

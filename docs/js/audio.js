@@ -120,7 +120,7 @@ export class Engine {
   applyDrum() {
     if (!this.drumBus) return;
     const t = this.ctx.currentTime, d = this.drum;
-    this.drumBus.gain.setTargetAtTime(d.level, t, 0.02); this.drumWet.gain.setTargetAtTime(d.drive, t, 0.02); this.drumDry.gain.setTargetAtTime(1 - d.drive * 0.5, t, 0.02);
+    this.drumBus.gain.setTargetAtTime(1.5 * d.level, t, 0.02); this.drumWet.gain.setTargetAtTime(d.drive, t, 0.02); this.drumDry.gain.setTargetAtTime(1 - d.drive * 0.5, t, 0.02);
   }
   // Sidechain: każde uderzenie stopy szybko przycina sygnał syntezatora i oddaje go z czasem zależnym od RELEASE.
   _duck(t) {
