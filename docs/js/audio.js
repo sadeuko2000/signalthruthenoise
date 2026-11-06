@@ -3,6 +3,7 @@ import { pitch } from './generator.js';
 import { Vocoder } from './vocoder.js';
 import { VOICES, blendWeights, randomizeParams } from './engines.js';
 import { stepHash } from './generator.js';
+import { DrumKit, generateDrums, DRUM_STEPS } from './drums.js';
 import { GlobalFx } from './fx.js';
 
 const midiToHz = (m) => 440 * Math.pow(2, (m - 69) / 12);
@@ -19,6 +20,9 @@ export class Engine {
     this.xy = [0.25, 0.75];       // pozycja na padzie
     this.enabled = [1, 1, 1, 1];  // które silniki biorą udział w miksie
     this.types = [1, 0, 2, 3];    // rodzaj silnika w każdym z 4 miejsc (0 prophet, 1 ms-20, 2 dx, 3 wavetable); mogą się powtarzać. Domyślnie jak w szkicu: MS20, PROPHET, DX, WAVE
+    // perkusja: ustawienia (kit 0 808, 1 909, 2 SYNTH; levels = stopa, werbel, klaskanie, hat zamknięty i otwarty), sidechain stopy na sygnał syntezatora
+    this.drum = { on: true, kit: 0, level: 0.8, levels: [1, 0.85, 0.7, 0.55, 0.5], mute: [false, false, false, false, false], kt: 1, kd: 1, st: 1, hd: 1, drive: 0, sc: true, scAmt: 0.65, scRel: 0.18, style: 0, density: 0.5 };
+    this.drumPattern = generateDrums({ style: 0, density: 0.5, seed: 1 });
     this.latch = false;           // LATCH: nuty trzymają się aż do następnej
     this.human = 0;               // 0..1: losowe drobne przesunięcia czasu i głośności
     this.ghost = 0;               // 0..1: ciche nuty-duchy w pustych krokach
@@ -75,7 +79,17 @@ export class Engine {
     this.fx = new GlobalFx(c, () => this.effBpm);
     this.mix.connect(this.dry).connect(this.fx.input);
     const mfx = this._buildMasterFx(c);             // efekty master: DJ filter, tape, chorus, beat repeat
-    this.fx.output.connect(mfx.input); mfx.output.connect(this.master);
+    // sygnał syntezatora przechodzi przez bramkę sidechain (stopa go przycina), perkusja ma własną szynę, a obie wpadają do wspólnego wyjścia
+    this.fx.output.connect(mfx.input);
+    this.scGain = c.createGain(); mfx.output.connect(this.scGain); this.scGain.connect(this.master);
+    this.drumIn = c.createGain(); this.drumBus = c.createGain(); this.drumDry = c.createGain(); this.drumWet = c.createGain();
+    const dpre = c.createGain(), dsh = c.createWaveShaper(), dpost = c.createGain(), dcv = new Float32Array(1024);
+    for (let i = 0; i < dcv.length; i++) dcv[i] = Math.tanh(1.8 * ((i / 1023) * 2 - 1)) / Math.tanh(1.8);
+    dsh.curve = dcv; dsh.oversample = '2x'; dpre.gain.value = 2; dpost.gain.value = 0.6;
+    this.drumIn.connect(this.drumDry).connect(this.drumBus); this.drumIn.connect(dpre).connect(dsh).connect(dpost).connect(this.drumWet).connect(this.drumBus);
+    this.drumBus.connect(this.master);
+    this.drums = new DrumKit(c, this.drumIn);
+    this.applyDrum();
     // korektor 3-pasmowy między silnikami a resztą toru
     this.eqIn = c.createGain();
     const lo = c.createBiquadFilter(), md = c.createBiquadFilter(), hi = c.createBiquadFilter();
@@ -101,6 +115,19 @@ export class Engine {
     this.setBlend(0.25, 0.75);
   }
 
+
+  // Szyna perkusji: poziom i drive (równoległe nasycenie).
+  applyDrum() {
+    if (!this.drumBus) return;
+    const t = this.ctx.currentTime, d = this.drum;
+    this.drumBus.gain.setTargetAtTime(d.level, t, 0.02); this.drumWet.gain.setTargetAtTime(d.drive, t, 0.02); this.drumDry.gain.setTargetAtTime(1 - d.drive * 0.5, t, 0.02);
+  }
+  // Sidechain: każde uderzenie stopy szybko przycina sygnał syntezatora i oddaje go z czasem zależnym od RELEASE.
+  _duck(t) {
+    const g = this.scGain.gain, a = this.drum.scAmt, rel = Math.max(0.03, this.drum.scRel);
+    g.setTargetAtTime(1 - a, t, 0.004); g.setTargetAtTime(1, t + 0.035, rel / 3);
+  }
+  auditionDrum(track) { if (this.ctx && this.drums) this.drums.trigger(track, this.ctx.currentTime + 0.01, 1, this.drum); }
 
   // ---------- efekty na sumie (strona FX, zakładka MSTR) ----------
   _buildMasterFx(c) {
@@ -257,7 +284,7 @@ export class Engine {
   stop() {
     clearInterval(this.timer);
     this.timer = null;
-    if (this.ctx) this.voices.forEach((v) => v.silence(this.ctx.currentTime));
+    if (this.ctx) { this.voices.forEach((v) => v.silence(this.ctx.currentTime)); this.scGain.gain.cancelScheduledValues(this.ctx.currentTime); this.scGain.gain.setTargetAtTime(1, this.ctx.currentTime, 0.01); }
   }
 
   get playing() { return !!this.timer; }
@@ -280,6 +307,14 @@ export class Engine {
     const jitter = this.human > 0 ? (Math.random() - 0.5) * dur * 0.3 * this.human : 0;
     const tt = t + (i % 2 === 1 ? pat.swing * dur : 0) + Math.max(-0.01, jitter);
     if (this.onStep) this.onStep(i, t);
+    if (this.drum.on && this.drums) {              // perkusja: krok bębnów = krok wzoru basu mod 16, ten sam swing
+      const ds = i % DRUM_STEPS, td = t + (ds % 2 === 1 ? pat.swing * dur : 0), st = this.drumPattern.steps;
+      for (let k = 0; k < st.length; k++) {
+        const v = st[k][ds]; if (!v || this.drum.mute[k]) continue;
+        this.drums.trigger(k, td, v, this.drum);
+        if (k === 0 && this.drum.sc && (this.drum.levels[0] ?? 1) > 0.02) this._duck(td);
+      }
+    }
     if (!s.on) {
       this.lastTied = false;
       // GHOST: ciche nuty-duchy (tonika) w części pustych kroków, stałe dla danego kroku

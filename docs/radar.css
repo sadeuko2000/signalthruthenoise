@@ -15,7 +15,7 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 #radar{position:relative;container-type:size;display:flex;flex-direction:column;height:100dvh;max-width:430px;margin:0 auto;background:var(--paper)}
 .head{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top,0px) + 10px) max(16px,env(safe-area-inset-right,0px)) 8px max(16px,env(safe-area-inset-left,0px))}
 .tempo{width:44px;height:44px;display:grid;place-items:center}
-.tabs4{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--ink);border-bottom:1px solid var(--ink)}
+.tabs4{display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--ink);border-bottom:1px solid var(--ink)}
 .tabs4 button{min-height:27px;font-size:20px;letter-spacing:.1em;border-right:1px solid var(--ink)}
 .tabs4 button:last-child{border-right:0}
 .tabs4 button.on{background:var(--ink);color:var(--paper)}

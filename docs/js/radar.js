@@ -4,6 +4,7 @@ import { generateBass, mutate, DEFAULTS, withAccent, withSlide } from './generat
 import { Engine } from './audio.js';
 import { VOICE_NAMES, PARAM_SPECS, clampToDisc, setGlideTime } from './engines.js';
 import { FILTER_STYLES, FX_STYLES, mapValues } from './fx.js';
+import { generateDrums, emptyDrums, DRUM_TRACKS, DRUM_KITS, DRUM_STYLES, DRUM_STEPS } from './drums.js';
 import { makeKnob, initKnobs } from './knob.js';
 import { TAU, DEG_MIN, DEG_MAX, R_OUT, degToR, rToDeg, angleOfStep, polar, stepFromAngle, sweepPos, echoAlpha, echoes, placeNote, clearNote, moveNote, resizeSteps, nFromR, rFromN, nFromTheta, thetaFromN, delayCopies, bandPass, rotateSteps, reverseSteps, invertSteps, clearSteps, doubleSteps, halveSteps } from './radargeo.js';
 
@@ -18,7 +19,7 @@ const finalize = (p) => withSlide(withAccent({ ...p, root: effRoot() }, state.ac
 let pattern = finalize(generateBass(state));
 engine.pattern = pattern;
 let page = 'seq';
-const tabSel = { seq: 0, mix: 0, syn: 0, fx: 0 };   // wybrana pod-zakładka każdej strony (0 = MAIN)
+const tabSel = { seq: 0, mix: 0, syn: 0, fx: 0, drum: 0 };   // wybrana pod-zakładka każdej strony (0 = MAIN)
 let synSel = 0;                                  // silnik edytowany na stronie SYN (0..3)
 const globals = { cutoff: 0.5, reso: 0.5, master: 1, comp: 0.5, mdrive: 0, dj: 0, tape: 0, wow: 0, chorus: 0 };   // ustawienia wyjściowe i filtra globalnego (do zapisu w presetach)
 const padPos = { x: 0.25, y: 0.75 };
@@ -65,12 +66,11 @@ const RADAR_K = 0.91;      // średnica radaru jako ułamek pola ekranu: w rogac
 const geo = () => { const W = cv.width; return { W, cx: W / 2, cy: W / 2, R: (W / 2) * RADAR_K, dpr: W / Math.max(1, cv.clientWidth) }; };
 function sweepState() { const n = pattern.steps.length, pos = curPos(); return { n, pos, sw: (pos / n) * TAU }; }
 
-function drawBase(G, S) {
+function drawBase(G, S, o = {}) {
   const { W, cx, cy, R, dpr } = G;
   g.fillStyle = PAPER; g.fillRect(0, 0, W, W);
   // uproszczone tło: tylko pierścień toniki i oktawy oraz obrzeże, bez siatki stopni i bez drobnej podziałki
-  circle(cx, cy, degToR(0) * R, `rgba(${INK},.5)`, dpr);
-  circle(cx, cy, degToR(7) * R, `rgba(${INK},.5)`, dpr);
+  if (!o.noRings) { circle(cx, cy, degToR(0) * R, `rgba(${INK},.5)`, dpr); circle(cx, cy, degToR(7) * R, `rgba(${INK},.5)`, dpr); }
   circle(cx, cy, R * 0.985, `rgba(${INK},1)`, dpr);
   const { n, pos } = S, hot = Math.floor(pos) % n;
   for (let k = 0; k < n; k += 4) {                         // krótka kreska co 4 kroki (ćwierćnuta)
@@ -304,10 +304,44 @@ function drawSyn() {
   g.beginPath(); g.arc(kx, ky, R * 0.045, 0, TAU); g.moveTo(kx - R * 0.08, ky); g.lineTo(kx + R * 0.08, ky); g.moveTo(kx, ky - R * 0.08); g.lineTo(kx, ky + R * 0.08); g.stroke();
 }
 
+// ---------- DRUM: polarny sekwencer perkusji ----------
+// Pięć pierścieni (stopa, werbel, klaskanie, hat zamknięty, hat otwarty), 16 kroków dookoła. Dotknięcie kroku przełącza: pusty, uderzenie, akcent.
+const DRUM_R = [0.32, 0.44, 0.56, 0.68, 0.8];
+function drawDrum() {
+  const G = geo(), S0 = sweepState(), { cx, cy, R, dpr } = G;
+  const p16 = S0.pos % DRUM_STEPS, S = { n: DRUM_STEPS, pos: p16, sw: (p16 / DRUM_STEPS) * TAU }, hot = Math.floor(p16);
+  drawBase(G, S, { noRings: true });
+  g.font = FONT(R * 0.07); g.textAlign = 'center'; g.textBaseline = 'middle';
+  DRUM_R.forEach((rr, k) => {
+    const r = rr * R, muted = engine.drum.mute[k], a = muted ? 0.35 : 1;
+    circle(cx, cy, r, `rgba(${INK},${0.22 * a})`, dpr);
+    g.fillStyle = `rgba(${INK},${0.75 * a})`; g.fillText(['K', 'S', 'C', 'H', 'O'][k], cx - r + 0, cy - R * 0.045);
+    for (let s = 0; s < DRUM_STEPS; s++) {
+      const v = engine.drumPattern.steps[k][s], [x, y] = polarXY(cx, cy, r, angleOfStep(s, DRUM_STEPS));
+      g.beginPath();
+      if (!v) { g.arc(x, y, 1.8 * dpr, 0, TAU); g.fillStyle = `rgba(${INK},${0.3 * a})`; }
+      else { g.arc(x, y, (v > 1 ? 7 : 5) * dpr * (R / (150 * dpr)), 0, TAU); g.fillStyle = v > 1 ? `rgba(${ACC},${a})` : `rgba(${INK},${a})`; }
+      g.fill();
+      if (v && s === hot && engine.playing && !muted) { g.beginPath(); g.arc(x, y, 11 * dpr * (R / (150 * dpr)), 0, TAU); g.strokeStyle = `rgba(${ACC},.9)`; g.lineWidth = 1.5 * dpr; g.stroke(); }
+    }
+  });
+  drawSweepLine(G, S);
+  drawCorners(G, dotDefs());
+}
+function drumTap(p) {
+  let best = -1, bd = 1;
+  DRUM_R.forEach((r, k) => { const d = Math.abs(p.rn - r); if (d < bd) { bd = d; best = k; } });
+  if (bd > 0.06) return;
+  const s = stepFromAngle(p.theta, DRUM_STEPS), row = engine.drumPattern.steps[best];
+  row[s] = (row[s] + 1) % 3;
+  if (row[s]) engine.auditionDrum(best);
+}
+function drumRandom() { engine.drumPattern = generateDrums({ style: engine.drum.style, density: engine.drum.density, seed: (Math.random() * 1e9) | 0 }); }
+
 let raf = 0, lastSync = 0;
 function loop(ts) {
   if (ts - lastSync > 120) { lastSync = ts; if (typeof syncAssign === 'function') syncAssign(); }
-  if (!el('radar').hidden) { if (page === 'mix') drawMix(); else if (page === 'fx') drawFx(ts); else if (page === 'syn') drawSyn(); else drawSeq(); }
+  if (!el('radar').hidden) { if (page === 'mix') drawMix(); else if (page === 'fx') drawFx(ts); else if (page === 'syn') drawSyn(); else if (page === 'drum') drawDrum(); else drawSeq(); }
   raf = requestAnimationFrame(loop);
 }
 
@@ -339,6 +373,7 @@ function fxFrom(p) {
 cv.addEventListener('pointerdown', (e) => {
   const p = pointerPolar(e);
   cv.setPointerCapture(e.pointerId);
+  if (page === 'drum') { drumTap(p); return; }
   if (page === 'mix') { drag = { mode: 'mix' }; mixFrom(p); return; }
   if (page === 'fx') { drag = { mode: 'fx' }; fxFrom(p); return; }
   if (page === 'syn') { drag = { mode: 'syn' }; synFrom(p); return; }
@@ -384,7 +419,7 @@ function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('on'); cl
 const snapshot = () => JSON.parse(JSON.stringify({
   pattern,
   state: { root: state.root, mode: state.mode, accent: state.accent, slide: state.slide, oct: state.oct, swing: state.swing, seed: state.seed, density: state.density, syncopation: state.syncopation, latch: state.latch, mixMode: state.mixMode },
-  audio: { offs: { offFAtk: engine.p.offFAtk, offFRel: engine.p.offFRel, offAAtk: engine.p.offAAtk, offARel: engine.p.offARel }, bpm: engine.bpm, tmul: engine.tempoMul, vOff: engine.vOff, gate: engine.gateMul, human: engine.human, ghost: engine.ghost, velo: engine.velo, types: engine.types, enabled: engine.enabled, levels: engine.levels, solo: engine.solo, xy: engine.xy, eq: engine.eq, vOct: engine.vOct, vTune: engine.vTune, vEq: engine.vEq, params: engine.voices.map((v) => v.params) },
+  audio: { offs: { offFAtk: engine.p.offFAtk, offFRel: engine.p.offFRel, offAAtk: engine.p.offAAtk, offARel: engine.p.offARel }, drum: engine.drum, dpat: engine.drumPattern, bpm: engine.bpm, tmul: engine.tempoMul, vOff: engine.vOff, gate: engine.gateMul, human: engine.human, ghost: engine.ghost, velo: engine.velo, types: engine.types, enabled: engine.enabled, levels: engine.levels, solo: engine.solo, xy: engine.xy, eq: engine.eq, vOct: engine.vOct, vTune: engine.vTune, vEq: engine.vEq, params: engine.voices.map((v) => v.params) },
   globals, ctl: fxCtl, warp: warpIdx, ctrl, assign, route: engine.fx.order,
   fx: [engine.fx.filter, engine.fx.fx, engine.fx.fx2].map((x) => ({ style: x.style, values: x.values, bypass: x.bypass })),
 }));
@@ -398,6 +433,7 @@ function restore(sn) {
   Object.assign(state, sn.state); engine.latch = state.latch;
   const a = sn.audio;
   Object.assign(engine.p, a.offs || {});
+  if (a.drum) { Object.assign(engine.drum, a.drum); engine.drumPattern = JSON.parse(JSON.stringify(a.dpat || engine.drumPattern)); engine.applyDrum(); }
   engine.setBpm(a.bpm); engine.setTempoMul(a.tmul || 1); (a.vOff || [0, 0, 0, 0]).forEach((v, i) => { engine.vOff[i] = v; }); engine.gateMul = a.gate; engine.human = a.human; engine.ghost = a.ghost; engine.velo = a.velo;
   a.types.forEach((t, i) => { if (engine.types[i] !== t) engine.setType(i, t); });
   a.params.forEach((pr, i) => Object.entries(pr).forEach(([id, v]) => { if (id in engine.voices[i].params) engine.setParam(i, id, v); }));
@@ -723,8 +759,35 @@ for (let i = 0; i < 4; i++) {
 }
 [['flt', 0], ['fx1p', 1], ['fx2p', 2]].forEach(([pre, j]) => { for (let i = 0; i < 8; i++) CONTG[`${pre}${i + 1}`] = fxN(j, i); });
 const CSTEP = { tempo: 1 / 6, ofs1: 1 / 6, ofs2: 1 / 6, ofs3: 1 / 6, ofs4: 1 / 6, oct: 0.25, shift: 0.125, length: 1 / 6, oct1: 0.25, oct2: 0.25, oct3: 0.25, oct4: 0.25 };      // wartości dyskretne
-const TOGGLES = new Set(['fbyp', 'f1byp', 'f2byp', 'latch', 'dotmode', 'mute1', 'mute2', 'mute3', 'mute4', 'solo1', 'solo2', 'solo3', 'solo4']);
+const TOGGLES = new Set(['dron', 'dsc', 'dm0', 'dm1', 'dm2', 'dm3', 'dm4', 'fbyp', 'f1byp', 'f2byp', 'latch', 'dotmode', 'mute1', 'mute2', 'mute3', 'mute4', 'solo1', 'solo2', 'solo3', 'solo4']);
 const nameOfSW = (id) => { if (!SW[id]) return id; const l = SW[id][0]; return typeof l === 'function' ? l() : l; };
+
+// DRUM: poziomy ścieżek, stroiki i zaniki, drive, sidechain i gęstość losowanych wzorów
+const D = () => engine.drum;
+CONT.dlevel = ['DRUMS', (n) => { D().level = n * 1.2; engine.applyDrum(); }];
+CONT.dkick = ['KICK', (n) => { D().levels[0] = n; }]; CONT.dsnare = ['SNARE', (n) => { D().levels[1] = n; }]; CONT.dclap = ['CLAP', (n) => { D().levels[2] = n; }];
+CONT.dhat = ['HAT', (n) => { D().levels[3] = n; }]; CONT.dopen = ['O.HAT', (n) => { D().levels[4] = n; }];
+CONT.dkt = ['K.TUNE', (n) => { D().kt = lin2(n, 0.7, 1.4); }]; CONT.dkd = ['K.DEC', (n) => { D().kd = lin2(n, 0.5, 1.6); }];
+CONT.dst = ['S.TUNE', (n) => { D().st = lin2(n, 0.7, 1.4); }]; CONT.dhd = ['H.DEC', (n) => { D().hd = lin2(n, 0.5, 1.8); }];
+CONT.ddrive = ['D.DRIVE', (n) => { D().drive = n; engine.applyDrum(); }];
+CONT.dscamt = ['SC AMT', (n) => { D().scAmt = n * 0.95; }]; CONT.dscrel = ['SC REL', (n) => { D().scRel = lin2(n, 0.04, 0.4); }];
+CONT.ddens = ['DENS', (n) => { D().density = n; }];
+Object.assign(CONTG, {
+  dlevel: () => D().level / 1.2, dkick: () => D().levels[0], dsnare: () => D().levels[1], dclap: () => D().levels[2], dhat: () => D().levels[3], dopen: () => D().levels[4],
+  dkt: () => (D().kt - 0.7) / 0.7, dkd: () => (D().kd - 0.5) / 1.1, dst: () => (D().st - 0.7) / 0.7, dhd: () => (D().hd - 0.5) / 1.3,
+  ddrive: () => D().drive, dscamt: () => D().scAmt / 0.95, dscrel: () => (D().scRel - 0.04) / 0.36, ddens: () => D().density,
+});
+
+const drumToggle = (k) => () => { D().mute[k] = !D().mute[k]; };
+Object.assign(SW, {
+  dron: ['DRUMS', () => D().on, () => { D().on = !D().on; }],
+  dsc: ['SIDECH.', () => D().sc, () => { D().sc = !D().sc; toast(D().sc ? 'SIDECHAIN: WŁ.' : 'SIDECHAIN: WYŁ.'); }],
+  dkit: [() => DRUM_KITS[D().kit], () => false, () => { D().kit = (D().kit + 1) % DRUM_KITS.length; engine.auditionDrum(0); }],
+  dstyle: [() => DRUM_STYLES[D().style], () => false, () => { D().style = (D().style + 1) % DRUM_STYLES.length; drumRandom(); }],
+  drandom: ['RANDOM', () => false, () => drumRandom()], dclear: ['CLEAR', () => false, () => { engine.drumPattern = { ...engine.drumPattern, steps: emptyDrums() }; }],
+  dm0: ['MUTE K', () => D().mute[0], drumToggle(0)], dm1: ['MUTE S', () => D().mute[1], drumToggle(1)], dm2: ['MUTE C', () => D().mute[2], drumToggle(2)],
+  dm3: ['MUTE CH', () => D().mute[3], drumToggle(3)], dm4: ['MUTE OH', () => D().mute[4], drumToggle(4)],
+});
 const CTL_TYPES = { xy: 'XY PAD', pads: '4 PRZYCISKI', faders: '4 SUWAKI', wheels: 'PITCH + MOD' };
 const CTL_KEY = 'radarxxx.ctrl.v2';
 // Kontrolery (zakładka CTRL) sterują tylko tym, co jest w danej sekcji: każda strona ma własną listę parametrów, własne przełączniki i własne ustawienia.
@@ -732,6 +795,7 @@ const SECTION_CONT = {
   seq: ['cutoff', 'reso', 'offfatk', 'offfrel', 'offaatk', 'offarel', 'gate', 'accent', 'shift', 'oct', 'tempo', 'length', 'swing', 'human', 'ghost', 'slide', 'glide', 'velo', 'ofs1', 'ofs2', 'ofs3', 'ofs4'],
   mix: ['eqlow', 'eqmid', 'eqhigh', 'fx1mix', 'master', 'lv1', 'lv2', 'lv3', 'lv4', 'tune1', 'tune2', 'tune3', 'tune4', 'oct1', 'oct2', 'oct3', 'oct4', 'vlo1', 'vlo2', 'vlo3', 'vlo4', 'vhi1', 'vhi2', 'vhi3', 'vhi4', 'padx', 'pady'],
   syn: ['cutoff', 'reso', 'fenv', 'fdec', 'aatk', 'adec', 'asus', 'arel', 'lv1', 'lv2', 'lv3', 'lv4'],
+  drum: ['dlevel', 'dkick', 'dsnare', 'dclap', 'dhat', 'dopen', 'dkt', 'dkd', 'dst', 'dhd', 'ddrive', 'dscamt', 'dscrel', 'ddens'],
   fx: [...[1, 2, 3, 4, 5, 6, 7, 8].map((i) => `flt${i}`), ...[1, 2, 3, 4, 5, 6, 7, 8].map((i) => `fx1p${i}`), ...[1, 2, 3, 4, 5, 6, 7, 8].map((i) => `fx2p${i}`), 'djf', 'tape', 'wow', 'chorusm', 'master', 'comp', 'mdrive'],
 };
 const SECTION_SW = {
@@ -739,11 +803,13 @@ const SECTION_SW = {
   mix: ['fbyp', 'dotmode', 'mute1', 'mute2', 'mute3', 'mute4', 'solo1', 'solo2', 'solo3', 'solo4', 'type1', 'type2', 'type3', 'type4', 'rndeng'],
   syn: ['rndsyn', 'mute1', 'mute2', 'mute3', 'mute4', 'solo1', 'solo2', 'solo3', 'solo4'],
   fx: ['fbyp', 'f1byp', 'f2byp', 'route', 'rndfx'],
+  drum: ['dron', 'dsc', 'dkit', 'dstyle', 'drandom', 'dclear', 'dm0', 'dm1', 'dm2', 'dm3', 'dm4'],
 };
 const ctrlDefault = () => ({
   seq: { left: 'xy', right: 'pads', xy: ['cutoff', 'offfrel', 'reso', 'offarel'], pads: ['latch', 'warp', 'mutate', 'random'], faders: ['cutoff', 'reso', 'gate', 'accent'], mod: 'cutoff' },
   mix: { left: 'xy', right: 'faders', xy: ['eqlow', 'eqmid', 'eqhigh', 'fx1mix'], pads: ['solo1', 'solo2', 'solo3', 'solo4'], faders: ['lv1', 'lv2', 'lv3', 'lv4'], mod: 'eqhigh' },
   syn: { left: 'xy', right: 'faders', xy: ['cutoff', 'fenv', 'reso', 'fdec'], pads: ['rndsyn', 'mute1', 'mute2', 'solo1'], faders: ['cutoff', 'reso', 'fenv', 'fdec'], mod: 'cutoff' },
+  drum: { left: 'xy', right: 'pads', xy: ['dkt', 'dkd', 'dscamt', 'dscrel'], pads: ['dsc', 'dkit', 'dstyle', 'drandom'], faders: ['dkick', 'dsnare', 'dhat', 'dlevel'], mod: 'ddrive' },
   fx: { left: 'xy', right: 'pads', xy: ['fmix', 'fx1mix', 'flt1', 'fx1p1'], pads: ['fbyp', 'f1byp', 'f2byp', 'route'], faders: ['djf', 'tape', 'wow', 'chorusm'], mod: 'djf' },
 });
 const mergeCtrl = (base, sv) => { const out = {}; for (const p of Object.keys(base)) out[p] = { ...base[p], ...((sv && sv[p]) || {}) }; return out; };
@@ -857,6 +923,7 @@ const ASSIGN_DEFAULT = {
   'seq:3': ['tempo', 'length', 'swing', 'human', 'ghost', 'slide', 'glide', 'velo', null, null],
   'mix:0': ['eqlow', 'eqmid', 'eqhigh', 'fx1mix', 'fbyp', 'master', 'dotmode', null, null, null],
   'syn:0': ['cutoff', 'reso', 'fenv', 'fdec', 'adec', 'asus', 'arel', 'aatk', null, null],
+  'drum:0': ['dlevel', 'dkick', 'dsnare', 'dclap', 'dhat', 'dopen', 'dkt', 'dkd', 'dscamt', 'dscrel'],
   'fx:0': ['flt1', 'flt2', 'flt3', 'fmix', 'flt4', 'fx1p1', 'fx1p2', 'fx1p3', 'fx1mix', 'fx2mix'],
 };
 const ASSIGN_KEY = 'radarxxx.assign.v1';
@@ -953,6 +1020,10 @@ const DESC = {
   random: 'nowy losowy wzór', mutate: 'zmienia brzmienie i wysokość części nut', warp: 'przekształca wzór: obrót, odbicie, wspak',
   reverse: 'odwraca kolejność nut', invert: 'odbija wysokości nut w pionie', rotl: 'przesuwa wzór o krok wstecz', rotr: 'przesuwa wzór o krok do przodu',
   double: 'kopiuje pierwszą połowę wzoru na drugą', half: 'skraca wzór o połowę', clear: 'czyści wzór', basem: 'nuta bazowa o półton niżej', basep: 'nuta bazowa o półton wyżej', keyn: 'następna skala (electro, fryg, moll)',
+  dlevel: 'głośność całej perkusji', dkick: 'głośność stopy', dsnare: 'głośność werbla', dclap: 'głośność klaskania', dhat: 'głośność hatu zamkniętego', dopen: 'głośność hatu otwartego',
+  dkt: 'strojenie stopy', dkd: 'długość wybrzmiewania stopy', dst: 'strojenie werbla', dhd: 'długość hatów', ddrive: 'nasycenie perkusji', dscamt: 'sidechain: ile stopa przycina syntezator', dscrel: 'sidechain: czas powrotu syntezatora', ddens: 'gęstość losowanych wzorów',
+  dron: 'włącza i wyłącza perkusję', dsc: 'włącza i wyłącza sidechain stopy', dkit: 'następny zestaw brzmień: 808, 909, SYNTH', dstyle: 'następny styl wzorów: TECHNO, ELECTRO', drandom: 'nowy losowy wzór perkusji', dclear: 'czyści wzór perkusji',
+  dm0: 'wycisza stopę', dm1: 'wycisza werbel', dm2: 'wycisza klaskanie', dm3: 'wycisza hat zamknięty', dm4: 'wycisza hat otwarty',
   xy: 'oś X steruje dwoma parametrami, oś Y dwoma innymi', pads: 'cztery przyciski: przełączniki i akcje', faders: 'cztery pionowe suwaki', wheels: 'pitch bend (±2 półtony) i modulation',
   knob: 'dziesięć pokręteł', slider: 'dziesięć pionowych suwaków',
 };
@@ -1022,6 +1093,7 @@ const tabNames = (p) => ({
   mix: ['MAIN', ...VOICE_NAMES.map((_, i) => TAB_SHORT[engine.types[i]]), 'CTRL'],
   syn: ['MAIN', ...VOICE_NAMES.map((_, i) => TAB_SHORT[engine.types[i]]), 'CTRL'],
   fx: ['MAIN', 'FLT', 'FX1', 'FX2', 'MSTR', 'CTRL'],
+  drum: ['MAIN', 'PTRN', 'CTRL'],
 })[p];
 function renderSub() {
   const host = el('subtabs'), names = tabNames(page);
@@ -1047,6 +1119,17 @@ function renderPanel() {
 
   if (isAssign()) { renderAssign(); return; }       // zakładki z dziesięcioma przypisywalnymi miejscami (patrz wyżej)
 
+  if (page === 'drum') {
+    // PTRN: narzędzia wzoru perkusji i wyciszanie ścieżek
+    panelEl.appendChild(grid);
+    const rot = (k) => { engine.drumPattern = { ...engine.drumPattern, steps: engine.drumPattern.steps.map((row) => row.map((_, i) => row[(((i - k) % DRUM_STEPS) + DRUM_STEPS) % DRUM_STEPS])) }; };
+    B({ kind: 'act', icon: 'clear', label: () => 'CLEAR', act: () => SW.dclear[2]() });
+    B({ kind: 'act', icon: 'rotl', label: () => 'ROT ←', act: () => rot(-1) }); B({ kind: 'act', icon: 'rotr', label: () => 'ROT →', act: () => rot(1) });
+    B({ kind: 'act', label: () => 'FILL', act: () => { const st = engine.drumPattern.steps.map((r) => r.slice()); [13, 14, 15].forEach((i, n) => { st[1][i] = n === 2 ? 2 : 1; }); st[3][15] = 0; engine.drumPattern = { ...engine.drumPattern, steps: st }; } });
+    B({ kind: 'act', label: () => 'RANDOM', act: drumRandom });
+    DRUM_TRACKS.forEach((n, k) => B({ kind: 'tog', label: () => n, on: () => !engine.drum.mute[k], act: () => { engine.drum.mute[k] = !engine.drum.mute[k]; } }));
+    return;
+  }
   if (page === 'seq') {
     panelEl.appendChild(grid);
     if (tab === 1) {
@@ -1106,6 +1189,12 @@ function renderPanel() {
 // ---------- kropki w rogach ----------
 const ctlLabel = ['OBA', 'FILTR', 'EFEKT'];
 function dotList() {
+  if (page === 'drum') return [
+    { label: 'RANDOM', act: drumRandom },
+    { label: DRUM_KITS[engine.drum.kit], sub: 'KIT', act: () => { engine.drum.kit = (engine.drum.kit + 1) % DRUM_KITS.length; engine.auditionDrum(0); } },
+    { label: DRUM_STYLES[engine.drum.style], sub: 'STYLE', act: () => { engine.drum.style = (engine.drum.style + 1) % DRUM_STYLES.length; drumRandom(); } },
+    { label: 'SC', sub: 'SIDECHAIN', lit: engine.drum.sc, act: () => { engine.drum.sc = !engine.drum.sc; toast(engine.drum.sc ? 'SIDECHAIN: WŁ.' : 'SIDECHAIN: WYŁ.'); } },
+  ];
   if (page === 'seq') return [
     { label: 'RANDOM', act: actions.random }, { label: 'MUTATE', act: actions.mut },
     { label: 'LATCH', lit: state.latch, act: actions.latch }, { label: 'WARP', sub: `› ${WARP_OPS[warpIdx % WARP_OPS.length][0]}`, act: actions.warp },
@@ -1167,7 +1256,7 @@ window.addEventListener('keydown', (e) => {
   if (!bpmPop.hidden) { if (e.code === 'Escape') { e.preventDefault(); showBpm(false); } else if (e.code === 'ArrowUp') { e.preventDefault(); setBpm(engine.bpm + 1); } else if (e.code === 'ArrowDown') { e.preventDefault(); setBpm(engine.bpm - 1); } return; }
   const map = { Space: togglePlay, KeyR: () => { actions.random(); commitSoon(); }, KeyM: () => { actions.mut(); commitSoon(); },
     KeyZ: () => stepHistory(e.shiftKey ? 1 : -1),
-    Digit1: () => setPage('seq'), Digit2: () => setPage('mix'), Digit3: () => setPage('syn'), Digit4: () => setPage('fx'),
+    Digit1: () => setPage('seq'), Digit2: () => setPage('mix'), Digit3: () => setPage('syn'), Digit4: () => setPage('fx'), Digit5: () => setPage('drum'),
     ArrowUp: () => setBpm(engine.bpm + 2), ArrowDown: () => setBpm(engine.bpm - 2) };
   if (map[e.code]) { e.preventDefault(); if (e.target instanceof HTMLButtonElement) e.target.blur(); map[e.code](); }
 });
