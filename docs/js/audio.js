@@ -23,6 +23,7 @@ export class Engine {
     this.human = 0;               // 0..1: losowe drobne przesunięcia czasu i głośności
     this.ghost = 0;               // 0..1: ciche nuty-duchy w pustych krokach
     this.velo = 1;                // mnożnik siły uderzenia (nie wpływa na akcenty)
+    this.vOff = [0, 0, 0, 0];     // przesunięcie wzoru wysyłanego do każdego silnika (w krokach 1/16: 0, 1, 4/3, 2, 8/3, 4, 8)
     this.vOct = [0, 0, 0, 0];     // oktawa każdego silnika
     this.vTune = [0, 0, 0, 0];    // dostrojenie każdego silnika (cent)
     this.vEq = [[0, 0], [0, 0], [0, 0], [0, 0]];   // EQ każdego silnika: niskie, wysokie (dB)
@@ -284,7 +285,7 @@ export class Engine {
       // GHOST: ciche nuty-duchy (tonika) w części pustych kroków, stałe dla danego kroku
       if (this.ghost > 0 && stepHash(i, 777) < this.ghost * 0.35) {
         const gf = midiToHz(pitch(pat.root, pat.mode, 0, 0)) * this.octMul;
-        this.voices.forEach((v, vi) => { if (this.eff[vi] > 0.02) v.note(tt, this._voiceFreq(vi, gf), Math.round(46 * this.velo), false, dur * 0.35, false, false); });
+        this.voices.forEach((v, vi) => { if (this.eff[vi] > 0.02) v.note(tt + this.vOff[vi] * dur, this._voiceFreq(vi, gf), Math.round(46 * this.velo), false, dur * 0.35, false, false); });
       }
       return;
     }
@@ -304,7 +305,7 @@ export class Engine {
       const len = r === 1 ? dur * Math.min(4, gate) : part * 0.5;
       const slide = k === 0 && this.lastTied;
       const hold = tiedOut && k === r - 1;
-      this.voices.forEach((v, vi) => { if (this.eff[vi] > 0.02) v.note(t0, this._voiceFreq(vi, freq), vel, accent, len, slide, hold); });
+      this.voices.forEach((v, vi) => { if (this.eff[vi] > 0.02) v.note(t0 + this.vOff[vi] * dur, this._voiceFreq(vi, freq), vel, accent, len, slide, hold); });
     }
     this.lastTied = tiedOut;
   }
