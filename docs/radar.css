@@ -137,6 +137,7 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 /* tryb ENCODER / CONTROLLER */
 .moderow{display:flex;justify-content:space-between;align-items:center;height:22px;font-size:20px;letter-spacing:.1em;line-height:1}
 .moderow button{font-size:20px;letter-spacing:.1em;padding:0}
+.moderow button:nth-child(2):not(:last-child){color:var(--acc)}
 .moderow.off{visibility:hidden}
 .ctlwrap{display:grid;grid-template-columns:1fr 1fr;gap:24px;height:130px}
 .cbox{position:relative;border:1px solid var(--ink);height:130px;touch-action:none;user-select:none;overflow:hidden}

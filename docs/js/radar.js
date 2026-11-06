@@ -648,11 +648,25 @@ const CONT = {
   comp: ['COMP', (n) => { globals.comp = n; engine.setComp(n); }], mdrive: ['DRIVE', (n) => { globals.mdrive = n; engine.setDrive(n); }],
   eqlow: ['EQ LOW', (n) => engine.setEq(0, lin2(n, -12, 12))], eqmid: ['EQ MID', (n) => engine.setEq(1, lin2(n, -12, 12))], eqhigh: ['EQ HIGH', (n) => engine.setEq(2, lin2(n, -12, 12))],
   fmix: ['FLT MIX', (n) => setFxParam(fxSecs[0], 'mix', n)], fx1mix: ['FX1 MIX', (n) => setFxParam(fxSecs[1], 'mix', n)], fx2mix: ['FX2 MIX', (n) => setFxParam(fxSecs[2], 'mix', n)],
-  flt1: ['FLT P1', fxIdx(0, 0)], flt2: ['FLT P2', fxIdx(0, 1)], fx1p1: ['FX1 P1', fxIdx(1, 0)], fx1p2: ['FX1 P2', fxIdx(1, 1)], fx2p1: ['FX2 P1', fxIdx(2, 0)], fx2p2: ['FX2 P2', fxIdx(2, 1)],
   djf: ['DJ FLT', (n) => { globals.dj = n * 2 - 1; engine.setDj(globals.dj); }], tape: ['TAPE', (n) => { globals.tape = n; engine.setTape(n); }], wow: ['WOW', (n) => { globals.wow = n; engine.setWow(n); }], chorusm: ['CHORUS', (n) => { globals.chorus = n; engine.setChorus(n); }],
   padx: ['PAD X', (n) => setPad(n, padPos.y)], pady: ['PAD Y', (n) => setPad(padPos.x, n)],
   lv1: ['LEVEL 1', (n) => engine.setLevel(0, n * 1.5)], lv2: ['LEVEL 2', (n) => engine.setLevel(1, n * 1.5)], lv3: ['LEVEL 3', (n) => engine.setLevel(2, n * 1.5)], lv4: ['LEVEL 4', (n) => engine.setLevel(3, n * 1.5)],
 };
+
+// Parametry sekcji FX: osiem na filtr i na każdy z efektów, nazwa zależy od wybranego stylu (np. „FLT CUTOFF”).
+[['flt', 0, 'FLT'], ['fx1p', 1, 'FX1'], ['fx2p', 2, 'FX2']].forEach(([pre, j, nm]) => {
+  for (let i = 0; i < 8; i++) CONT[`${pre}${i + 1}`] = [() => { const sp = fxSecs[j] && fxSecs[j].styles[fxSecs[j].slot.style].params[i]; return sp ? `${nm} ${knobLabel(sp.label)}` : `${nm} P${i + 1}`; }, fxIdx(j, i)];
+});
+// MIX: oktawa i EQ każdego silnika
+for (let i = 0; i < 4; i++) {
+  CONT[`oct${i + 1}`] = [`OCT ${i + 1}`, (n) => { engine.vOct[i] = Math.round(lin2(n, -2, 2)); }];
+  CONT[`vlo${i + 1}`] = [`LOW ${i + 1}`, (n) => engine.setVoiceEq(i, 0, lin2(n, -12, 12))];
+  CONT[`vhi${i + 1}`] = [`HIGH ${i + 1}`, (n) => engine.setVoiceEq(i, 1, lin2(n, -12, 12))];
+}
+// SEQ: te, których brakowało (oktawa, shift, długość wzoru)
+CONT.oct = ['OKTAWA', (n) => { state.oct = Math.round(lin2(n, -2, 2)); refin(); }];
+CONT.shift = ['SHIFT', (() => { let last = 0; return (n) => { const v = Math.round(lin2(n, -4, 4)); const d = v - last; last = v; if (d) setSteps(rotateSteps(pattern.steps, d)); }; })()];
+CONT.length = ['LENGTH', (n) => { const len = 8 + 4 * Math.round(n * 6); if (len !== pattern.steps.length) setSteps(resizeSteps(pattern.steps, len)); }];
 const SW = {
   fbyp: ['FLT BYP', () => fxSecs[0].slot.bypass, () => bypass(0)], f1byp: ['FX1 BYP', () => fxSecs[1].slot.bypass, () => bypass(1)], f2byp: ['FX2 BYP', () => fxSecs[2].slot.bypass, () => bypass(2)],
   latch: ['LATCH', () => state.latch, actions.latch],
@@ -663,6 +677,10 @@ const SW = {
   rndeng: ['RND ENG', () => false, () => engine.enabled.forEach((on, i) => { if (on) engine.randomizeVoice(i); })], rndsyn: ['RND SYN', () => false, () => engine.enabled.forEach((on, i) => { if (on) engine.randomizeVoice(i); })],
   rndfx: ['RND FX', () => false, () => fxSecs.slice(0, 2).forEach((x) => x.randomize())],
   route: ['ROUTING', () => false, () => { const k = PERMS.findIndex((p) => p.join() === engine.fx.order.join()); engine.fx.route(PERMS[(k + 1) % PERMS.length]); toast(routeText()); }],
+  clear: ['CLEAR', () => false, actions.steps(clearSteps)], double: ['DOUBLE', () => false, actions.steps(doubleSteps)], half: ['HALF', () => false, actions.steps(halveSteps)],
+  basem: ['BASE −', () => false, () => actions.base(-1)], basep: ['BASE +', () => false, () => actions.base(1)], keyn: ['KEY', () => false, () => { actions.key(1); toast(MODE_LABEL[state.mode]); }],
+  type1: ['TYPE 1', () => false, () => engine.setType(0, (engine.types[0] + 1) % SHORT.length)], type2: ['TYPE 2', () => false, () => engine.setType(1, (engine.types[1] + 1) % SHORT.length)],
+  type3: ['TYPE 3', () => false, () => engine.setType(2, (engine.types[2] + 1) % SHORT.length)], type4: ['TYPE 4', () => false, () => engine.setType(3, (engine.types[3] + 1) % SHORT.length)],
   random: ['RANDOM', () => false, actions.random], mutate: ['MUTATE', () => false, actions.mut], warp: ['WARP', () => false, actions.warp],
   reverse: ['REVERSE', () => false, actions.steps(reverseSteps)], invert: ['INVERT', () => false, actions.steps(invertSteps)],
   rotl: ['ROT ←', () => false, actions.steps((st) => rotateSteps(st, -1))], rotr: ['ROT →', () => false, actions.steps((st) => rotateSteps(st, 1))],
@@ -671,14 +689,14 @@ const CTL_TYPES = { xy: 'XY PAD', pads: '4 PRZYCISKI', faders: '4 SUWAKI', wheel
 const CTL_KEY = 'radarxxx.ctrl.v2';
 // Kontrolery (zakładka CTRL) sterują tylko tym, co jest w danej sekcji: każda strona ma własną listę parametrów, własne przełączniki i własne ustawienia.
 const SECTION_CONT = {
-  seq: ['cutoff', 'reso', 'offfatk', 'offfrel', 'offaatk', 'offarel', 'gate', 'accent', 'slide', 'swing', 'human', 'ghost', 'velo', 'glide', 'tempo'],
-  mix: ['eqlow', 'eqmid', 'eqhigh', 'fx1mix', 'master', 'lv1', 'lv2', 'lv3', 'lv4', 'tune1', 'tune2', 'tune3', 'tune4', 'padx', 'pady'],
+  seq: ['cutoff', 'reso', 'offfatk', 'offfrel', 'offaatk', 'offarel', 'gate', 'accent', 'shift', 'oct', 'tempo', 'length', 'swing', 'human', 'ghost', 'slide', 'glide', 'velo'],
+  mix: ['eqlow', 'eqmid', 'eqhigh', 'fx1mix', 'master', 'lv1', 'lv2', 'lv3', 'lv4', 'tune1', 'tune2', 'tune3', 'tune4', 'oct1', 'oct2', 'oct3', 'oct4', 'vlo1', 'vlo2', 'vlo3', 'vlo4', 'vhi1', 'vhi2', 'vhi3', 'vhi4', 'padx', 'pady'],
   syn: ['cutoff', 'reso', 'fenv', 'fdec', 'aatk', 'adec', 'asus', 'arel', 'lv1', 'lv2', 'lv3', 'lv4'],
-  fx: ['flt1', 'flt2', 'fx1p1', 'fx1p2', 'fx2p1', 'fx2p2', 'fmix', 'fx1mix', 'fx2mix', 'djf', 'tape', 'wow', 'chorusm', 'master', 'comp', 'mdrive'],
+  fx: [...[1, 2, 3, 4, 5, 6, 7, 8].map((i) => `flt${i}`), ...[1, 2, 3, 4, 5, 6, 7, 8].map((i) => `fx1p${i}`), ...[1, 2, 3, 4, 5, 6, 7, 8].map((i) => `fx2p${i}`), 'djf', 'tape', 'wow', 'chorusm', 'master', 'comp', 'mdrive'],
 };
 const SECTION_SW = {
-  seq: ['latch', 'random', 'mutate', 'warp', 'reverse', 'invert', 'rotl', 'rotr'],
-  mix: ['fbyp', 'mute1', 'mute2', 'mute3', 'mute4', 'solo1', 'solo2', 'solo3', 'solo4', 'rndeng'],
+  seq: ['latch', 'random', 'mutate', 'warp', 'reverse', 'invert', 'rotl', 'rotr', 'double', 'half', 'clear', 'basem', 'basep', 'keyn'],
+  mix: ['fbyp', 'mute1', 'mute2', 'mute3', 'mute4', 'solo1', 'solo2', 'solo3', 'solo4', 'type1', 'type2', 'type3', 'type4', 'rndeng'],
   syn: ['rndsyn', 'mute1', 'mute2', 'mute3', 'mute4', 'solo1', 'solo2', 'solo3', 'solo4'],
   fx: ['fbyp', 'f1byp', 'f2byp', 'route', 'rndfx'],
 };
@@ -711,7 +729,7 @@ function vSlider({ label, value, onInput, spring, rest = 0.5 }) {
   el0.addEventListener('pointerup', end); el0.addEventListener('pointercancel', end);
   return el0;
 }
-const nameOfC = (id) => (CONT[id] ? CONT[id][0] : id);
+const nameOfC = (id) => { if (!CONT[id]) return id; const l = CONT[id][0]; return typeof l === 'function' ? l() : l; };
 function buildXY(box) {
   box.classList.add('xy');
   box.innerHTML = '<div class="hx"></div><div class="hy"></div><div class="puck"></div><span class="cname"></span>';
@@ -750,6 +768,13 @@ function renderControllers() {
   ['left', 'right'].forEach((side) => { const box = document.createElement('div'); box.className = 'cbox'; CTL_BUILD[C()[side]](box); wrap.appendChild(box); });
   panelEl.appendChild(wrap);
 }
+// RANDOM w CTRL: losuje, czym sterują pad XY (4 parametry), przyciski, suwaki i modulation, wyłącznie spośród parametrów tej sekcji
+function randomizeCtrl() {
+  const shuffle = (a) => { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [b[i], b[k]] = [b[k], b[i]]; } return b; };
+  const c = C(), cont = shuffle(SECTION_CONT[page]);
+  c.xy = cont.slice(0, 4); c.faders = shuffle(SECTION_CONT[page]).slice(0, 4); c.mod = shuffle(SECTION_CONT[page])[0]; c.pads = shuffle(SECTION_SW[page]).slice(0, 4);
+  saveCtrl();
+}
 const FX_NAMES = ['FLT', 'FX1', 'FX2'];
 const PERMS = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
 const routeText = () => `ROUTING:${engine.fx.order.map((i) => FX_NAMES[i]).join('-')}`;
@@ -757,6 +782,7 @@ function moderow() {
   const ctl = isCtl(), fxp = page === 'fx', on = fxp || ctl;
   const r = document.createElement('div'); r.className = `moderow${on ? '' : ' off'}`;
   const m = document.createElement('button'), e = document.createElement('button');
+  let rnd = null;
   e.textContent = 'EDIT';
   if (fxp && !ctl) {
     // strona FX: kolejność sekcji w łańcuchu; dotknięcie napisu przełącza kolejne układy, EDIT otwiera okienko
@@ -764,13 +790,15 @@ function moderow() {
     m.addEventListener('click', () => { const k = PERMS.findIndex((p) => p.join() === engine.fx.order.join()); engine.fx.route(PERMS[(k + 1) % PERMS.length]); m.textContent = routeText(); commitSoon(); });
     e.addEventListener('click', () => showCtl(true, 'route'));
   } else {
-    // zakładka CTRL: napis MODE:CONTROLLER (dotknięcie wraca na MAIN), EDIT otwiera przypisania kontrolerów
+    // zakładka CTRL: napis MODE:CONTROLLER (dotknięcie wraca na MAIN), RANDOM losuje przypisania, EDIT otwiera przypisania kontrolerów
     m.textContent = 'MODE:CONTROLLER'; m.setAttribute('aria-label', 'Wróć do pokręteł');
     m.addEventListener('click', () => { tabSel[page] = 0; renderSub(); renderPanel(); });
+    rnd = document.createElement('button'); rnd.textContent = 'RANDOM'; rnd.setAttribute('aria-label', 'Losuj przypisania kontrolerów');
+    rnd.addEventListener('click', () => { randomizeCtrl(); renderPanel(); commitSoon(); toast('LOSOWO PRZYPISANO'); });
     e.addEventListener('click', () => showCtl(true));
   }
   if (!on) { m.tabIndex = -1; e.tabIndex = -1; }
-  r.appendChild(m); r.appendChild(e); return r;
+  r.appendChild(m); if (rnd) r.appendChild(rnd); r.appendChild(e); return r;
 }
 // okienko EDIT: typ obu boksów i przypisania parametrów (listy rozwijane)
 const ctlPop = el('ctl-pop');
@@ -797,7 +825,7 @@ function renderCtlEdit() {
     r.appendChild(sp); r.appendChild(sel); body.appendChild(r);
   };
   const sec = (t) => { const d = document.createElement('div'); d.className = 'csec'; d.textContent = t; body.appendChild(d); };
-  const types = Object.entries(CTL_TYPES), cont = SECTION_CONT[page].map((k) => [k, CONT[k][0]]), sw = SECTION_SW[page].map((k) => [k, SW[k][0]]);   // tylko parametry tej sekcji
+  const types = Object.entries(CTL_TYPES), cont = SECTION_CONT[page].map((k) => [k, nameOfC(k)]), sw = SECTION_SW[page].map((k) => [k, SW[k][0]]);   // tylko parametry tej sekcji
   el('ctl-title').textContent = `KONTROLERY: ${page.toUpperCase()}`;
   row('LEWY', types, C().left, (v) => { C().left = v; }); row('PRAWY', types, C().right, (v) => { C().right = v; });
   const used = new Set([C().left, C().right]);
