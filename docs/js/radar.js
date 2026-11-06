@@ -125,14 +125,15 @@ function drawCorners(G, defs, flat = false) {
   const ang = [-Math.PI / 4, Math.PI / 4, (5 * Math.PI) / 4, (3 * Math.PI) / 4];
   defs.forEach((d, i) => {
     if (!d) return;
-    const top = i < 2, left = i % 2 === 0, x = left ? m : W - m, y = top ? m : W - m, a = d.dim ? 0.4 : 1;
+    const top = i < 2, left = i % 2 === 0, x = flat ? ((i + 0.5) * W) / 4 : left ? m : W - m, y = flat ? W * 0.855 : top ? m : W - m, a = d.dim ? 0.4 : 1;
     g.beginPath(); g.arc(x, y, rd, 0, TAU);
     if (d.lit === false) { g.strokeStyle = `rgba(${ACC},${a})`; g.lineWidth = 2 * dpr; g.stroke(); }
     else { g.fillStyle = `rgba(${ACC},${a})`; g.fill(); }
-    if (flat) {                                   // bez okręgu (sekwencer perkusji): napis poziomo obok kropki, podpis pod albo nad nim
-      g.textBaseline = 'middle'; g.textAlign = left ? 'left' : 'right'; const tx = left ? x + rd + 8 * dpr : x - rd - 8 * dpr;
-      g.font = FONT(size); g.fillStyle = `rgba(${INK},${a})`; g.fillText(d.label, tx, y);
-      if (d.sub) { g.font = FONT(sz2); g.fillStyle = `rgba(${INK},${0.65 * a})`; g.fillText(d.sub, tx, y + (top ? 1 : -1) * size * 0.95); }
+    if (flat) {                                   // sekwencer perkusji: cztery kropki w rzędzie pod siatką, napis i podpis wyśrodkowane pod każdą
+      const fs = W * 0.034, fs2 = W * 0.027;
+      g.textBaseline = 'middle'; g.textAlign = 'center';
+      g.font = FONT(fs); g.fillStyle = `rgba(${INK},${a})`; g.fillText(d.label, x, y + rd + fs * 0.95);
+      if (d.sub) { g.font = FONT(fs2); g.fillStyle = `rgba(${INK},${0.65 * a})`; g.fillText(d.sub, x, y + rd + fs * 0.95 + fs2 * 1.5); }
       return;
     }
     // główny napis: tuż za obrzeżem radaru, na przekątnej, obrócony o 45° (styczny do okręgu), między radarem a kropką
@@ -314,7 +315,7 @@ function drawSyn() {
 // ---------- DRUM: klasyczny sekwencer krokowy ----------
 // Pięć rzędów (stopa, werbel, klaskanie, hat zamknięty, hat otwarty) i 16 kroków w poziomie, w miejscu radaru. Dotknięcie przełącza: pusty, uderzenie, akcent;
 // przeciągnięcie po rzędzie wpisuje tę samą wartość w kolejne kroki.
-const DG = { x0: 0.095, x1: 0.975, y0: 0.2, y1: 0.8 };            // pole siatki jako ułamek kwadratu ekranu
+const DG = { x0: 0.095, x1: 0.975, y0: 0.11, y1: 0.77 };            // pole siatki jako ułamek kwadratu ekranu
 function drawDrum() {
   const G = geo(), S0 = sweepState(), { W, dpr } = G;
   const p16 = S0.pos % DRUM_STEPS, hot = Math.floor(p16), gx = DG.x0 * W, gw = (DG.x1 - DG.x0) * W, gy = DG.y0 * W, gh = (DG.y1 - DG.y0) * W, cw = gw / DRUM_STEPS, rh = gh / DRUM_TRACKS.length;
@@ -1193,7 +1194,7 @@ function dotList() {
       { label: 'RANDOM', sub: 'NOWY WZÓR', act: drumRandom, say: () => 'RANDOM: nowy losowy wzór perkusji' },
       { label: `KIT ${DRUM_KITS[d.kit]}`, sub: 'ZMIEŃ ZESTAW', act: () => { d.kit = (d.kit + 1) % DRUM_KITS.length; engine.auditionDrum(0); }, say: () => `KIT: zestaw brzmień ${DRUM_KITS[d.kit]}` },
       { label: `STYLE ${DRUM_STYLES[d.style]}`, sub: 'ZMIEŃ STYL', act: () => { d.style = (d.style + 1) % DRUM_STYLES.length; drumRandom(); }, say: () => `STYLE: ${DRUM_STYLES[d.style]}, nowy wzór w tym stylu` },
-      { label: `SIDECH. ${d.sc ? 'WŁ.' : 'WYŁ.'}`, sub: 'STOPA PRZYCINA BAS', lit: d.sc, act: () => { d.sc = !d.sc; }, say: () => `SIDECHAIN ${d.sc ? 'WŁ.' : 'WYŁ.'}: stopa ${d.sc ? 'przycina syntezator' : 'nie przycina syntezatora'}` },
+      { label: `SIDECH. ${d.sc ? 'WŁ.' : 'WYŁ.'}`, sub: 'PRZYCINA BAS', lit: d.sc, act: () => { d.sc = !d.sc; }, say: () => `SIDECHAIN ${d.sc ? 'WŁ.' : 'WYŁ.'}: stopa ${d.sc ? 'przycina syntezator' : 'nie przycina syntezatora'}` },
     ];
   }
   if (page === 'seq') return [
@@ -1236,7 +1237,7 @@ cv.addEventListener('pointerup', commitSoon);
 // ---------- strony ----------
 let glideMs = 50;
 function setPage(p) {
-  page = p;
+  page = p; el('dots').classList.toggle('row', p === 'drum');
   document.querySelectorAll('#pages button').forEach((b) => b.classList.toggle('on', b.dataset.page === p));
   if (p === 'syn' && tabSel.syn > 0 && tabSel.syn < tabNames('syn').length - 1) synSel = tabSel.syn - 1;
   renderSub(); renderPanel();

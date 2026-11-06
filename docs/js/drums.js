@@ -78,6 +78,10 @@ export class DrumKit {
     const g = this._gain(t, 1.0 * lv, dec);
     if (kit === 'SYNTH') { const sh = c.createWaveShaper(); sh.curve = this.curve; o.connect(sh).connect(g); } else o.connect(g);
     g.connect(this.out);
+    // składowa o oktawę wyżej, krótsza: stopa słyszalna także na małych głośnikach telefonu (bez niej to głównie podbas poniżej 60 Hz)
+    const o2 = this._osc('triangle', cfg[0] * tune * 2, t, t + dec * 0.5 + 0.1);
+    o2.frequency.exponentialRampToValueAtTime(cfg[1] * tune * 2, t + cfg[2]);
+    o2.connect(this._gain(t, 0.38 * lv, dec * 0.45)).connect(this.out);
     if (kit === '909') {                              // krótki trzask przy uderzeniu
       const n = this._noise(t, t + 0.03), bp = this._bq('bandpass', 2600, 0.8), cg = this._gain(t, 0.35 * lv, 0.012);
       n.connect(bp).connect(cg).connect(this.out);

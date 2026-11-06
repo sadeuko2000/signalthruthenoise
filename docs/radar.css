@@ -83,6 +83,8 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .dots{position:absolute;inset:0;pointer-events:none}
 .dot{position:absolute;width:24%;height:14%;pointer-events:auto;background:transparent}
 .dot:nth-child(1){left:0;top:0}.dot:nth-child(2){right:0;top:0}.dot:nth-child(3){left:0;bottom:0}.dot:nth-child(4){right:0;bottom:0}
+.dots.row .dot{top:auto;bottom:0;width:25%;height:19%}
+.dots.row .dot:nth-child(1){left:0}.dots.row .dot:nth-child(2){left:25%;right:auto}.dots.row .dot:nth-child(3){left:50%}.dots.row .dot:nth-child(4){left:75%;right:auto}
 .dot:active{opacity:1;background:rgba(11,11,11,.06)}
 .subtabs{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);border-block:1px solid var(--ink)}
 .subtabs button{min-height:28px;font-size:20px;letter-spacing:.08em;border-right:1px solid var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}

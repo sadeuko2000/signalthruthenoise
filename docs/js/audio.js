@@ -21,7 +21,7 @@ export class Engine {
     this.enabled = [1, 1, 1, 1];  // które silniki biorą udział w miksie
     this.types = [1, 0, 2, 3];    // rodzaj silnika w każdym z 4 miejsc (0 prophet, 1 ms-20, 2 dx, 3 wavetable); mogą się powtarzać. Domyślnie jak w szkicu: MS20, PROPHET, DX, WAVE
     // perkusja: ustawienia (kit 0 808, 1 909, 2 SYNTH; levels = stopa, werbel, klaskanie, hat zamknięty i otwarty), sidechain stopy na sygnał syntezatora
-    this.drum = { on: true, kit: 0, level: 0.8, levels: [1, 0.85, 0.7, 0.55, 0.5], mute: [false, false, false, false, false], kt: 1, kd: 1, st: 1, hd: 1, drive: 0, sc: true, scAmt: 0.65, scRel: 0.18, style: 0, density: 0.5 };
+    this.drum = { on: true, kit: 0, level: 0.8, levels: [1, 1, 0.95, 0.9, 0.8], mute: [false, false, false, false, false], kt: 1, kd: 1, st: 1, hd: 1, drive: 0, sc: true, scAmt: 0.65, scRel: 0.18, style: 0, density: 0.5 };
     this.drumPattern = generateDrums({ style: 0, density: 0.5, seed: 1 });
     this.latch = false;           // LATCH: nuty trzymają się aż do następnej
     this.human = 0;               // 0..1: losowe drobne przesunięcia czasu i głośności
