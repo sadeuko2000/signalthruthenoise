@@ -304,8 +304,9 @@ function drawSyn() {
   g.beginPath(); g.arc(kx, ky, R * 0.045, 0, TAU); g.moveTo(kx - R * 0.08, ky); g.lineTo(kx + R * 0.08, ky); g.moveTo(kx, ky - R * 0.08); g.lineTo(kx, ky + R * 0.08); g.stroke();
 }
 
-let raf = 0;
+let raf = 0, lastSync = 0;
 function loop(ts) {
+  if (ts - lastSync > 120) { lastSync = ts; if (typeof syncAssign === 'function') syncAssign(); }
   if (!el('radar').hidden) { if (page === 'mix') drawMix(); else if (page === 'fx') drawFx(ts); else if (page === 'syn') drawSyn(); else drawSeq(); }
   raf = requestAnimationFrame(loop);
 }
@@ -384,7 +385,7 @@ const snapshot = () => JSON.parse(JSON.stringify({
   pattern,
   state: { root: state.root, mode: state.mode, accent: state.accent, slide: state.slide, oct: state.oct, swing: state.swing, seed: state.seed, density: state.density, syncopation: state.syncopation, latch: state.latch, mixMode: state.mixMode },
   audio: { offs: { offFAtk: engine.p.offFAtk, offFRel: engine.p.offFRel, offAAtk: engine.p.offAAtk, offARel: engine.p.offARel }, bpm: engine.bpm, gate: engine.gateMul, human: engine.human, ghost: engine.ghost, velo: engine.velo, types: engine.types, enabled: engine.enabled, levels: engine.levels, solo: engine.solo, xy: engine.xy, eq: engine.eq, vOct: engine.vOct, vTune: engine.vTune, vEq: engine.vEq, params: engine.voices.map((v) => v.params) },
-  globals, ctl: fxCtl, warp: warpIdx, ctrl, route: engine.fx.order,
+  globals, ctl: fxCtl, warp: warpIdx, ctrl, assign, route: engine.fx.order,
   fx: [engine.fx.filter, engine.fx.fx, engine.fx.fx2].map((x) => ({ style: x.style, values: x.values, bypass: x.bypass })),
 }));
 function applyGlobals() {
@@ -408,6 +409,7 @@ function restore(sn) {
   Object.assign(globals, sn.globals); applyGlobals();
   fxCtl = sn.ctl; warpIdx = sn.warp || 0;
   if (sn.ctrl) { ctrl = mergeCtrl(ctrlDefault(), sn.ctrl); saveCtrl(); }
+  if (sn.assign) { assign = JSON.parse(JSON.stringify(sn.assign)); saveAssign(); }
   if (sn.route) engine.fx.route(sn.route);
   sn.fx.forEach((x, j) => {
     const sec = fxSecs[j]; if (!sec) return;
@@ -681,10 +683,37 @@ const SW = {
   basem: ['BASE −', () => false, () => actions.base(-1)], basep: ['BASE +', () => false, () => actions.base(1)], keyn: ['KEY', () => false, () => { actions.key(1); toast(MODE_LABEL[state.mode]); }],
   type1: ['TYPE 1', () => false, () => engine.setType(0, (engine.types[0] + 1) % SHORT.length)], type2: ['TYPE 2', () => false, () => engine.setType(1, (engine.types[1] + 1) % SHORT.length)],
   type3: ['TYPE 3', () => false, () => engine.setType(2, (engine.types[2] + 1) % SHORT.length)], type4: ['TYPE 4', () => false, () => engine.setType(3, (engine.types[3] + 1) % SHORT.length)],
+  dotmode: [() => state.mixMode.toUpperCase(), () => state.mixMode === 'solo', () => { state.mixMode = state.mixMode === 'solo' ? 'mute' : 'solo'; }],
   random: ['RANDOM', () => false, actions.random], mutate: ['MUTATE', () => false, actions.mut], warp: ['WARP', () => false, actions.warp],
   reverse: ['REVERSE', () => false, actions.steps(reverseSteps)], invert: ['INVERT', () => false, actions.steps(invertSteps)],
   rotl: ['ROT ←', () => false, actions.steps((st) => rotateSteps(st, -1))], rotr: ['ROT →', () => false, actions.steps((st) => rotateSteps(st, 1))],
 };
+
+// Odczyt aktualnej wartości (0..1) każdego celu: pokrętła i suwaki przypisywalnych zakładek pokazują stan, nie tylko go ustawiają.
+const envN = (id) => () => { const sp = specOfType(engine.types[0], id); return clamp01((engine.voices[0].params[id] - sp.min) / (sp.max - sp.min)); };
+const fxN = (j, i) => () => { const sec = fxSecs[j], sp = sec && sec.styles[sec.slot.style].params[i]; return sp ? sec.slot.values[sec.slot.style][sp.id] : 0; };
+const mixN = (j) => () => { const sec = fxSecs[j]; return sec ? (sec.slot.values[sec.slot.style].mix ?? 0) : 0; };
+const CONTG = {
+  cutoff: () => globals.cutoff, reso: () => globals.reso,
+  fenv: envN('fEnv'), fdec: envN('fDec'), adec: envN('aDec'), asus: envN('aSus'), aatk: envN('aAtk'), arel: envN('aRel'),
+  offfatk: () => (engine.p.offFAtk + 1) / 2, offfrel: () => (engine.p.offFRel + 1) / 2, offaatk: () => (engine.p.offAAtk + 1) / 2, offarel: () => (engine.p.offARel + 1) / 2,
+  gate: () => (engine.gateMul - 0.4) / 1.2, accent: () => state.accent, slide: () => state.slide, swing: () => state.swing / 0.4,
+  human: () => engine.human, ghost: () => engine.ghost, velo: () => (engine.velo - 0.4) / 0.6, glide: () => glideMs / 200, tempo: () => (engine.bpm - 70) / 110,
+  master: () => globals.master / 1.2, comp: () => globals.comp, mdrive: () => globals.mdrive,
+  eqlow: () => (engine.eq[0] + 12) / 24, eqmid: () => (engine.eq[1] + 12) / 24, eqhigh: () => (engine.eq[2] + 12) / 24,
+  fmix: mixN(0), fx1mix: mixN(1), fx2mix: mixN(2),
+  djf: () => (globals.dj + 1) / 2, tape: () => globals.tape, wow: () => globals.wow, chorusm: () => globals.chorus,
+  padx: () => padPos.x, pady: () => padPos.y,
+  oct: () => (state.oct + 2) / 4, shift: () => 0.5, length: () => (pattern.steps.length - 8) / 24,
+};
+for (let i = 0; i < 4; i++) {
+  CONTG[`lv${i + 1}`] = () => engine.levels[i] / 1.5; CONTG[`tune${i + 1}`] = () => (engine.vTune[i] + 100) / 200; CONTG[`oct${i + 1}`] = () => (engine.vOct[i] + 2) / 4;
+  CONTG[`vlo${i + 1}`] = () => (engine.vEq[i][0] + 12) / 24; CONTG[`vhi${i + 1}`] = () => (engine.vEq[i][1] + 12) / 24;
+}
+[['flt', 0], ['fx1p', 1], ['fx2p', 2]].forEach(([pre, j]) => { for (let i = 0; i < 8; i++) CONTG[`${pre}${i + 1}`] = fxN(j, i); });
+const CSTEP = { oct: 0.25, shift: 0.125, length: 1 / 6, oct1: 0.25, oct2: 0.25, oct3: 0.25, oct4: 0.25 };      // wartości dyskretne
+const TOGGLES = new Set(['fbyp', 'f1byp', 'f2byp', 'latch', 'dotmode', 'mute1', 'mute2', 'mute3', 'mute4', 'solo1', 'solo2', 'solo3', 'solo4']);
+const nameOfSW = (id) => { if (!SW[id]) return id; const l = SW[id][0]; return typeof l === 'function' ? l() : l; };
 const CTL_TYPES = { xy: 'XY PAD', pads: '4 PRZYCISKI', faders: '4 SUWAKI', wheels: 'PITCH + MOD' };
 const CTL_KEY = 'radarxxx.ctrl.v2';
 // Kontrolery (zakładka CTRL) sterują tylko tym, co jest w danej sekcji: każda strona ma własną listę parametrów, własne przełączniki i własne ustawienia.
@@ -696,7 +725,7 @@ const SECTION_CONT = {
 };
 const SECTION_SW = {
   seq: ['latch', 'random', 'mutate', 'warp', 'reverse', 'invert', 'rotl', 'rotr', 'double', 'half', 'clear', 'basem', 'basep', 'keyn'],
-  mix: ['fbyp', 'mute1', 'mute2', 'mute3', 'mute4', 'solo1', 'solo2', 'solo3', 'solo4', 'type1', 'type2', 'type3', 'type4', 'rndeng'],
+  mix: ['fbyp', 'dotmode', 'mute1', 'mute2', 'mute3', 'mute4', 'solo1', 'solo2', 'solo3', 'solo4', 'type1', 'type2', 'type3', 'type4', 'rndeng'],
   syn: ['rndsyn', 'mute1', 'mute2', 'mute3', 'mute4', 'solo1', 'solo2', 'solo3', 'solo4'],
   fx: ['fbyp', 'f1byp', 'f2byp', 'route', 'rndfx'],
 };
@@ -714,18 +743,19 @@ const C = () => ctrl[page];
 const ctrlVals = { x: 0.5, y: 0.5, faders: [0.5, 0.5, 0.5, 0.5], pitch: 0.5, mod: 0 };
 
 // pionowy suwak: value 0..1 od dołu; spring = wraca na środek po puszczeniu (pitch bend); bipolar = bez wypełnienia
-function vSlider({ label, value, onInput, spring, rest = 0.5 }) {
-  const el0 = document.createElement('div'); el0.className = `vs${spring ? ' spring' : ''}${spring && rest === 0.5 ? ' bipolar' : ''}`;
+function vSlider({ label, value, onInput, spring, rest = 0.5, compact }) {
+  const el0 = document.createElement('div'); el0.className = `vs${spring ? ' spring' : ''}${spring && rest === 0.5 ? ' bipolar' : ''}${compact ? ' cmp' : ''}`;
   el0.innerHTML = '<div class="vt"><div class="vf"></div><div class="vk"></div></div><span class="vl"></span>';
   const t = el0.querySelector('.vt'), f = el0.querySelector('.vf'), k = el0.querySelector('.vk'), l = el0.querySelector('.vl');
   l.textContent = label;
   let v = value; const paint = () => { f.style.height = `${v * 100}%`; k.style.top = `${(1 - v) * 100}%`; }; paint();
   const say = (r) => { if (typeof r === 'string') l.textContent = r || label; };      // onInput może zwrócić nowy podpis (np. długość pętli)
   const from = (e) => { const r = t.getBoundingClientRect(); v = Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height)); paint(); say(onInput(v)); };
+  el0.setValue = (nv) => { v = nv; paint(); };                           // ustawienie z kodu (odświeżenie), bez zdarzenia
   let on = false;
-  el0.addEventListener('pointerdown', (e) => { on = true; el0.setPointerCapture(e.pointerId); from(e); });
+  el0.addEventListener('pointerdown', (e) => { on = true; el0.classList.add('hold'); el0.setPointerCapture(e.pointerId); from(e); });
   el0.addEventListener('pointermove', (e) => { if (on) from(e); });
-  const end = () => { if (!on) return; on = false; if (spring) { v = rest; paint(); say(onInput(rest)); } else commitSoon(); };
+  const end = () => { if (!on) return; on = false; el0.classList.remove('hold'); if (spring) { v = rest; paint(); say(onInput(rest)); } else commitSoon(); };
   el0.addEventListener('pointerup', end); el0.addEventListener('pointercancel', end);
   return el0;
 }
@@ -749,7 +779,7 @@ function buildPads(box) {
   box.classList.add('pads');
   C().pads.forEach((id) => {
     const d = SW[id], b = document.createElement('button'); if (!d) return;
-    b.textContent = d[0]; const upd = () => b.classList.toggle('lit', !!d[1]());
+    b.textContent = nameOfSW(id); const upd = () => b.classList.toggle('lit', !!d[1]());
     b.addEventListener('click', () => { d[2](); upd(); commitSoon(); }); upd(); box.appendChild(b);
   });
 }
@@ -779,32 +809,108 @@ const FX_NAMES = ['FLT', 'FX1', 'FX2'];
 const PERMS = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
 const routeText = () => `ROUTING:${engine.fx.order.map((i) => FX_NAMES[i]).join('-')}`;
 function moderow() {
-  const ctl = isCtl(), fxp = page === 'fx', on = fxp || ctl;
+  const ctl = isCtl(), fxp = page === 'fx', asg = isAssign(), on = fxp || ctl || asg;
   const r = document.createElement('div'); r.className = `moderow${on ? '' : ' off'}`;
   const m = document.createElement('button'), e = document.createElement('button');
   let rnd = null;
   e.textContent = 'EDIT';
-  if (fxp && !ctl) {
-    // strona FX: kolejność sekcji w łańcuchu; dotknięcie napisu przełącza kolejne układy, EDIT otwiera okienko
-    m.textContent = routeText(); m.setAttribute('aria-label', 'Zmień kolejność efektów');
-    m.addEventListener('click', () => { const k = PERMS.findIndex((p) => p.join() === engine.fx.order.join()); engine.fx.route(PERMS[(k + 1) % PERMS.length]); m.textContent = routeText(); commitSoon(); });
-    e.addEventListener('click', () => showCtl(true, 'route'));
-  } else {
+  if (ctl) {
     // zakładka CTRL: napis MODE:CONTROLLER (dotknięcie wraca na MAIN), RANDOM losuje przypisania, EDIT otwiera przypisania kontrolerów
     m.textContent = 'MODE:CONTROLLER'; m.setAttribute('aria-label', 'Wróć do pokręteł');
     m.addEventListener('click', () => { tabSel[page] = 0; renderSub(); renderPanel(); });
     rnd = document.createElement('button'); rnd.textContent = 'RANDOM'; rnd.setAttribute('aria-label', 'Losuj przypisania kontrolerów');
     rnd.addEventListener('click', () => { randomizeCtrl(); renderPanel(); commitSoon(); toast('LOSOWO PRZYPISANO'); });
     e.addEventListener('click', () => showCtl(true));
+  } else if (fxp) {
+    // strona FX: kolejność sekcji w łańcuchu; dotknięcie napisu przełącza kolejne układy, EDIT otwiera okienko (na MAIN także przypisania)
+    m.textContent = routeText(); m.setAttribute('aria-label', 'Zmień kolejność efektów');
+    m.addEventListener('click', () => { const k = PERMS.findIndex((p) => p.join() === engine.fx.order.join()); engine.fx.route(PERMS[(k + 1) % PERMS.length]); m.textContent = routeText(); commitSoon(); });
+    e.addEventListener('click', () => showCtl(true, 'route'));
+  } else {
+    // przypisywalna zakładka: MODE przełącza 10 pokręteł (ENCODER) i 10 suwaków (SLIDER)
+    const kind = asg ? getAssign().kind : 'knob';
+    m.textContent = `MODE:${kind === 'slider' ? 'SLIDER' : 'ENCODER'}`; m.setAttribute('aria-label', 'Przełącz pokrętła i suwaki');
+    m.addEventListener('click', () => { const a = getAssign(); a.kind = a.kind === 'slider' ? 'knob' : 'slider'; saveAssign(); renderPanel(); commitSoon(); });
+    e.addEventListener('click', () => showCtl(true, 'assign'));
   }
   if (!on) { m.tabIndex = -1; e.tabIndex = -1; }
   r.appendChild(m); if (rnd) r.appendChild(rnd); r.appendChild(e); return r;
+}
+// ============================================================================
+// Przypisywalne zakładki (SEQ MAIN, SEQ EXTRA, MIX MAIN, SYN MAIN, FX MAIN): dziesięć miejsc, każde ma wybrany parametr albo przycisk.
+// Wybierasz 10 potencjometrów albo 10 suwaków (MODE), w okienku EDIT zmieniasz przypisania i wracasz do ustawień początkowych (DEFAULT), RANDOM losuje przypisania.
+// ============================================================================
+const ASSIGN_DEFAULT = {
+  'seq:0': ['cutoff', 'reso', 'offfatk', 'offfrel', 'offaatk', 'offarel', 'gate', 'accent', 'shift', 'oct'],
+  'seq:3': ['tempo', 'length', 'swing', 'human', 'ghost', 'slide', 'glide', 'velo', null, null],
+  'mix:0': ['eqlow', 'eqmid', 'eqhigh', 'fx1mix', 'fbyp', 'master', 'dotmode', null, null, null],
+  'syn:0': ['cutoff', 'reso', 'fenv', 'fdec', 'adec', 'asus', 'arel', 'aatk', null, null],
+  'fx:0': ['flt1', 'flt2', 'flt3', 'fmix', 'flt4', 'fx1p1', 'fx1p2', 'fx1p3', 'fx1mix', 'fx2mix'],
+};
+const ASSIGN_KEY = 'radarxxx.assign.v1';
+let assign = {};
+try { assign = JSON.parse(localStorage.getItem(ASSIGN_KEY) || '{}') || {}; } catch { assign = {}; }
+const saveAssign = () => { try { localStorage.setItem(ASSIGN_KEY, JSON.stringify(assign)); } catch { /* brak pamięci */ } };
+const assignKey = () => `${page}:${tabSel[page]}`;
+const isAssign = () => ASSIGN_DEFAULT[assignKey()] !== undefined;
+const getAssign = () => {
+  const k = assignKey(), cur = assign[k], def = ASSIGN_DEFAULT[k];
+  if (!cur || !Array.isArray(cur.slots) || cur.slots.length !== 10) assign[k] = { kind: 'knob', slots: def.slice() };
+  return assign[k];
+};
+const resetAssign = () => { delete assign[assignKey()]; saveAssign(); };
+function randomizeAssign() {
+  const a = getAssign(), pool = SECTION_CONT[page].slice();
+  for (let i = pool.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [pool[i], pool[k]] = [pool[k], pool[i]]; }
+  a.slots = Array.from({ length: 10 }, (_, i) => pool[i] || null);
+  saveAssign();
+}
+// odświeża pokrętła i suwaki, gdy wartość zmieniła się gdzie indziej (np. dotykiem na radarze); pomija ten, który właśnie trzymasz
+const assignRefs = [];
+function syncAssign() {
+  assignRefs.forEach(({ id, el: kn, kind }) => {
+    if (!kn.isConnected || id === 'shift' || !CONTG[id]) return;
+    if (kn.classList.contains('drag') || kn.classList.contains('hold')) return;
+    const v = clamp01(CONTG[id]());
+    if (kind === 'knob') { if (Math.abs(kn.value - v) > 0.004) kn.value = v; } else if (kn.setValue) kn.setValue(v);
+  });
+}
+function renderAssign() {
+  const a = getAssign(), grid = document.createElement('div'); assignRefs.length = 0;
+  if (a.kind === 'slider') {
+    grid.className = 'sliderrow';
+    a.slots.forEach((id) => {
+      if (!id) { const e0 = document.createElement('div'); e0.className = 'vs empty'; grid.appendChild(e0); return; }
+      if (SW[id]) {
+        const w = document.createElement('div'); w.className = 'vs vsw'; w.innerHTML = '<button class="vsb"></button><span class="vl"></span>';
+        const b = w.querySelector('.vsb'), l = w.querySelector('.vl'); const upd = () => { l.textContent = nameOfSW(id); b.classList.toggle('lit', !!SW[id][1]()); }; upd();
+        b.addEventListener('click', () => { SW[id][2](); upd(); commitSoon(); }); grid.appendChild(w); return;
+      }
+      const sl = vSlider({ label: knobLabel(nameOfC(id)), value: CONTG[id] ? clamp01(CONTG[id]()) : 0, onInput: (v) => { CONT[id][1](v); }, compact: true });
+      assignRefs.push({ id, el: sl, kind: 'slider' }); grid.appendChild(sl);
+    });
+  } else {
+    grid.className = 'pgrid';
+    a.slots.forEach((id) => {
+      if (!id) { spacer(grid); return; }
+      if (SW[id]) { cellButton(grid, { kind: TOGGLES.has(id) ? 'tog' : 'act', label: () => knobLabel(nameOfSW(id)), on: () => !!SW[id][1](), act: () => SW[id][2]() }); return; }
+      const step = CSTEP[id] || 0.001, k = document.createElement('div');
+      makeKnob(k, { label: knobLabel(nameOfC(id)), min: 0, max: 1, step, value: CONTG[id] ? clamp01(CONTG[id]()) : 0, def: CONTG[id] ? clamp01(CONTG[id]()) : 0, fmt: 'pct' });
+      k.addEventListener('input', () => CONT[id][1](k.value));
+      assignRefs.push({ id, el: k, kind: 'knob' }); grid.appendChild(k);
+    });
+  }
+  panelEl.appendChild(grid);
+  const rt = document.createElement('div'); rt.className = 'randrow';
+  const rb = document.createElement('button'); rb.className = 'randtext'; rb.textContent = 'RANDOM'; rb.setAttribute('aria-label', 'Losuj przypisania');
+  rb.addEventListener('click', () => { randomizeAssign(); renderPanel(); commitSoon(); toast('LOSOWO PRZYPISANO'); });
+  rt.appendChild(rb); panelEl.appendChild(rt);
 }
 // okienko EDIT: typ obu boksów i przypisania parametrów (listy rozwijane)
 const ctlPop = el('ctl-pop');
 let ctlView = 'ctl';
 function renderRouteEdit() {
-  const body = el('ctl-body'); body.innerHTML = ''; el('ctl-title').textContent = 'ROUTING';
+  const body = el('ctl-body'); body.innerHTML = ''; el('ctl-title').textContent = isAssign() ? 'ROUTING I STEROWANIE' : 'ROUTING';
   const info = document.createElement('div'); info.className = 'csec'; info.textContent = `WEJŚCIE › ${engine.fx.order.map((i) => FX_NAMES[i]).join(' › ')} › WYJŚCIE`; body.appendChild(info);
   engine.fx.order.forEach((cur, pos) => {
     const r = document.createElement('div'); r.className = 'crow'; const sp = document.createElement('span'); sp.textContent = `MIEJSCE ${pos + 1}`;
@@ -813,8 +919,30 @@ function renderRouteEdit() {
     sel.addEventListener('change', () => { const o = engine.fx.order.slice(), want = +sel.value, from = o.indexOf(want); o[from] = o[pos]; o[pos] = want; engine.fx.route(o); renderRouteEdit(); renderPanel(); commitSoon(); });   // wybór zamienia miejscami z dotychczasowym właścicielem
     r.appendChild(sp); r.appendChild(sel); body.appendChild(r);
   });
+  if (isAssign()) appendAssignEditor(body);
+}
+function appendAssignEditor(body) {
+  const a = getAssign(), cont = SECTION_CONT[page].map((k) => [k, nameOfC(k)]), sw = SECTION_SW[page].map((k) => [k, nameOfSW(k)]);
+  const sec = document.createElement('div'); sec.className = 'csec'; sec.textContent = `STEROWANIE: ${page.toUpperCase()} ${tabNames(page)[tabSel[page]]} (10 MIEJSC)`; body.appendChild(sec);
+  const mk = (lab, fill, cur, set) => {
+    const r = document.createElement('div'); r.className = 'crow'; const sp = document.createElement('span'); sp.textContent = lab;
+    const sel = document.createElement('select'); sel.setAttribute('aria-label', lab); fill(sel, cur);
+    sel.addEventListener('change', () => { set(sel.value); saveAssign(); renderPanel(); commitSoon(); });
+    r.appendChild(sp); r.appendChild(sel); body.appendChild(r);
+  };
+  mk('TYP', (sel, cur) => [['knob', '10 POTENCJOMETRÓW'], ['slider', '10 SUWAKÓW']].forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; if (v === cur) o.selected = true; sel.appendChild(o); }), a.kind, (v) => { a.kind = v; });
+  a.slots.forEach((cur, i) => mk(`${i + 1}`, (sel, c) => {
+    const add = (parent, v, t) => { const o = document.createElement('option'); o.value = v; o.textContent = t; if (v === (c || '')) o.selected = true; parent.appendChild(o); };
+    add(sel, '', '—'); cont.forEach(([v, t]) => add(sel, v, t));
+    const g = document.createElement('optgroup'); g.label = 'PRZYCISKI'; sw.forEach(([v, t]) => add(g, v, t)); sel.appendChild(g);
+  }, cur, (v) => { a.slots[i] = v || null; }));
+}
+function renderAssignEdit() {
+  const body = el('ctl-body'); body.innerHTML = ''; el('ctl-title').textContent = 'STEROWANIE';
+  appendAssignEditor(body);
 }
 function renderCtlEdit() {
+  if (ctlView === 'assign') { renderAssignEdit(); return; }
   if (ctlView === 'route') { renderRouteEdit(); return; }
   const body = el('ctl-body'); body.innerHTML = ''; el('ctl-title').textContent = 'KONTROLERY';
   const row = (lab, opts, cur, set) => {
@@ -825,7 +953,7 @@ function renderCtlEdit() {
     r.appendChild(sp); r.appendChild(sel); body.appendChild(r);
   };
   const sec = (t) => { const d = document.createElement('div'); d.className = 'csec'; d.textContent = t; body.appendChild(d); };
-  const types = Object.entries(CTL_TYPES), cont = SECTION_CONT[page].map((k) => [k, nameOfC(k)]), sw = SECTION_SW[page].map((k) => [k, SW[k][0]]);   // tylko parametry tej sekcji
+  const types = Object.entries(CTL_TYPES), cont = SECTION_CONT[page].map((k) => [k, nameOfC(k)]), sw = SECTION_SW[page].map((k) => [k, nameOfSW(k)]);   // tylko parametry tej sekcji
   el('ctl-title').textContent = `KONTROLERY: ${page.toUpperCase()}`;
   row('LEWY', types, C().left, (v) => { C().left = v; }); row('PRAWY', types, C().right, (v) => { C().right = v; });
   const used = new Set([C().left, C().right]);
@@ -835,6 +963,12 @@ function renderCtlEdit() {
   if (used.has('wheels')) { sec('PITCH BEND (±2 PÓŁTONY) I MODULATION'); row('MOD', cont, C().mod, (v) => { C().mod = v; }); }
 }
 const showCtl = (on, view = 'ctl') => { ctlPop.hidden = !on; if (on) { ctlView = view; renderCtlEdit(); el('ctl-ok').focus(); } };
+// DEFAULT: wraca do ustawień początkowych tego, co aktualnie edytujesz (kontrolery sekcji, przypisania zakładki, routing)
+el('ctl-default').addEventListener('click', () => {
+  if (ctlView === 'ctl') { ctrl[page] = ctrlDefault()[page]; saveCtrl(); }
+  else { if (ctlView === 'route') engine.fx.route([0, 1, 2]); if (isAssign()) resetAssign(); }
+  renderCtlEdit(); renderPanel(); commitSoon(); toast('USTAWIENIA DOMYŚLNE');
+});
 el('ctl-ok').addEventListener('click', () => showCtl(false));
 ctlPop.addEventListener('pointerdown', (e) => { if (e.target === ctlPop) showCtl(false); });
 
@@ -868,111 +1002,60 @@ function renderPanel() {
   const grid = document.createElement('div'); grid.className = 'pgrid';
   const tab = tabSel[page], B = (o) => cellButton(grid, o), Kn = (...a) => grid.appendChild(synKnob(...a)), Sp = () => spacer(grid);
 
+  if (isAssign()) { renderAssign(); return; }       // zakładki z dziesięcioma przypisywalnymi miejscami (patrz wyżej)
+
   if (page === 'seq') {
     panelEl.appendChild(grid);
-    if (tab === 0) {
-      // MAIN: filtr globalny, globalne obwiednie (przesunięcie -100%…+100% względem ustawień każdego silnika), gate, accent, shift, oktawa
-      const off = (key) => (v) => { engine.p[key] = v; engine.voices.forEach((x) => x.refresh && x.refresh(engine.ctx.currentTime)); };
-      Kn('CUTOFF', 0, 1, 0.001, globals.cutoff, 0.5, (v) => { globals.cutoff = v; engine.setCutoff(cutoffHz(v)); });
-      Kn('RESO', 0, 1, 0.01, globals.reso, 0.5, (v) => { globals.reso = v; engine.setResonance(1 + v * 22); });
-      Kn('F.ATK', -1, 1, 0.01, engine.p.offFAtk, 0, off('offFAtk'));
-      Kn('F.REL', -1, 1, 0.01, engine.p.offFRel, 0, off('offFRel'));
-      Kn('A.ATK', -1, 1, 0.01, engine.p.offAAtk, 0, off('offAAtk'));
-      Kn('A.REL', -1, 1, 0.01, engine.p.offARel, 0, off('offARel'));
-      Kn('GATE', 0.4, 1.6, 0.01, engine.gateMul, 1, (v) => { engine.gateMul = v; });
-      Kn('ACCENT', 0, 1, 0.01, state.accent, 0.5, (v) => { state.accent = v; refin(); });
-      let last = 0; Kn('SHIFT', -4, 4, 1, 0, 0, (v) => { const d = Math.round(v) - last; last = Math.round(v); if (d) setSteps(rotateSteps(pattern.steps, d)); });
-      Kn('OKTAWA', -2, 2, 1, state.oct, 0, (v) => { state.oct = Math.round(v); refin(); engine.audition({ degree: 0, octave: 0, vel: 100 }); });
-    } else if (tab === 1) {
+    if (tab === 1) {
       const A = (name, ic, fn) => B({ kind: 'act', icon: ic, label: () => name, act: actions.steps(fn) });
       A('CLEAR', 'clear', clearSteps); A('REVERSE', 'reverse', reverseSteps); A('INVERT', 'invert', invertSteps); A('ROT ←', 'rotl', (st) => rotateSteps(st, -1)); A('ROT →', 'rotr', (st) => rotateSteps(st, 1));
       A('DOUBLE', 'double', doubleSteps); A('HALF', 'half', halveSteps);
       Sp(); Sp(); B({ kind: 'act', label: () => 'RANDOM', act: actions.random });
-    } else if (tab === 2) {
+    } else {
       stepRow(grid, 'BASE', baseLabel, () => actions.base(-1), () => actions.base(1));
       stepRow(grid, 'KEY', () => MODE_LABEL[state.mode], () => actions.key(-1), () => actions.key(1));
-    } else {
-      // EXTRA: czas i feeling (tempo, długość, swing, human, ghost), nuty (slide, glide, velo) i RANDOM
-      Kn('TEMPO', 70, 180, 1, engine.bpm, 130, (v) => setBpm(v));
-      Kn('LENGTH', 8, 32, 4, pattern.steps.length, 16, (v) => { const n = Math.round(v); if (n !== pattern.steps.length) setSteps(resizeSteps(pattern.steps, n)); });
-      Kn('SWING', 0, 0.4, 0.01, state.swing, 0, (v) => { state.swing = v; pattern = { ...pattern, swing: v }; engine.pattern = pattern; });
-      Kn('HUMAN', 0, 1, 0.01, engine.human, 0, (v) => { engine.human = v; });
-      Kn('GHOST', 0, 1, 0.01, engine.ghost, 0, (v) => { engine.ghost = v; });
-      Kn('SLIDE', 0, 1, 0.01, state.slide, 0.1, (v) => { state.slide = v; refin(); });
-      Kn('GLIDE', 0, 200, 5, glideMs, 50, (v) => { glideMs = v; setGlideTime(v / 1000); });
-      Kn('VELO', 0.4, 1, 0.01, engine.velo, 1, (v) => { engine.velo = v; });
-      Sp(); B({ kind: 'act', label: () => 'RANDOM', act: actions.random });
     }
   } else if (page === 'mix') {
     panelEl.appendChild(grid);
-    if (tab === 0) {
-      ['LOW', 'MID', 'HIGH'].forEach((n, b) => Kn(n, -12, 12, 0.5, engine.eq[b], 0, (v) => engine.setEq(b, v)));
-      const sec = fxSecs[1];
-      Kn('SEND', 0, 1, 0.01, sec.slot.values[sec.slot.style].mix, 0, (v) => setFxParam(sec, 'mix', v));
-      B({ kind: 'tog', label: () => 'FILTR', on: () => !fxSecs[0].slot.bypass, act: () => bypass(0) });
-      Kn('MASTER', 0, 1.2, 0.01, globals.master, 1, (v) => { globals.master = v; engine.setMaster(v); });
-      B({ kind: 'act', label: () => state.mixMode.toUpperCase(), act: () => { state.mixMode = state.mixMode === 'solo' ? 'mute' : 'solo'; } });
-      Sp(); Sp(); B({ kind: 'act', label: () => 'RANDOM', act: () => { engine.enabled.forEach((on, i) => { if (on) engine.randomizeVoice(i); }); } });
-    } else {
-      const i = tab - 1;
-      Kn('LEVEL', 0, 1.5, 0.01, engine.levels[i], 1, (v) => engine.setLevel(i, v));
-      Kn('TUNE', -100, 100, 1, engine.vTune[i], 0, (v) => { engine.vTune[i] = v; });
-      Kn('OCT', -2, 2, 1, engine.vOct[i], 0, (v) => { engine.vOct[i] = Math.round(v); });
-      Kn('EQ LOW', -12, 12, 0.5, engine.vEq[i][0], 0, (v) => engine.setVoiceEq(i, 0, v));
-      Kn('EQ HIGH', -12, 12, 0.5, engine.vEq[i][1], 0, (v) => engine.setVoiceEq(i, 1, v));
-      B({ kind: 'act', label: () => typeName(i), act: () => { engine.setType(i, (engine.types[i] + 1) % SHORT.length); renderSub(); renderPanel(); } });
-      B({ kind: 'tog', label: () => 'ON', on: () => !!engine.enabled[i], act: () => engine.setEnabled(i, !engine.enabled[i]) });
-      B({ kind: 'tog', label: () => 'SOLO', on: () => engine.solo === i, act: () => engine.setSolo(engine.solo === i ? null : i) });
-      Sp(); B({ kind: 'act', label: () => 'RANDOM', act: () => engine.randomizeVoice(i) });
-    }
+    const i = tab - 1;
+    Kn('LEVEL', 0, 1.5, 0.01, engine.levels[i], 1, (v) => engine.setLevel(i, v));
+    Kn('TUNE', -100, 100, 1, engine.vTune[i], 0, (v) => { engine.vTune[i] = v; });
+    Kn('OCT', -2, 2, 1, engine.vOct[i], 0, (v) => { engine.vOct[i] = Math.round(v); });
+    Kn('EQ LOW', -12, 12, 0.5, engine.vEq[i][0], 0, (v) => engine.setVoiceEq(i, 0, v));
+    Kn('EQ HIGH', -12, 12, 0.5, engine.vEq[i][1], 0, (v) => engine.setVoiceEq(i, 1, v));
+    B({ kind: 'act', label: () => typeName(i), act: () => { engine.setType(i, (engine.types[i] + 1) % SHORT.length); renderSub(); renderPanel(); } });
+    B({ kind: 'tog', label: () => 'ON', on: () => !!engine.enabled[i], act: () => engine.setEnabled(i, !engine.enabled[i]) });
+    B({ kind: 'tog', label: () => 'SOLO', on: () => engine.solo === i, act: () => engine.setSolo(engine.solo === i ? null : i) });
+    Sp(); B({ kind: 'act', label: () => 'RANDOM', act: () => engine.randomizeVoice(i) });
   } else if (page === 'syn') {
     panelEl.appendChild(grid);
-    if (tab === 0) {
-      // makra: jedno pokrętło ustawia ten parametr we wszystkich czterech silnikach
-      const macro = (label, id) => { const sp = specOfType(engine.types[0], id); const k = synKnob(label, sp.min, sp.max, sp.step, engine.voices[0].params[id], sp.def, (v) => VOICE_NAMES.forEach((_, i) => engine.setParam(i, id, v))); macroRefs[id] = k; grid.appendChild(k); };
-      Kn('CUTOFF', 0, 1, 0.001, globals.cutoff, 0.5, (v) => { globals.cutoff = v; engine.setCutoff(cutoffHz(v)); });
-      Kn('RESO', 0, 1, 0.01, globals.reso, 0.5, (v) => { globals.reso = v; engine.setResonance(1 + v * 22); });
-      macro('F.ENV', 'fEnv'); macro('F.ZAN.', 'fDec'); macro('A.ZAN.', 'aDec');
-      macro('A.SUST.', 'aSus'); macro('A.REL.', 'aRel'); macro('A.ATAK', 'aAtk');
-      Sp(); B({ kind: 'act', label: () => 'RANDOM', act: () => { engine.enabled.forEach((on, i) => { if (on) engine.randomizeVoice(i); }); renderPanel(); } });
-    } else {
-      const i = synSel, t = engine.types[i], pv = engine.voices[i].params;
-      grid.classList.add('model');
-      // komórka MODEL po lewej (dotknięcie zmienia rodzaj silnika), obok osiem pokręteł w dwóch rzędach po cztery
-      const mc = document.createElement('button'); mc.className = 'modelcell';
-      mc.innerHTML = `<span class="cl">MODEL</span><b>${TAB_SHORT[t]}</b>`; mc.setAttribute('aria-label', 'Zmień rodzaj silnika');
-      mc.addEventListener('click', () => { engine.setType(i, (engine.types[i] + 1) % SHORT.length); renderSub(); renderPanel(); commitSoon(); });
-      grid.appendChild(mc);
-      const own = PARAM_SPECS[t].filter((x) => x.group !== 'env').slice(0, 3);
-      const add = (sp) => { const k = synKnob(labOf(sp), sp.min, sp.max, sp.step, pv[sp.id], sp.def, (v) => engine.setParam(i, sp.id, v)); synRefs[sp.id] = k; grid.appendChild(k); };
-      own.forEach(add); add(specOfType(t, 'fEnv'));
-      ['fDec', 'aDec', 'aRel'].forEach((id) => add(specOfType(t, id)));
-      B({ kind: 'act', label: () => 'RANDOM', act: () => { const vals = engine.randomizeVoice(i); for (const [id, v] of Object.entries(vals)) if (synRefs[id]) synRefs[id].value = v; } });
-    }
+    const i = synSel, t = engine.types[i], pv = engine.voices[i].params;
+    grid.classList.add('model');
+    // komórka MODEL po lewej (dotknięcie zmienia rodzaj silnika), obok osiem pokręteł w dwóch rzędach po cztery
+    const mc = document.createElement('button'); mc.className = 'modelcell';
+    mc.innerHTML = `<span class="cl">MODEL</span><b>${TAB_SHORT[t]}</b>`; mc.setAttribute('aria-label', 'Zmień rodzaj silnika');
+    mc.addEventListener('click', () => { engine.setType(i, (engine.types[i] + 1) % SHORT.length); renderSub(); renderPanel(); commitSoon(); });
+    grid.appendChild(mc);
+    const own = PARAM_SPECS[t].filter((x) => x.group !== 'env').slice(0, 3);
+    const add = (sp) => { const k = synKnob(labOf(sp), sp.min, sp.max, sp.step, pv[sp.id], sp.def, (v) => engine.setParam(i, sp.id, v)); synRefs[sp.id] = k; grid.appendChild(k); };
+    own.forEach(add); add(specOfType(t, 'fEnv'));
+    ['fDec', 'aDec', 'aRel'].forEach((id) => add(specOfType(t, id)));
+    B({ kind: 'act', label: () => 'RANDOM', act: () => { const vals = engine.randomizeVoice(i); for (const [id, v] of Object.entries(vals)) if (synRefs[id]) synRefs[id].value = v; } });
+  } else if (tab === 4) {
+    // MSTR: master (głośność, kompresja, drive) i efekty na sumie: DJ filter, tape (TAPE + WOW), chorus oraz beat repeat jako pionowy suwak
+    panelEl.appendChild(grid); grid.classList.add('mstr');
+    Kn('MASTER', 0, 1.2, 0.01, globals.master, 1, (v) => { globals.master = v; engine.setMaster(v); });
+    Kn('COMP', 0, 1, 0.01, globals.comp, 0.5, (v) => { globals.comp = v; engine.setComp(v); });
+    Kn('DRIVE', 0, 1, 0.01, globals.mdrive, 0, (v) => { globals.mdrive = v; engine.setDrive(v); });
+    Kn('DJ FLT', -1, 1, 0.01, globals.dj, 0, (v) => { globals.dj = v; engine.setDj(v); });
+    Kn('TAPE', 0, 1, 0.01, globals.tape, 0, (v) => { globals.tape = v; engine.setTape(v); });
+    Kn('WOW', 0, 1, 0.01, globals.wow, 0, (v) => { globals.wow = v; engine.setWow(v); });
+    Kn('CHORUS', 0, 1, 0.01, globals.chorus, 0, (v) => { globals.chorus = v; engine.setChorus(v); });
+    Sp();
+    const rs = vSlider({ label: 'REPEAT', value: 0, spring: true, rest: 0, onInput: (v) => engine.setRepeat(v) });   // chwilowy: puszczenie wyłącza pętlę
+    rs.classList.add('repeat'); grid.appendChild(rs);
   } else {
-    if (tab === 0) {
-      panelEl.appendChild(grid);
-      const fk = (j, id) => { const sec = fxSecs[j], si = sec.slot.style, sp = sec.styles[si].params.find((x) => x.id === id); if (!sp) return Sp(); const k = document.createElement('div'); makeKnob(k, { label: knobLabel(sp.label), min: 0, max: 1, step: 0.001, value: sec.slot.values[si][id], def: sp.def, show: (n) => sp.show(sp.map(n)) }); k.addEventListener('input', () => setFxParam(sec, id, k.value)); fxMainRefs[`${j}:${id}`] = k; grid.appendChild(k); };
-      const fp = fxSecs[0].styles[fxSecs[0].slot.style].params.map((x) => x.id), ep = fxSecs[1].styles[fxSecs[1].slot.style].params.map((x) => x.id);
-      [fp[0], fp[1], fp[2], 'mix', fp.includes('tone') ? 'tone' : fp[3]].forEach((id) => fk(0, id));
-      [ep[0], ep[1], ep[2], 'mix'].forEach((id) => fk(1, id));
-      B({ kind: 'act', label: () => 'RANDOM', act: () => { fxSecs.slice(0, 2).forEach((x) => x.randomize()); renderPanel(); } });
-    } else if (tab === 4) {
-      // MSTR: master (głośność, kompresja, drive) i efekty na sumie: DJ filter, tape (TAPE + WOW), chorus oraz beat repeat jako pionowy suwak
-      panelEl.appendChild(grid); grid.classList.add('mstr');
-      Kn('MASTER', 0, 1.2, 0.01, globals.master, 1, (v) => { globals.master = v; engine.setMaster(v); });
-      Kn('COMP', 0, 1, 0.01, globals.comp, 0.5, (v) => { globals.comp = v; engine.setComp(v); });
-      Kn('DRIVE', 0, 1, 0.01, globals.mdrive, 0, (v) => { globals.mdrive = v; engine.setDrive(v); });
-      Kn('DJ FLT', -1, 1, 0.01, globals.dj, 0, (v) => { globals.dj = v; engine.setDj(v); });
-      Kn('TAPE', 0, 1, 0.01, globals.tape, 0, (v) => { globals.tape = v; engine.setTape(v); });
-      Kn('WOW', 0, 1, 0.01, globals.wow, 0, (v) => { globals.wow = v; engine.setWow(v); });
-      Kn('CHORUS', 0, 1, 0.01, globals.chorus, 0, (v) => { globals.chorus = v; engine.setChorus(v); });
-      Sp();
-      const rs = vSlider({ label: 'REPEAT', value: 0, spring: true, rest: 0, onInput: (v) => engine.setRepeat(v) });   // chwilowy: puszczenie wyłącza pętlę
-      rs.classList.add('repeat'); grid.appendChild(rs);
-    } else {
-      panelEl.appendChild(fxSecs[tab - 1].sec);
-    }
+    panelEl.appendChild(fxSecs[tab - 1].sec);
   }
 }
 
