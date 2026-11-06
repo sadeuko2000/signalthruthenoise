@@ -120,7 +120,7 @@ function arcText(txt, cx, cy, r, ang, cw, size, color) {
 }
 // Cztery kropki w rogach ekranu (przyciski o funkcji zależnej od strony), z napisami wygiętymi wzdłuż obrzeża radaru jak w szkicu.
 // defs[i]: { label, sub, lit, bar, barHot, dim }. lit === false = pusta kropka (przełącznik wyłączony), w pozostałych przypadkach pełna.
-function drawCorners(G, defs) {
+function drawCorners(G, defs, flat = false) {
   const { W, cx, cy, R, dpr } = G, rd = W * 0.04, m = W * 0.088, size = W * 0.047, sz2 = W * 0.036;
   const ang = [-Math.PI / 4, Math.PI / 4, (5 * Math.PI) / 4, (3 * Math.PI) / 4];
   defs.forEach((d, i) => {
@@ -129,6 +129,12 @@ function drawCorners(G, defs) {
     g.beginPath(); g.arc(x, y, rd, 0, TAU);
     if (d.lit === false) { g.strokeStyle = `rgba(${ACC},${a})`; g.lineWidth = 2 * dpr; g.stroke(); }
     else { g.fillStyle = `rgba(${ACC},${a})`; g.fill(); }
+    if (flat) {                                   // bez okręgu (sekwencer perkusji): napis poziomo obok kropki, podpis pod albo nad nim
+      g.textBaseline = 'middle'; g.textAlign = left ? 'left' : 'right'; const tx = left ? x + rd + 8 * dpr : x - rd - 8 * dpr;
+      g.font = FONT(size); g.fillStyle = `rgba(${INK},${a})`; g.fillText(d.label, tx, y);
+      if (d.sub) { g.font = FONT(sz2); g.fillStyle = `rgba(${INK},${0.65 * a})`; g.fillText(d.sub, tx, y + (top ? 1 : -1) * size * 0.95); }
+      return;
+    }
     // główny napis: tuż za obrzeżem radaru, na przekątnej, obrócony o 45° (styczny do okręgu), między radarem a kropką
     const sx = left ? -1 : 1, sy = top ? -1 : 1, dist = R * 1.089;
     g.save(); g.translate(cx + sx * dist * Math.SQRT1_2, cy + sy * dist * Math.SQRT1_2); g.rotate(sx * sy > 0 ? -Math.PI / 4 : Math.PI / 4);
@@ -304,37 +310,49 @@ function drawSyn() {
   g.beginPath(); g.arc(kx, ky, R * 0.045, 0, TAU); g.moveTo(kx - R * 0.08, ky); g.lineTo(kx + R * 0.08, ky); g.moveTo(kx, ky - R * 0.08); g.lineTo(kx, ky + R * 0.08); g.stroke();
 }
 
-// ---------- DRUM: polarny sekwencer perkusji ----------
-// Pięć pierścieni (stopa, werbel, klaskanie, hat zamknięty, hat otwarty), 16 kroków dookoła. Dotknięcie kroku przełącza: pusty, uderzenie, akcent.
-const DRUM_R = [0.32, 0.44, 0.56, 0.68, 0.8];
+// ---------- DRUM: klasyczny sekwencer krokowy ----------
+// Pięć rzędów (stopa, werbel, klaskanie, hat zamknięty, hat otwarty) i 16 kroków w poziomie, w miejscu radaru. Dotknięcie przełącza: pusty, uderzenie, akcent;
+// przeciągnięcie po rzędzie wpisuje tę samą wartość w kolejne kroki.
+const DG = { x0: 0.095, x1: 0.975, y0: 0.2, y1: 0.8 };            // pole siatki jako ułamek kwadratu ekranu
 function drawDrum() {
-  const G = geo(), S0 = sweepState(), { cx, cy, R, dpr } = G;
-  const p16 = S0.pos % DRUM_STEPS, S = { n: DRUM_STEPS, pos: p16, sw: (p16 / DRUM_STEPS) * TAU }, hot = Math.floor(p16);
-  drawBase(G, S, { noRings: true });
-  g.font = FONT(R * 0.07); g.textAlign = 'center'; g.textBaseline = 'middle';
-  DRUM_R.forEach((rr, k) => {
-    const r = rr * R, muted = engine.drum.mute[k], a = muted ? 0.35 : 1;
-    circle(cx, cy, r, `rgba(${INK},${0.22 * a})`, dpr);
-    g.fillStyle = `rgba(${INK},${0.75 * a})`; g.fillText(['K', 'S', 'C', 'H', 'O'][k], cx - r + 0, cy - R * 0.045);
+  const G = geo(), S0 = sweepState(), { W, dpr } = G;
+  const p16 = S0.pos % DRUM_STEPS, hot = Math.floor(p16), gx = DG.x0 * W, gw = (DG.x1 - DG.x0) * W, gy = DG.y0 * W, gh = (DG.y1 - DG.y0) * W, cw = gw / DRUM_STEPS, rh = gh / DRUM_TRACKS.length;
+  g.fillStyle = PAPER; g.fillRect(0, 0, W, W);
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  for (let k = 0; k < DRUM_TRACKS.length; k++) {
+    const muted = engine.drum.mute[k], a = muted ? 0.35 : 1, y = gy + k * rh;
+    g.font = FONT(rh * 0.3); g.fillStyle = `rgba(${INK},${0.8 * a})`; g.fillText(['K', 'S', 'C', 'H', 'O'][k], gx * 0.5, y + rh / 2);
     for (let s = 0; s < DRUM_STEPS; s++) {
-      const v = engine.drumPattern.steps[k][s], [x, y] = polarXY(cx, cy, r, angleOfStep(s, DRUM_STEPS));
-      g.beginPath();
-      if (!v) { g.arc(x, y, 1.8 * dpr, 0, TAU); g.fillStyle = `rgba(${INK},${0.3 * a})`; }
-      else { g.arc(x, y, (v > 1 ? 7 : 5) * dpr * (R / (150 * dpr)), 0, TAU); g.fillStyle = v > 1 ? `rgba(${ACC},${a})` : `rgba(${INK},${a})`; }
-      g.fill();
-      if (v && s === hot && engine.playing && !muted) { g.beginPath(); g.arc(x, y, 11 * dpr * (R / (150 * dpr)), 0, TAU); g.strokeStyle = `rgba(${ACC},.9)`; g.lineWidth = 1.5 * dpr; g.stroke(); }
+      const v = engine.drumPattern.steps[k][s], x = gx + s * cw, pad = Math.max(1.5 * dpr, cw * 0.1), cx0 = x + pad, cy0 = y + pad, w = cw - 2 * pad, h = rh - 2 * pad;
+      if (!v) { g.fillStyle = `rgba(${INK},${(s % 4 === 0 ? 0.16 : 0.09) * a})`; g.fillRect(cx0, cy0, w, h); }
+      else { g.fillStyle = v > 1 ? `rgba(${ACC},${a})` : `rgba(${INK},${a})`; g.fillRect(cx0, cy0, w, h); }
     }
-  });
-  drawSweepLine(G, S);
-  drawCorners(G, dotDefs());
+  }
+  if (engine.playing) {                                           // bieżący krok: ramka wokół kolumny
+    const x = gx + hot * cw;
+    g.strokeStyle = `rgba(${ACC},1)`; g.lineWidth = 1.6 * dpr; g.strokeRect(x + 0.5 * dpr, gy - 4 * dpr, cw - dpr, gh + 8 * dpr);
+  }
+  g.font = FONT(W * 0.036); g.fillStyle = `rgba(${INK},.6)`; [1, 5, 9, 13].forEach((n) => g.fillText(String(n), gx + (n - 0.5) * cw, gy - 12 * dpr));   // numery uderzeń (ćwierćnut)
+  drawCorners(G, dotDefs(), true);
 }
-function drumTap(p) {
-  let best = -1, bd = 1;
-  DRUM_R.forEach((r, k) => { const d = Math.abs(p.rn - r); if (d < bd) { bd = d; best = k; } });
-  if (bd > 0.06) return;
-  const s = stepFromAngle(p.theta, DRUM_STEPS), row = engine.drumPattern.steps[best];
-  row[s] = (row[s] + 1) % 3;
-  if (row[s]) engine.auditionDrum(best);
+function drumCell(e) {
+  const r = cv.getBoundingClientRect(), u = (e.clientX - r.left) / r.width, v = (e.clientY - r.top) / r.height;
+  if (u < DG.x0 || u >= DG.x1 || v < DG.y0 || v >= DG.y1) return null;
+  return { k: Math.floor(((v - DG.y0) / (DG.y1 - DG.y0)) * DRUM_TRACKS.length), s: Math.floor(((u - DG.x0) / (DG.x1 - DG.x0)) * DRUM_STEPS) };
+}
+function drumDown(e) {
+  cv.setPointerCapture(e.pointerId);
+  const c = drumCell(e); if (!c) return;
+  const row = engine.drumPattern.steps[c.k], val = (row[c.s] + 1) % 3;
+  drag = { mode: 'drum', val, last: `${c.k}:${c.s}` };
+  row[c.s] = val; if (val) engine.auditionDrum(c.k);
+}
+function drumMove(e) {
+  const c = drumCell(e); if (!c) return;
+  const key = `${c.k}:${c.s}`; if (key === drag.last) return;
+  drag.last = key;
+  const row = engine.drumPattern.steps[c.k];
+  if (row[c.s] !== drag.val) { row[c.s] = drag.val; if (drag.val) engine.auditionDrum(c.k); }
 }
 function drumRandom() { engine.drumPattern = generateDrums({ style: engine.drum.style, density: engine.drum.density, seed: (Math.random() * 1e9) | 0 }); }
 
@@ -373,7 +391,7 @@ function fxFrom(p) {
 cv.addEventListener('pointerdown', (e) => {
   const p = pointerPolar(e);
   cv.setPointerCapture(e.pointerId);
-  if (page === 'drum') { drumTap(p); return; }
+  if (page === 'drum') { drumDown(e); return; }
   if (page === 'mix') { drag = { mode: 'mix' }; mixFrom(p); return; }
   if (page === 'fx') { drag = { mode: 'fx' }; fxFrom(p); return; }
   if (page === 'syn') { drag = { mode: 'syn' }; synFrom(p); return; }
@@ -388,6 +406,7 @@ cv.addEventListener('pointerdown', (e) => {
 });
 cv.addEventListener('pointermove', (e) => {
   if (!drag) return;
+  if (drag.mode === 'drum') { drumMove(e); return; }
   const p = pointerPolar(e);
   if (drag.mode === 'mix') { mixFrom(p); return; }
   if (drag.mode === 'fx') { fxFrom(p); return; }
