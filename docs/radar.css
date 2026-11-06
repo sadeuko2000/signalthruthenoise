@@ -177,3 +177,6 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .randrow{display:flex;justify-content:flex-end;height:18px;margin-top:-2px}
 .randtext{font-size:20px;letter-spacing:.1em;color:var(--acc);padding:0;line-height:1}
 .popok.alt{background:transparent;color:var(--ink);border:1px solid var(--ink)}
+.ctlbody .rc{display:grid;gap:2px;min-width:0}
+.ctlbody .cap{font-size:13px;line-height:1.1;opacity:.7;letter-spacing:.03em;min-height:14px}
+.menubody.ctlbody{max-height:410px}

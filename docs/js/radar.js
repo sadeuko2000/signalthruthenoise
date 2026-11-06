@@ -921,6 +921,36 @@ function renderRouteEdit() {
   });
   if (isAssign()) appendAssignEditor(body);
 }
+
+// Opisy parametrów i przycisków pokazywane w oknie EDIT pod listą wyboru (krótkie nazwy na pokrętłach bywają zagadkowe).
+const DESC = {
+  cutoff: 'filtr globalny: częstotliwość odcięcia', reso: 'filtr globalny: rezonans',
+  fenv: 'siła zrywu filtra (wszystkie silniki)', fdec: 'zanik zrywu filtra (wszystkie silniki)', adec: 'zanik głośności (wszystkie silniki)',
+  asus: 'sustain głośności (wszystkie silniki)', aatk: 'atak głośności (wszystkie silniki)', arel: 'release głośności (wszystkie silniki)',
+  offfatk: 'atak obwiedni filtra, −100…+100%', offfrel: 'release (zanik) obwiedni filtra, −100…+100%', offaatk: 'atak obwiedni głośności, −100…+100%', offarel: 'release obwiedni głośności, −100…+100%',
+  gate: 'długość wszystkich nut', accent: 'ile nut dostaje akcent', slide: 'ile ślizgów między nutami', swing: 'opóźnienie parzystych kroków',
+  human: 'losowe drobne wahania czasu i siły', ghost: 'ciche nuty-duchy w pustych krokach', velo: 'siła uderzenia nut', glide: 'czas ślizgu przy SLIDE',
+  tempo: 'tempo w BPM (70–180)', shift: 'obrót wzoru o kroki', oct: 'oktawa całego wzoru (−2…+2)', length: 'długość wzoru w krokach (8–32)',
+  master: 'głośność wyjścia', comp: 'siła kompresji na wyjściu', mdrive: 'przester wyjściowy', eqlow: 'EQ: niskie tony', eqmid: 'EQ: środek', eqhigh: 'EQ: wysokie tony',
+  fmix: 'filtr: ile sygnału przechodzi przez filtr', fx1mix: 'FX1: ilość efektu (send)', fx2mix: 'FX2: ilość efektu',
+  djf: 'DJ filtr: w lewo dolnoprzepustowy, w prawo górnoprzepustowy', tape: 'taśma: nasycenie, ciemniejsza góra, szum', wow: 'taśma: wahanie wysokości', chorusm: 'chorus: ilość efektu',
+  padx: 'pad MIX: oś X (pozycja kursora)', pady: 'pad MIX: oś Y (pozycja kursora)',
+  fbyp: 'włącza i omija filtr', f1byp: 'włącza i omija FX1', f2byp: 'włącza i omija FX2', latch: 'nuty trzymają się do następnej', dotmode: 'kropki na MIX: SOLO albo MUTE',
+  rndeng: 'losuje brzmienie silników', rndsyn: 'losuje brzmienie silników', rndfx: 'losuje ustawienia filtra i efektów', route: 'zmienia kolejność FLT, FX1, FX2',
+  random: 'nowy losowy wzór', mutate: 'zmienia brzmienie i wysokość części nut', warp: 'przekształca wzór: obrót, odbicie, wspak',
+  reverse: 'odwraca kolejność nut', invert: 'odbija wysokości nut w pionie', rotl: 'przesuwa wzór o krok wstecz', rotr: 'przesuwa wzór o krok do przodu',
+  double: 'kopiuje pierwszą połowę wzoru na drugą', half: 'skraca wzór o połowę', clear: 'czyści wzór', basem: 'nuta bazowa o półton niżej', basep: 'nuta bazowa o półton wyżej', keyn: 'następna skala (electro, fryg, moll)',
+  xy: 'oś X steruje dwoma parametrami, oś Y dwoma innymi', pads: 'cztery przyciski: przełączniki i akcje', faders: 'cztery pionowe suwaki', wheels: 'pitch bend (±2 półtony) i modulation',
+  knob: 'dziesięć pokręteł', slider: 'dziesięć pionowych suwaków',
+};
+for (let i = 1; i <= 4; i++) Object.assign(DESC, { [`lv${i}`]: `głośność silnika ${i}`, [`tune${i}`]: `strojenie silnika ${i} (±100 cent)`, [`oct${i}`]: `oktawa silnika ${i}`, [`vlo${i}`]: `EQ silnika ${i}: niskie`, [`vhi${i}`]: `EQ silnika ${i}: wysokie`,
+  [`mute${i}`]: `wycisza silnik ${i}`, [`solo${i}`]: `gra tylko silnik ${i}`, [`type${i}`]: `zmienia rodzaj silnika ${i}` });
+const descOf = (id) => { if (!id) return 'puste miejsce'; if (DESC[id]) return DESC[id]; const m = /^(flt|fx1p|fx2p)(\d)$/.exec(id); return m ? `parametr ${m[2]} sekcji ${m[1] === 'flt' ? 'filtra' : m[1] === 'fx1p' ? 'FX1' : 'FX2'} (nazwa zależy od stylu)` : ''; };
+const withCap = (sel, r, sp) => {            // lista wyboru z podpisem pod spodem, odświeżanym przy zmianie
+  const rc = document.createElement('div'); rc.className = 'rc'; const cap = document.createElement('small'); cap.className = 'cap'; cap.textContent = descOf(sel.value);
+  sel.addEventListener('change', () => { cap.textContent = descOf(sel.value); });
+  rc.appendChild(sel); rc.appendChild(cap); r.appendChild(sp); r.appendChild(rc);
+};
 function appendAssignEditor(body) {
   const a = getAssign(), cont = SECTION_CONT[page].map((k) => [k, nameOfC(k)]), sw = SECTION_SW[page].map((k) => [k, nameOfSW(k)]);
   const sec = document.createElement('div'); sec.className = 'csec'; sec.textContent = `STEROWANIE: ${page.toUpperCase()} ${tabNames(page)[tabSel[page]]} (10 MIEJSC)`; body.appendChild(sec);
@@ -928,7 +958,7 @@ function appendAssignEditor(body) {
     const r = document.createElement('div'); r.className = 'crow'; const sp = document.createElement('span'); sp.textContent = lab;
     const sel = document.createElement('select'); sel.setAttribute('aria-label', lab); fill(sel, cur);
     sel.addEventListener('change', () => { set(sel.value); saveAssign(); renderPanel(); commitSoon(); });
-    r.appendChild(sp); r.appendChild(sel); body.appendChild(r);
+    withCap(sel, r, sp); body.appendChild(r);
   };
   mk('TYP', (sel, cur) => [['knob', '10 POTENCJOMETRÓW'], ['slider', '10 SUWAKÓW']].forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; if (v === cur) o.selected = true; sel.appendChild(o); }), a.kind, (v) => { a.kind = v; });
   a.slots.forEach((cur, i) => mk(`${i + 1}`, (sel, c) => {
@@ -950,7 +980,7 @@ function renderCtlEdit() {
     const sel = document.createElement('select'); sel.setAttribute('aria-label', lab);
     opts.forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; if (v === cur) o.selected = true; sel.appendChild(o); });
     sel.addEventListener('change', () => { set(sel.value); saveCtrl(); renderCtlEdit(); renderPanel(); commitSoon(); });
-    r.appendChild(sp); r.appendChild(sel); body.appendChild(r);
+    withCap(sel, r, sp); body.appendChild(r);
   };
   const sec = (t) => { const d = document.createElement('div'); d.className = 'csec'; d.textContent = t; body.appendChild(d); };
   const types = Object.entries(CTL_TYPES), cont = SECTION_CONT[page].map((k) => [k, nameOfC(k)]), sw = SECTION_SW[page].map((k) => [k, nameOfSW(k)]);   // tylko parametry tej sekcji
