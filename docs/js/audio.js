@@ -76,7 +76,7 @@ export class Engine {
     this.dry = c.createGain();
     this.mix = c.createGain();
     // po miksie silników: globalny filtr -> globalny efekt -> wyjście
-    this.fx = new GlobalFx(c, () => this.effBpm);
+    this.fx = new GlobalFx(c, () => this.bpm);
     this.mix.connect(this.dry).connect(this.fx.input);
     const mfx = this._buildMasterFx(c);             // efekty master: DJ filter, tape, chorus, beat repeat
     // sygnał syntezatora przechodzi przez bramkę sidechain (stopa go przycina), perkusja ma własną szynę, a obie wpadają do wspólnego wyjścia
@@ -180,7 +180,7 @@ export class Engine {
     const m = this.mfx, t = this.ctx.currentTime, on = v > 0.02;
     if (on) {
       const DIV = [['1/2', 2], ['1/4', 1], ['1/8', 0.5], ['1/16', 0.25], ['1/32', 0.125]], d = DIV[Math.min(DIV.length - 1, Math.floor(v * DIV.length))];
-      m.rdel.delayTime.setTargetAtTime(Math.min(2.9, (60 / this.effBpm) * d[1]), t, 0.01);
+      m.rdel.delayTime.setTargetAtTime(Math.min(2.9, (60 / this.bpm) * d[1]), t, 0.01);
       if (!this._rep) { m.rin.gain.setTargetAtTime(0, t, 0.004); m.rfb.gain.setTargetAtTime(0.999, t, 0.004); m.rdry.gain.setTargetAtTime(0, t, 0.006); m.rwet.gain.setTargetAtTime(1, t, 0.006); this._rep = true; }
       return d[0];
     }
