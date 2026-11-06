@@ -1247,7 +1247,7 @@ function dotList() {
 function dotDefs() { return dotList(); }
 el('dots').addEventListener('click', (e) => {
   const b = e.target.closest('.dot'); if (!b) return;
-  const d = dotList()[+b.dataset.i]; d.act(); const m = d.say && d.say(); if (m) { toast(m); descMsg = { page, m }; updateDesc(); } commitSoon();
+  const d = dotList()[+b.dataset.i]; d.act(); const m = d.say && d.say(); if (m) toast(m); commitSoon();
 });
 el('dots').addEventListener('pointerdown', (e) => e.stopPropagation());
 
@@ -1255,26 +1255,13 @@ el('dots').addEventListener('pointerdown', (e) => e.stopPropagation());
 panelEl.addEventListener('input', commitSoon);
 cv.addEventListener('pointerup', commitSoon);
 
-// ---------- stały pasek opisu pod radarem ----------
-// domyślnie: co robią cztery kropki na tej stronie; po dotknięciu kropki: jej komunikat (do zmiany strony)
-const DOT_INFO = {
-  seq: 'RANDOM nowy wzór basu · MUTATE zmienia brzmienie i część nut · LATCH trzyma nuty do następnej · WARP przekształca wzór',
-  mix: 'Kropki = silniki 1–4. Tryb SOLO: gra tylko wybrany. Tryb MUTE: wycisza wybrany. Tryb zmienisz na zakładce MAIN',
-  syn: 'Kropki = silniki 1–4: dotknij, by edytować dany silnik. Pasek w kropce = głośność względem najgłośniejszego',
-  fx: 'FILTR i EFEKT: włącz/omiń · STEROW.: co zmienia dotyk radaru · STYLE: następny styl',
-  drum: 'RANDOM nowy wzór · KIT 808/909/SYNTH · STYLE techno/electro · SIDECH. stopa przycina bas',
-};
-let descMsg = null;
-function updateDesc() { descEl.textContent = descMsg && descMsg.page === page ? descMsg.m : DOT_INFO[page]; }
-const descEl = el('desc');
-
 // ---------- strony ----------
 let glideMs = 50;
 function setPage(p) {
   page = p;
   document.querySelectorAll('#pages button').forEach((b) => b.classList.toggle('on', b.dataset.page === p));
   if (p === 'syn' && tabSel.syn > 0 && tabSel.syn < tabNames('syn').length - 1) synSel = tabSel.syn - 1;
-  renderSub(); renderPanel(); updateDesc();
+  renderSub(); renderPanel();
   fit(); updateInfo();
 }
 document.querySelectorAll('#pages button').forEach((b) => b.addEventListener('click', () => setPage(b.dataset.page)));

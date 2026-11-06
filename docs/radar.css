@@ -25,9 +25,7 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .scopewrap{display:grid;place-items:center}
 #scope{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
 .scopebox{position:relative;width:min(100%,340px);min-width:240px;aspect-ratio:1}
-@supports (width:1cqh){.scopebox{width:min(100%,340px,max(240px,calc(100cqh - 459px)))}}
-.desc{min-height:30px;margin:-2px 0;font-size:13px;line-height:1.15;letter-spacing:.04em;text-align:center;display:flex;align-items:center;justify-content:center;padding:0 4px}
-.desc b{font-weight:400;border-bottom:1px solid var(--ink)}
+@supports (width:1cqh){.scopebox{width:min(100%,340px,max(240px,calc(100cqh - 423px)))}}
 .side{display:flex;flex-direction:column;gap:8px}
 #readout{margin:0;font:inherit;font-size:14px;line-height:1.3;white-space:pre;display:none}
 
