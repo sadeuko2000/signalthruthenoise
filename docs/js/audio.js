@@ -277,7 +277,8 @@ export class Engine {
     if (this.timer || !this.ctx) return;
     this.step = 0;
     this.lastTied = false;
-    this.nextTime = this.ctx.currentTime + 0.06;
+    this.nextTime = this.dNext = this.ctx.currentTime + 0.06;
+    this.dStep = 0;
     this.timer = setInterval(() => this._tick(), 25);
   }
 
@@ -292,11 +293,26 @@ export class Engine {
   _tick() {
     if (this.step >= this.pattern.steps.length) this.step = 0;   // wzór mógł się skrócić (zmiana długości)
     const ahead = this.ctx.currentTime + 0.12;
+    while (this.dNext < ahead) {            // perkusja: własny zegar, zawsze globalne tempo (bez mnożnika)
+      this._scheduleDrum(this.dStep, this.dNext);
+      this.dStep = (this.dStep + 1) % DRUM_STEPS;
+      this.dNext += 60 / this.bpm / 4;
+    }
     while (this.nextTime < ahead) {
       this._scheduleStep(this.step, this.nextTime);
       const n = this.pattern.steps.length;
       this.step = (this.step + 1) % n;
       this.nextTime += 60 / this.effBpm / 4;
+    }
+  }
+
+  _scheduleDrum(ds, t) {
+    if (!this.drum.on || !this.drums) return;
+    const dur = 60 / this.bpm / 4, td = t + (ds % 2 === 1 ? this.pattern.swing * dur : 0), st = this.drumPattern.steps;
+    for (let k = 0; k < st.length; k++) {
+      const v = st[k][ds]; if (!v || this.drum.mute[k]) continue;
+      this.drums.trigger(k, td, v, this.drum);
+      if (k === 0 && this.drum.sc && (this.drum.levels[0] ?? 1) > 0.02) this._duck(td);
     }
   }
 
@@ -307,14 +323,6 @@ export class Engine {
     const jitter = this.human > 0 ? (Math.random() - 0.5) * dur * 0.3 * this.human : 0;
     const tt = t + (i % 2 === 1 ? pat.swing * dur : 0) + Math.max(-0.01, jitter);
     if (this.onStep) this.onStep(i, t);
-    if (this.drum.on && this.drums) {              // perkusja: krok bębnów = krok wzoru basu mod 16, ten sam swing
-      const ds = i % DRUM_STEPS, td = t + (ds % 2 === 1 ? pat.swing * dur : 0), st = this.drumPattern.steps;
-      for (let k = 0; k < st.length; k++) {
-        const v = st[k][ds]; if (!v || this.drum.mute[k]) continue;
-        this.drums.trigger(k, td, v, this.drum);
-        if (k === 0 && this.drum.sc && (this.drum.levels[0] ?? 1) > 0.02) this._duck(td);
-      }
-    }
     if (!s.on) {
       this.lastTied = false;
       // GHOST: ciche nuty-duchy (tonika) w części pustych kroków, stałe dla danego kroku
