@@ -19,6 +19,7 @@ const finalize = (p) => withSlide(withAccent({ ...p, root: effRoot() }, state.ac
 let pattern = finalize(generateBass(state));
 engine.pattern = pattern;
 let page = 'seq';
+let view = 'classic';                            // widok: classic (strony SEQ/MIX/SYN/FX/DRUM), scenes (pole XY + pady scen), orbit (instrument jako orbity)
 const tabSel = { seq: 0, mix: 0, syn: 0, fx: 0, drum: 0 };   // wybrana pod-zakładka każdej strony (0 = MAIN)
 let synSel = 0;                                  // silnik edytowany na stronie SYN (0..3)
 const globals = { cutoff: 0.5, reso: 0.5, master: 1, comp: 0.5, mdrive: 0, dj: 0, tape: 0, wow: 0, chorus: 0 };   // ustawienia wyjściowe i filtra globalnego (do zapisu w presetach)
@@ -361,7 +362,9 @@ function drumRandom() { engine.drumPattern = generateDrums({ style: engine.drum.
 let raf = 0, lastSync = 0;
 function loop(ts) {
   if (ts - lastSync > 120) { lastSync = ts; if (typeof syncAssign === 'function') syncAssign(); }
-  if (!el('radar').hidden) { if (page === 'mix') drawMix(); else if (page === 'fx') drawFx(ts); else if (page === 'syn') drawSyn(); else if (page === 'drum') drawDrum(); else drawSeq(); }
+  if (!el('radar').hidden && view === 'orbit') drawOrbit(ts);
+  else if (!el('radar').hidden && view === 'scenes') syncScenes();
+  else if (!el('radar').hidden) { if (page === 'mix') drawMix(); else if (page === 'fx') drawFx(ts); else if (page === 'syn') drawSyn(); else if (page === 'drum') drawDrum(); else drawSeq(); }
   raf = requestAnimationFrame(loop);
 }
 
@@ -393,6 +396,7 @@ function fxFrom(p) {
 cv.addEventListener('pointerdown', (e) => {
   const p = pointerPolar(e);
   cv.setPointerCapture(e.pointerId);
+  if (view === 'orbit') { orbitDown(e); return; }
   if (page === 'drum') { drumDown(e); return; }
   if (page === 'mix') { drag = { mode: 'mix' }; mixFrom(p); return; }
   if (page === 'fx') { drag = { mode: 'fx' }; fxFrom(p); return; }
@@ -409,6 +413,7 @@ cv.addEventListener('pointerdown', (e) => {
 cv.addEventListener('pointermove', (e) => {
   if (!drag) return;
   if (drag.mode === 'drum') { drumMove(e); return; }
+  if (drag.mode === 'orbit') { orbitMove(e); return; }
   const p = pointerPolar(e);
   if (drag.mode === 'mix') { mixFrom(p); return; }
   if (drag.mode === 'fx') { fxFrom(p); return; }
@@ -423,6 +428,7 @@ cv.addEventListener('pointermove', (e) => {
   }
 });
 function endDrag() {
+  if (drag && drag.mode === 'orbit') commitSoon();
   if (drag && drag.mode === 'seq' && drag.grabbed && !drag.moved) setSteps(clearNote(pattern.steps, drag.i));   // dotknięcie istniejącego echa usuwa je
   drag = null; touch = null;
 }
@@ -1234,10 +1240,192 @@ el('dots').addEventListener('pointerdown', (e) => e.stopPropagation());
 panelEl.addEventListener('input', commitSoon);
 cv.addEventListener('pointerup', commitSoon);
 
+
+// ============================================================================
+// Widoki: KLASYCZNY (dotychczasowy), SCENY (pole XY i 16 padów ze scenami) oraz ORBITY (cały instrument jako układ orbit)
+// ============================================================================
+function setView(v) {
+  view = v;
+  document.querySelectorAll('#viewbar button').forEach((b) => b.classList.toggle('on', b.dataset.view === v));
+  document.querySelectorAll('#pages button').forEach((b) => b.classList.toggle('on', v === 'classic' && b.dataset.page === page));
+  el('scopewrap').hidden = v === 'scenes';
+  el('subtabs').hidden = el('panel').hidden = v !== 'classic';
+  el('scenes').hidden = v !== 'scenes';
+  el('orbitbar').hidden = v !== 'orbit';
+  document.querySelector('.scopebox').classList.toggle('plain', v === 'orbit');
+  if (v !== 'orbit') { orbSel = null; orbZ = 0; }
+  if (v === 'orbit') orbInfo();
+  if (v === 'scenes') renderScenes();
+  fit();
+}
+el('viewbar').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setView(b.dataset.view); });
+
+// ---------- SCENY ----------
+// Scena = pełna migawka (wzór, brzmienie, efekty, perkusja), jak w historii i presetach. Pusty pad zapisuje bieżący stan, pełny go wczytuje, długie przytrzymanie usuwa.
+const SCENE_KEY = 'radarxxx.scenes.v1', SC_NAMES = 'ABCDEFGHIJKLMNOP';
+let scenes = Array(16).fill(null), scAct = -1;
+try { const sv = JSON.parse(localStorage.getItem(SCENE_KEY) || 'null'); if (Array.isArray(sv) && sv.length === 16) scenes = sv; } catch { /* brak zapisu */ }
+const saveScenes = () => { try { localStorage.setItem(SCENE_KEY, JSON.stringify(scenes)); return true; } catch { return false; } };
+function renderScenes() {
+  const host = el('spads'); host.innerHTML = '';
+  scenes.forEach((sc, i) => { const b = document.createElement('button'); b.className = `spad ${sc ? 'has' : 'empty'}${i === scAct ? ' act' : ''}`; b.textContent = SC_NAMES[i]; b.dataset.i = i; b.setAttribute('aria-label', `Scena ${SC_NAMES[i]}`); host.appendChild(b); });
+  el('schint').textContent = 'PUSTY PAD: ZAPISZ TU · PEŁNY: WCZYTAJ · DŁUGO: USUŃ';
+  syncScenes();
+}
+function saveScene(i) {
+  flushCommit(); scenes[i] = snapshot(); scAct = i;
+  toast(saveScenes() ? `SCENA ${SC_NAMES[i]} ZAPISANA` : 'NIE UDAŁO SIĘ ZAPISAĆ'); renderScenes();
+}
+function sceneTap(i) {
+  if (!scenes[i]) { saveScene(i); return; }
+  flushCommit(); restore(scenes[i]); scAct = i; pushHistory(); toast(`SCENA ${SC_NAMES[i]}`); renderScenes();
+}
+let padTimer = 0, padLong = false;
+el('spads').addEventListener('pointerdown', (e) => {
+  const b = e.target.closest('.spad'); if (!b) return;
+  padLong = false; clearTimeout(padTimer);
+  const i = +b.dataset.i;
+  if (scenes[i]) padTimer = setTimeout(() => { padLong = true; scenes[i] = null; if (scAct === i) scAct = -1; saveScenes(); renderScenes(); toast(`SCENA ${SC_NAMES[i]} USUNIĘTA`); }, 600);
+});
+['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => el('spads').addEventListener(t, () => clearTimeout(padTimer)));
+el('spads').addEventListener('click', (e) => { const b = e.target.closest('.spad'); if (!b) return; if (padLong) { padLong = false; return; } sceneTap(+b.dataset.i); });
+el('sc-rand').addEventListener('click', () => { actions.random(); commitSoon(); });
+el('sc-mut').addEventListener('click', () => { actions.mut(); commitSoon(); });
+el('sc-save').addEventListener('click', () => { const i = scAct >= 0 ? scAct : scenes.findIndex((x) => !x); if (i < 0) toast('WYBIERZ PAD DO NADPISANIA'); else saveScene(i); });
+const xyEl = el('xy'), xyd = el('xyd');
+let xyDrag = false;
+const xyFrom = (e) => { const r = xyEl.getBoundingClientRect(); CONT.cutoff[1](clamp01((e.clientX - r.left) / r.width)); CONT.reso[1](1 - clamp01((e.clientY - r.top) / r.height)); syncScenes(); };
+xyEl.addEventListener('pointerdown', (e) => { xyDrag = true; xyEl.setPointerCapture(e.pointerId); xyFrom(e); });
+xyEl.addEventListener('pointermove', (e) => { if (xyDrag) xyFrom(e); });
+const xyEnd = () => { if (xyDrag) { xyDrag = false; commitSoon(); } };
+xyEl.addEventListener('pointerup', xyEnd); xyEl.addEventListener('pointercancel', xyEnd);
+function syncScenes() { xyd.style.left = `${CONTG.cutoff() * 100}%`; xyd.style.top = `${(1 - CONTG.reso()) * 100}%`; }
+
+// ---------- ORBITY ----------
+// Trzy orbity: zewnętrzna = kroki wzoru (dotyk włącza i wyłącza), środkowa = silniki i perkusja, wewnętrzna = filtr i efekty, w środku MASTER.
+// Dotknięcie obiektu przybliża go i pokazuje cztery satelity: przeciągnij kropkę w górę lub w dół, żeby zmienić parametr, dotknij przełącznik, żeby go włączyć.
+const ORB_R = [0.86, 0.58, 0.29];
+let orbSel = null, orbZ = 0, orbLast = { x: 0, y: 0 }, orbTf = { s: 1, tx: 0, ty: 0 }, orbHit = { items: [], sats: [] };
+const SAT_DEG = [45, 135, 225, 315];
+function orbItems(G) {
+  const { cx, cy, R } = G, at = (r, deg) => ({ x: cx + Math.sin((deg * Math.PI) / 180) * r * R, y: cy - Math.cos((deg * Math.PI) / 180) * r * R }), items = [];
+  for (let i = 0; i < 4; i++) items.push({ kind: 'eng', i, ...at(ORB_R[1], i * 72 + 36), r: R * (0.045 + 0.05 * clamp01(engine.levels[i] / 1.5)), label: typeName(i), on: !!engine.enabled[i] });
+  items.push({ kind: 'drum', i: 0, ...at(ORB_R[1], 4 * 72 + 36), r: R * (0.045 + 0.05 * clamp01(CONTG.dlevel())), label: 'DRUM', on: !!engine.drum.on });
+  for (let j = 0; j < 3; j++) items.push({ kind: 'fx', i: j, ...at(ORB_R[2], 60 + j * 120), r: R * 0.055, label: ['FLT', 'FX1', 'FX2'][j], on: !fxSecs[j].slot.bypass });
+  items.push({ kind: 'master', i: 0, x: cx, y: cy, r: R * 0.05, label: 'MASTER', on: true });
+  return items;
+}
+function orbSats(it) {
+  if (it.kind === 'eng') return [['c', `lv${it.i + 1}`], ['c', `tune${it.i + 1}`], ['c', `oct${it.i + 1}`], ['s', `mute${it.i + 1}`]];
+  if (it.kind === 'drum') return [['c', 'dlevel'], ['c', 'dkick'], ['c', 'dscamt'], ['s', 'dsc']];
+  if (it.kind === 'fx') { const j = it.i; return [['c', `${['flt', 'fx1p', 'fx2p'][j]}1`], ['c', `${['flt', 'fx1p', 'fx2p'][j]}2`], ['c', ['fmix', 'fx1mix', 'fx2mix'][j]], ['s', ['fbyp', 'f1byp', 'f2byp'][j]]]; }
+  return [['c', 'master'], ['c', 'comp'], ['c', 'mdrive'], ['c', 'tempo']];
+}
+function orbInfo() {
+  el('orb-back').hidden = !orbSel;
+  const it = orbSel && orbHit.items.find((x) => x.kind === orbSel.kind && x.i === orbSel.i);
+  el('orbinfo').textContent = it ? `${it.label}: PRZECIĄGNIJ KROPKĘ W GÓRĘ LUB W DÓŁ` : 'DOTKNIJ PLANETĘ, ŻEBY JĄ ZBLIŻYĆ · DOTKNIJ KROPKĘ NA ZEWNĘTRZNEJ ORBICIE, ŻEBY ZMIENIĆ NUTĘ';
+}
+function drawOrbit(ts) {
+  const G = geo(), { W, cx, cy, R, dpr } = G, S = sweepState(), n = S.n;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = PAPER; g.fillRect(0, 0, W, W);
+  const items = orbItems(G), sel = orbSel && items.find((x) => x.kind === orbSel.kind && x.i === orbSel.i);
+  const tgt = sel ? 1 : 0; orbZ += (tgt - orbZ) * 0.22; if (Math.abs(tgt - orbZ) < 0.003) orbZ = tgt;
+  const z = orbZ, s = 1 + 0.9 * z; if (sel) orbLast = { x: sel.x - cx, y: sel.y - cy };
+  orbTf = { s, tx: cx * (1 - s) - z * s * orbLast.x, ty: cy * (1 - s) - z * s * orbLast.y };
+  g.setTransform(s, 0, 0, s, orbTf.tx, orbTf.ty);
+  const dimA = 1 - 0.7 * z;
+  // orbity i podpisy
+  ORB_R.forEach((r, k) => { circle(cx, cy, r * R, `rgba(${INK},${k === 0 ? 1 : 0.55 * dimA + 0.2})`, (k === 0 ? 1.4 : 1) * dpr, k === 0 ? null : [3 * dpr, 4 * dpr]); });
+  g.font = FONT(R * 0.062); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = `rgba(${INK},${0.6 * dimA})`;
+  ['WZÓR', 'SILNIKI', 'EFEKTY'].forEach((t, k) => g.fillText(t, cx, cy - ORB_R[k] * R + R * 0.05));
+  // zewnętrzna orbita: kroki wzoru i głowica
+  g.globalAlpha = dimA;
+  const hot = Math.floor(S.pos) % n;
+  for (let i = 0; i < n; i++) {
+    const st = pattern.steps[i], [x, y] = polarXY(cx, cy, R * ORB_R[0], angleOfStep(i, n));
+    g.beginPath();
+    if (st.on) { g.arc(x, y, R * 0.027, 0, TAU); g.fillStyle = st.vel >= 110 ? `rgb(${ACC})` : `rgb(${INK})`; g.fill(); }
+    else { g.arc(x, y, R * 0.011, 0, TAU); g.strokeStyle = `rgba(${INK},.55)`; g.lineWidth = dpr; g.stroke(); }
+    if (i === hot && engine.playing) { g.beginPath(); g.arc(x, y, R * 0.045, 0, TAU); g.strokeStyle = `rgb(${ACC})`; g.lineWidth = 2 * dpr; g.stroke(); }
+  }
+  const [lx, ly] = polarXY(cx, cy, R * ORB_R[0], S.sw);
+  g.beginPath(); g.moveTo(cx, cy); g.lineTo(lx, ly); g.strokeStyle = `rgba(${INK},.8)`; g.lineWidth = 1.4 * dpr; g.stroke();
+  g.globalAlpha = 1;
+  // obiekty: silniki i perkusja (koła), filtr i efekty (kwadraty), master (środek)
+  items.forEach((it) => {
+    const a = sel && it !== sel ? 0.3 : 1; g.globalAlpha = a;
+    g.beginPath();
+    if (it.kind === 'fx') g.rect(it.x - it.r, it.y - it.r, it.r * 2, it.r * 2); else g.arc(it.x, it.y, it.r, 0, TAU);
+    if (it.on) { g.fillStyle = it.kind === 'master' ? `rgb(${INK})` : `rgb(${ACC})`; g.fill(); }
+    g.strokeStyle = `rgb(${INK})`; g.lineWidth = 1.4 * dpr; g.stroke();
+    if (it.kind === 'drum') { g.beginPath(); g.arc(it.x, it.y, it.r * 0.4, 0, TAU); g.fillStyle = `rgb(${INK})`; g.fill(); }
+    if (it !== sel || z < 0.5) { g.font = FONT(R * 0.065); g.fillStyle = `rgb(${INK})`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(it.label, it.x, it.y + it.r + R * 0.06); }
+    g.globalAlpha = 1;
+  });
+  // satelity wybranego obiektu
+  const sats = [];
+  if (sel && z > 0.05) {
+    const ds = R * 0.2, rs = R * 0.062; g.globalAlpha = z;
+    orbSats(sel).forEach(([type, id], k) => {
+      const a = (SAT_DEG[k] * Math.PI) / 180, x = sel.x + Math.sin(a) * ds, y = sel.y - Math.cos(a) * ds;
+      sats.push({ x, y, r: rs, type, id });
+      g.beginPath(); g.arc(x, y, rs, 0, TAU);
+      if (type === 's') {
+        const lit = !!SW[id][1](); if (lit) { g.fillStyle = `rgb(${ACC})`; g.fill(); }
+        g.strokeStyle = `rgb(${INK})`; g.lineWidth = 1.4 * dpr; g.stroke();
+      } else {
+        const v = clamp01(CONTG[id]());
+        g.strokeStyle = `rgba(${INK},.25)`; g.lineWidth = R * 0.016; g.stroke();
+        g.beginPath(); g.arc(x, y, rs, Math.PI * 0.75, Math.PI * 0.75 + Math.PI * 1.5 * Math.max(0.001, v)); g.strokeStyle = `rgb(${INK})`; g.lineCap = 'round'; g.stroke(); g.lineCap = 'butt';
+        g.beginPath(); g.arc(x, y, R * 0.012, 0, TAU); g.fillStyle = `rgb(${ACC})`; g.fill();
+      }
+      g.font = FONT(R * 0.055); g.fillStyle = `rgb(${INK})`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText(type === 's' ? nameOfSW(id) : knobLabel(nameOfC(id)), x, y + rs + R * 0.055);
+    });
+    g.globalAlpha = 1;
+  }
+  orbHit = { items, sats };
+  g.setTransform(1, 0, 0, 1, 0, 0);
+}
+function orbWorld(e) {
+  const r = cv.getBoundingClientRect(), k = cv.width / r.width;
+  return { x: ((e.clientX - r.left) * k - orbTf.tx) / orbTf.s, y: ((e.clientY - r.top) * k - orbTf.ty) / orbTf.s };
+}
+function orbitDown(e) {
+  const w = orbWorld(e), G = geo(), { items, sats } = orbHit, hitItem = items.find((it) => Math.hypot(w.x - it.x, w.y - it.y) <= Math.max(it.r * 1.5, G.R * 0.075));
+  if (orbSel) {
+    const st = sats.find((x) => Math.hypot(w.x - x.x, w.y - x.y) <= x.r * 1.6);
+    if (st) {
+      if (st.type === 's') { SW[st.id][2](); commitSoon(); }
+      else drag = { mode: 'orbit', id: st.id, y0: e.clientY, v0: clamp01(CONTG[st.id]()), span: cv.getBoundingClientRect().width * 0.45 };
+      return;
+    }
+    orbSel = hitItem && !(hitItem.kind === orbSel.kind && hitItem.i === orbSel.i) ? { kind: hitItem.kind, i: hitItem.i } : null;
+    orbInfo(); return;
+  }
+  if (hitItem) { orbSel = { kind: hitItem.kind, i: hitItem.i }; orbInfo(); return; }
+  const dx = w.x - G.cx, dy = w.y - G.cy;
+  if (Math.abs(Math.hypot(dx, dy) - ORB_R[0] * G.R) < 0.09 * G.R) {
+    const n = pattern.steps.length; let th = Math.atan2(dx, -dy); if (th < 0) th += TAU;
+    const i = stepFromAngle(th, n), st = pattern.steps[i];
+    if (st.on) setSteps(clearNote(pattern.steps, i));
+    else { setSteps(placeNote(pattern.steps, i, st.degree ?? 0, st)); engine.audition(pattern.steps[i]); }
+    commitSoon();
+  }
+}
+function orbitMove(e) {
+  const v = clamp01(drag.v0 + (drag.y0 - e.clientY) / drag.span);
+  CONT[drag.id][1](v);
+}
+el('orb-back').addEventListener('click', () => { orbSel = null; orbInfo(); });
+el('orb-rand').addEventListener('click', () => { actions.random(); commitSoon(); });
+el('orb-mut').addEventListener('click', () => { actions.mut(); commitSoon(); });
+
 // ---------- strony ----------
 let glideMs = 50;
 function setPage(p) {
-  page = p; el('dots').classList.toggle('row', p === 'drum');
+  page = p; if (view !== 'classic') setView('classic'); el('dots').classList.toggle('row', p === 'drum');
   document.querySelectorAll('#pages button').forEach((b) => b.classList.toggle('on', b.dataset.page === p));
   if (p === 'syn' && tabSel.syn > 0 && tabSel.syn < tabNames('syn').length - 1) synSel = tabSel.syn - 1;
   renderSub(); renderPanel();

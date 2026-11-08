@@ -26,6 +26,11 @@
     </nav>
     <button id="play" class="play" aria-label="play / stop"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M3 1.5v13l11-6.5z" fill="currentColor"/></svg></button>
   </header>
+  <nav class="viewbar" id="viewbar" aria-label="Widok">
+    <button data-view="classic" class="on">KLASYCZNY</button>
+    <button data-view="scenes">SCENY</button>
+    <button data-view="orbit">ORBITY</button>
+  </nav>
 
   <main class="stage">
     <section class="scopewrap" id="scopewrap">
@@ -36,6 +41,16 @@
           <button class="dot" data-i="2"></button><button class="dot" data-i="3"></button>
         </div>
       </div>
+    </section>
+    <section class="orbitbar" id="orbitbar" hidden>
+      <div class="orbinfo" id="orbinfo"></div>
+      <div class="orbbtns"><button id="orb-back" hidden>◂ WSTECZ</button><button id="orb-rand">RANDOM</button><button id="orb-mut">MUTATE</button></div>
+    </section>
+    <section class="scenes" id="scenes" hidden>
+      <div class="xy" id="xy" aria-label="Pole XY: cutoff i rezonans"><i class="xyh"></i><i class="xyv"></i><b class="xyd" id="xyd"></b><span class="xyl">CUTOFF / RESO</span></div>
+      <div class="spads" id="spads"></div>
+      <div class="scbtns"><button id="sc-rand">RANDOM</button><button id="sc-mut">MUTATE</button><button id="sc-save">ZAPISZ SCENĘ</button></div>
+      <div class="schint" id="schint"></div>
     </section>
     <nav class="subtabs" id="subtabs" aria-label="Zakładki strony"></nav>
     <section class="panel" id="panel"></section>
