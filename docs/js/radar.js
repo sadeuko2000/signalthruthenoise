@@ -28,7 +28,11 @@ const cv = el('scope'), g = cv.getContext('2d');
 let lastStep = { i: 0, t: 0 }, heldPos = 0;
 engine.onStep = (i, t) => { lastStep = { i, t }; };
 
-const INK = '11,11,11', ACC = '255,75,31', PAPER = '#a6abad';      // wariant „Specimen”: czarna kreska na szarym papierze, pomarańczowy akcent
+const INK = '241,241,236', ACC = '198,255,26', PAPER = '#181818';      // paleta: biel i kwaśna limonka na prawie czarnym tle
+const PAPER_TRAIL = 'rgba(24,24,24,0.38)';                              // przy efekcie CRT ekran nie jest czyszczony do końca: zostaje poświata luminoforu za ruchomymi liniami
+let crtOn = true;
+try { crtOn = localStorage.getItem('radarxxx.crt.v1') !== '0'; } catch { /* domyślnie włączony */ }
+const clearScope = (W) => { g.fillStyle = crtOn ? PAPER_TRAIL : PAPER; g.fillRect(0, 0, W, W); };
 const FONT = (px) => `${Math.round(px)}px 'VT323', ui-monospace, Menlo, monospace`;
 const cutoffHz = (v) => 60 * Math.pow(100, v);
 
@@ -69,7 +73,7 @@ function sweepState() { const n = pattern.steps.length, pos = curPos(); return {
 
 function drawBase(G, S, o = {}) {
   const { W, cx, cy, R, dpr } = G;
-  g.fillStyle = PAPER; g.fillRect(0, 0, W, W);
+  clearScope(W);
   // uproszczone tło: tylko pierścień toniki i oktawy oraz obrzeże, bez siatki stopni i bez drobnej podziałki
   if (!o.noRings) { circle(cx, cy, degToR(0) * R, `rgba(${INK},.5)`, dpr); circle(cx, cy, degToR(7) * R, `rgba(${INK},.5)`, dpr); }
   circle(cx, cy, R * 0.985, `rgba(${INK},1)`, dpr);
@@ -320,7 +324,7 @@ const DG = { x0: 0.095, x1: 0.975, y0: 0.11, y1: 0.77 };            // pole siat
 function drawDrum() {
   const G = geo(), S0 = sweepState(), { W, dpr } = G;
   const p16 = S0.pos % DRUM_STEPS, hot = Math.floor(p16), gx = DG.x0 * W, gw = (DG.x1 - DG.x0) * W, gy = DG.y0 * W, gh = (DG.y1 - DG.y0) * W, cw = gw / DRUM_STEPS, rh = gh / DRUM_TRACKS.length;
-  g.fillStyle = PAPER; g.fillRect(0, 0, W, W);
+  clearScope(W);
   g.textAlign = 'center'; g.textBaseline = 'middle';
   for (let k = 0; k < DRUM_TRACKS.length; k++) {
     const muted = engine.drum.mute[k], a = muted ? 0.35 : 1, y = gy + k * rh;
@@ -365,8 +369,17 @@ function loop(ts) {
   if (!el('radar').hidden && view === 'orbit') drawOrbit(ts);
   else if (!el('radar').hidden && view === 'scenes') syncScenes();
   else if (!el('radar').hidden) { if (page === 'mix') drawMix(); else if (page === 'fx') drawFx(ts); else if (page === 'syn') drawSyn(); else if (page === 'drum') drawDrum(); else drawSeq(); }
+  if (crtOn && view !== 'scenes' && !el('radar').hidden) bloom();
   raf = requestAnimationFrame(loop);
 }
+// poświata: zmniejszona kopia ekranu (bez tła) rysowana na drugim płótnie, które CSS rozmywa i nakłada trybem screen
+const glowCv = el('glow'), gg = glowCv.getContext('2d');
+function bloom() {
+  const gw = Math.max(1, cv.width >> 2); if (glowCv.width !== gw) { glowCv.width = gw; glowCv.height = gw; }
+  gg.globalCompositeOperation = 'source-over'; gg.clearRect(0, 0, gw, gw); gg.drawImage(cv, 0, 0, gw, gw);
+  gg.globalCompositeOperation = 'difference'; gg.fillStyle = PAPER; gg.fillRect(0, 0, gw, gw); gg.globalCompositeOperation = 'source-over';
+}
+function setCrt(on) { crtOn = on; el('radar').classList.toggle('crt', on); try { localStorage.setItem('radarxxx.crt.v1', on ? '1' : '0'); } catch { /* brak pamięci */ } }
 
 // ---------- dotyk na ekranie ----------
 let drag = null;
@@ -520,6 +533,7 @@ function renderMenu(view = 'main') {
   body.innerHTML = '';
   if (view === 'main') {
     row(`PRESETY (${loadPresets().length}) ›`, () => renderMenu('presets'));
+    row(`EFEKT KINESKOPU: ${crtOn ? 'WŁ.' : 'WYŁ.'}`, () => { setCrt(!crtOn); renderMenu('main'); });
     row('USTAWIENIA MIDI (WKRÓTCE)', null, true);
     row('NAGRANIA (WKRÓTCE)', null, true);
   } else {
@@ -1328,7 +1342,7 @@ function orbInfo() {
 }
 function drawOrbit(ts) {
   const G = geo(), { W, cx, cy, R, dpr } = G, S = sweepState(), n = S.n;
-  g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = PAPER; g.fillRect(0, 0, W, W);
+  g.setTransform(1, 0, 0, 1, 0, 0); clearScope(W);
   const items = orbItems(G), sel = orbSel && items.find((x) => x.kind === orbSel.kind && x.i === orbSel.i);
   const tgt = sel ? 1 : 0; orbZ += (tgt - orbZ) * 0.22; if (Math.abs(tgt - orbZ) < 0.003) orbZ = tgt;
   const z = orbZ, s = 1 + 0.9 * z; if (sel) orbLast = { x: sel.x - cx, y: sel.y - cy };
@@ -1460,7 +1474,7 @@ el('go').addEventListener('click', async () => {
   setPad(padPos.x, padPos.y);
   buildFx();
   el('start').hidden = true;
-  el('radar').hidden = false;
+  el('radar').hidden = false; el('radar').classList.toggle('crt', crtOn);
   setPage('seq');
   pushHistory();
   engine.play(); lockScreen();

@@ -1,7 +1,7 @@
 /* radarxxx, wariant „Specimen”: szary papier, czarny druk, pomarańczowy akcent, pikselowy krój VT323.
    Struktura ekranu wzorowana na Ableton Note (tytuł, pasek zakładek, ekran, pasek przeglądu, pokrętła z nazwą nad pokrętłem). */
 :root{
-  --paper:#a6abad; --ink:#0b0b0b; --acc:#ff4b1f; --ink-dim:rgba(11,11,11,.28); --board:#d4d6d7;
+  --paper:#181818; --ink:#f1f1ec; --acc:#c6ff1a; --on-acc:#0e0e0e; --ink-dim:rgba(241,241,236,.28); --board:#262626;
   --mono:'VT323',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
   color-scheme:light;
 }
@@ -35,7 +35,7 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .knob .kl{order:-1;font-size:16px;letter-spacing:.08em;line-height:1;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;touch-action:pan-y}
 .knob svg{order:0;width:var(--ks);height:var(--ks);touch-action:none;overflow:visible}
 .knob .tr,.knob .va{fill:none;stroke-width:5.5;stroke-linecap:round}
-.knob .tr{stroke:rgba(11,11,11,.22)}
+.knob .tr{stroke:rgba(241,241,236,.22)}
 .knob .va{stroke:var(--ink)}
 .knob .pt{display:none}
 .knob.drag .kl,.knob:focus-visible .kl{text-decoration:underline;text-underline-offset:3px}
@@ -47,7 +47,7 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 #go::before{content:"■ ";color:var(--acc)}
 #start p{margin:0;font-size:16px;letter-spacing:.1em}
 .sweepdemo{width:min(60vw,260px);aspect-ratio:1;border-radius:50%;border:1px solid var(--ink);background:
-  conic-gradient(from 0deg,rgba(11,11,11,0) 0deg,rgba(11,11,11,.3) 358deg,rgba(11,11,11,.85) 360deg),
+  conic-gradient(from 0deg,rgba(241,241,236,0) 0deg,rgba(241,241,236,.3) 358deg,rgba(241,241,236,.85) 360deg),
   repeating-radial-gradient(circle,transparent 0 22%,var(--ink-dim) 22% calc(22% + 1px));animation:spin 3.2s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.sweepdemo{animation:none}}
@@ -61,7 +61,7 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 }
 
 /* okienko tempa */
-.pop{position:absolute;inset:0;z-index:30;display:grid;place-items:center;background:rgba(166,171,173,.82)}
+.pop{position:absolute;inset:0;z-index:30;display:grid;place-items:center;background:rgba(24,24,24,.86)}
 .popcard{width:min(86%,320px);padding:16px;border:1px solid var(--ink);background:var(--paper);box-shadow:6px 6px 0 var(--ink);display:grid;gap:12px;justify-items:center}
 .poplabel{font-size:16px;letter-spacing:.2em}
 .popval{display:flex;align-items:baseline;gap:8px}
@@ -85,7 +85,7 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .dot:nth-child(1){left:0;top:0}.dot:nth-child(2){right:0;top:0}.dot:nth-child(3){left:0;bottom:0}.dot:nth-child(4){right:0;bottom:0}
 .dots.row .dot{top:auto;bottom:0;width:25%;height:19%}
 .dots.row .dot:nth-child(1){left:0}.dots.row .dot:nth-child(2){left:25%;right:auto}.dots.row .dot:nth-child(3){left:50%}.dots.row .dot:nth-child(4){left:75%;right:auto}
-.dot:active{opacity:1;background:rgba(11,11,11,.06)}
+.dot:active{opacity:1;background:rgba(241,241,236,.06)}
 .subtabs{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);border-block:1px solid var(--ink)}
 .subtabs button{min-height:28px;font-size:20px;letter-spacing:.08em;border-right:1px solid var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
 .subtabs button:last-child{border-right:0}
@@ -98,11 +98,11 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .cellbtn{display:grid;justify-items:center;align-content:start;gap:3px;padding:2px;min-width:0}
 .cellbtn .cl{order:-1;font-size:16px;letter-spacing:.08em;line-height:1;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .cellbtn button{width:40px;height:40px;border-radius:50%;border:2px solid var(--ink);background:transparent}
-.cellbtn.act button{background:var(--acc);border-color:var(--acc)}
-.cellbtn.tog.on button{background:var(--acc);border-color:var(--acc)}
+.cellbtn.act button{background:var(--acc);border-color:var(--acc);color:var(--on-acc)}
+.cellbtn.tog.on button{background:var(--acc);border-color:var(--acc);color:var(--on-acc)}
 .cellbtn.tog button{box-shadow:inset 0 0 0 5px var(--paper)}
 .cellbtn.tog.on button{box-shadow:inset 0 0 0 5px var(--paper),0 0 0 0 transparent}
-.cellbtn.tog.on button{background:var(--acc);box-shadow:none}
+.cellbtn.tog.on button{background:var(--acc);box-shadow:none;color:var(--on-acc)}
 .cellbtn button:active{transform:scale(.94)}
 .spacer{min-height:1px}
 .steprow{grid-column:1/-1;grid-row:span 1;align-self:center;display:grid;grid-template-columns:64px 52px 1fr 52px;align-items:center;border:1px solid var(--ink);margin-bottom:6px}
@@ -114,7 +114,7 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .bar button{min-height:44px;font-size:20px;letter-spacing:.1em}
 .bar button:disabled{opacity:.3;cursor:default}
 .bar .rec{justify-self:center;width:53px;height:52px;border-radius:50%;background:var(--acc);border:0;padding:0}
-.bar .rec.on{box-shadow:0 0 0 4px rgba(255,75,31,.35)}
+.bar .rec.on{box-shadow:0 0 0 4px rgba(198,255,26,.35)}
 .toast{position:absolute;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 86px);transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:6px 12px;font-size:17px;letter-spacing:.06em;white-space:normal;text-align:center;max-width:88%;line-height:1.1;opacity:0;pointer-events:none;transition:opacity .18s;z-index:40}
 .toast.on{opacity:1}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
@@ -146,12 +146,12 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .cbox{position:relative;border:1px solid var(--ink);height:130px;touch-action:none;user-select:none;overflow:hidden}
 .cbox .cname{position:absolute;left:4px;right:4px;bottom:2px;font-size:13px;letter-spacing:.04em;line-height:1.05;opacity:.75;pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cbox.xy{cursor:crosshair}
-.cbox.xy .hx,.cbox.xy .hy{position:absolute;background:rgba(11,11,11,.25);pointer-events:none}
+.cbox.xy .hx,.cbox.xy .hy{position:absolute;background:rgba(241,241,236,.25);pointer-events:none}
 .cbox.xy .hx{left:0;right:0;height:1px}.cbox.xy .hy{top:0;bottom:0;width:1px}
 .cbox.xy .puck{position:absolute;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;background:var(--acc);pointer-events:none}
 .cbox.pads{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:4px;padding:4px}
 .cbox.pads button{border:1px solid var(--ink);font-size:16px;letter-spacing:.06em;padding:0 2px;line-height:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-.cbox.pads button.lit{background:var(--acc);border-color:var(--acc)}
+.cbox.pads button.lit{background:var(--acc);border-color:var(--acc);color:var(--on-acc)}
 .cbox.pads button:active{background:var(--ink);color:var(--paper)}
 .cbox.sliders{display:flex;justify-content:space-around;padding:6px 4px 0}
 .vs{position:relative;display:grid;grid-template-rows:1fr auto;justify-items:center;width:34px;height:100%;touch-action:none}
@@ -176,7 +176,7 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .vs.empty{visibility:hidden}
 .vs.vsw{grid-template-rows:auto auto;align-content:start;justify-items:center;gap:6px;padding-top:4px}
 .vs.vsw .vsb{width:26px;height:26px;border:2px solid var(--ink);border-radius:50%}
-.vs.vsw .vsb.lit{background:var(--acc);border-color:var(--acc)}
+.vs.vsw .vsb.lit{background:var(--acc);border-color:var(--acc);color:var(--on-acc)}
 .randrow{display:flex;justify-content:flex-end;height:18px;margin-top:-2px}
 .randtext{font-size:20px;letter-spacing:.1em;color:var(--acc);padding:0;line-height:1}
 .popok.alt{background:transparent;color:var(--ink);border:1px solid var(--ink)}
@@ -211,8 +211,8 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .spad{height:50px;border:1px solid var(--ink);font-size:20px;display:grid;place-items:center;position:relative;touch-action:manipulation}
 .spad.empty{opacity:.55;border-style:dashed}
 .spad.has::after{content:"";position:absolute;right:5px;top:5px;width:6px;height:6px;background:var(--ink)}
-.spad.act{background:var(--acc);border-color:var(--acc);color:var(--ink)}
-.spad.act::after{background:var(--ink)}
+.spad.act{background:var(--acc);border-color:var(--acc);color:var(--on-acc)}
+.spad.act::after{background:var(--on-acc)}
 .scbtns{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:6px}
 .scbtns button{border:1px solid var(--ink);min-height:36px;font-size:20px}
 .scbtns #sc-save{color:var(--acc);border-color:var(--acc)}
@@ -222,3 +222,17 @@ button:focus-visible,.knob:focus-visible{outline:2px solid var(--ink);outline-of
 .orbinfo{font-size:18px;letter-spacing:.06em;text-align:center;min-height:42px;display:grid;place-items:center;opacity:.85}
 .orbbtns{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:6px}
 .orbbtns button{border:1px solid var(--ink);min-height:36px;font-size:20px}
+
+/* efekt kineskopu (klasa .crt na #radar): poświata, linie skanowania, winieta i lekkie mruganie. Włączany w MENU. */
+.glow{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;mix-blend-mode:screen;filter:blur(5px) brightness(1.7);opacity:.95;display:none}
+.crt .glow{display:block}
+.crt{text-shadow:0 0 5px rgba(241,241,236,.35)}
+.crt .knob svg{filter:drop-shadow(0 0 3px rgba(241,241,236,.55))}
+.crt .randtext,.crt .moderow .rnd,.crt .scbtns #sc-save{text-shadow:0 0 8px rgba(198,255,26,.8)}
+.crt .cellbtn.act button,.crt .cellbtn.tog.on button,.crt .bar .rec,.crt .spad.act,.crt .xy .xyd,.crt .vs .vk,.crt .cbox.xy .puck,.crt .cbox.pads button.lit,.crt .vs.vsw .vsb.lit{box-shadow:0 0 12px rgba(198,255,26,.65)}
+.crt .tabs4 button.on,.crt .subtabs button.on,.crt .viewbar button.on{box-shadow:0 0 10px rgba(241,241,236,.35)}
+#radar.crt::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:25;mix-blend-mode:multiply;
+  background:repeating-linear-gradient(to bottom,rgba(0,0,0,.28) 0 1px,transparent 1px 3px),radial-gradient(ellipse at center,transparent 58%,rgba(0,0,0,.55) 100%);animation:flick 5.5s steps(1,end) infinite}
+@keyframes flick{0%,100%{opacity:1}47%{opacity:.93}48%{opacity:1}73%{opacity:.9}74%{opacity:1}}
+@media (prefers-reduced-motion:reduce){#radar.crt::after{animation:none}}
+.crt .tabs4 button.on,.crt .subtabs button.on,.crt .viewbar button.on,.crt #go,.crt .popok{text-shadow:none}
