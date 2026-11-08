@@ -30,8 +30,8 @@ engine.onStep = (i, t) => { lastStep = { i, t }; };
 
 const INK = '241,241,236', ACC = '198,255,26', PAPER = '#181818';      // paleta: biel i kwaśna limonka na prawie czarnym tle
 const PAPER_TRAIL = 'rgba(24,24,24,0.38)';                              // przy efekcie CRT ekran nie jest czyszczony do końca: zostaje poświata luminoforu za ruchomymi liniami
-let crtOn = true;
-try { crtOn = localStorage.getItem('radarxxx.crt.v1') !== '0'; } catch { /* domyślnie włączony */ }
+let crtOn = false;
+try { crtOn = localStorage.getItem('radarxxx.crt.v1') === '1'; } catch { /* domyślnie wyłączony */ }
 const clearScope = (W) => { g.fillStyle = crtOn ? PAPER_TRAIL : PAPER; g.fillRect(0, 0, W, W); };
 const FONT = (px) => `${Math.round(px)}px 'VT323', ui-monospace, Menlo, monospace`;
 const cutoffHz = (v) => 60 * Math.pow(100, v);
