@@ -22,6 +22,7 @@ let page = 'seq';
 let view = 'classic';                            // widok: classic (strony SEQ/MIX/SYN/FX/DRUM), scenes (pole XY + pady scen), orbit (instrument jako orbity)
 const tabSel = { seq: 0, mix: 0, syn: 0, fx: 0, drum: 0 };   // wybrana pod-zakładka każdej strony (0 = MAIN)
 let synSel = 0;                                  // silnik edytowany na stronie SYN (0..3)
+const synPg = [0, 0, 0, 0];                      // strona parametrów silnika zewnętrznego w każdym miejscu
 const globals = { cutoff: 0.5, reso: 0.5, master: 1, comp: 0.5, mdrive: 0, dj: 0, tape: 0, wow: 0, chorus: 0 };   // ustawienia wyjściowe i filtra globalnego (do zapisu w presetach)
 const padPos = { x: 0.25, y: 0.75 };
 const cv = el('scope'), g = cv.getContext('2d');
@@ -1188,7 +1189,12 @@ function renderPanel() {
     mc.addEventListener('click', () => { engine.setType(i, nextType(engine.types[i])); renderSub(); renderPanel(); commitSoon(); });
     grid.appendChild(mc);
     const add = (sp) => { const k = synKnob(labOf(sp), sp.min, sp.max, sp.step, pv[sp.id], sp.def, (v) => engine.setParam(i, sp.id, v)); synRefs[sp.id] = k; grid.appendChild(k); };
-    if (PARAM_SPECS[t].main) PARAM_SPECS[t].main.forEach((id) => add(specOfType(t, id)));       // silniki zewnętrzne: własna lista siedmiu pokręteł
+    if (PARAM_SPECS[t].pages) {                      // silniki zewnętrzne: wszystkie parametry modułu na stronach po sześć pokręteł, przycisk P1/n przełącza stronę
+      const pages = PARAM_SPECS[t].pages, pg = (synPg[i] || 0) % pages.length;
+      pages[pg].forEach((id) => add(specOfType(t, id)));
+      for (let k = pages[pg].length; k < 6; k++) Sp();
+      B({ kind: 'act', label: () => `P${pg + 1}/${pages.length}`, act: () => { synPg[i] = (pg + 1) % pages.length; renderPanel(); } });
+    }
     else {
       PARAM_SPECS[t].filter((x) => x.group !== 'env').slice(0, 3).forEach(add); add(specOfType(t, 'fEnv'));
       ['fDec', 'aDec', 'aRel'].forEach((id) => add(specOfType(t, id)));

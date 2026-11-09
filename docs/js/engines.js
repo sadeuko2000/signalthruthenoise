@@ -79,6 +79,7 @@ export function defaultParams(i) {
 export function randomizeParams(i, rng = Math.random) {
   const out = {};
   for (const sp of PARAM_SPECS[i]) {
+    if (sp.virtual) continue;                      // parametry wirtualne (obwiednie radarxxx w silnikach zewnętrznych) są widokiem parametrów modułu
     if (sp.choices) { out[sp.id] = sp.choices[Math.floor(rng() * sp.choices.length)]; continue; }
     const [lo, hi] = sp.rand;
     const v = lo + rng() * (hi - lo);

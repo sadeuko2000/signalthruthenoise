@@ -46,6 +46,7 @@ test('losowanie zostaje w granicach rand i w zakresie suwaka', () => {
     for (let seed = 0; seed < 200; seed++) {
       const vals = randomizeParams(i, mulberry32(seed));
       for (const sp of PARAM_SPECS[i]) {
+        if (sp.virtual) continue;
         const v = vals[sp.id];
         assert.ok(v >= sp.min && v <= sp.max, `${sp.id}=${v} poza suwakiem`);
         if (sp.choices) assert.ok(sp.choices.includes(v), `${sp.id}=${v} spoza choices`);
@@ -102,16 +103,17 @@ test('bip: przesunięcie globalne -1..+1 względem wartości silnika', () => {
 });
 
 import { ENGINE_SHORT, ENGINE_TAB } from '../docs/js/engines.js';
-test('silniki zewnętrzne (HOWL) dołączone do tablic: nazwy, specyfikacje, lista siedmiu pokręteł', () => {
+test('silniki zewnętrzne (HOWL): wszystkie parametry modułu są na stronach po najwyżej sześć pokręteł, każdy dokładnie raz', () => {
   assert.equal(PARAM_SPECS.length, 7);
   assert.equal(VOICES.length, 7);
   assert.equal(ENGINE_SHORT.length, 7);
   assert.equal(ENGINE_TAB.length, 7);
   for (let t = 4; t < 7; t++) {
-    const specs = PARAM_SPECS[t];
-    assert.equal(specs.main.length, 7, `${ENGINE_SHORT[t]}: siedem pokręteł na zakładce silnika`);
-    for (const id of specs.main) assert.ok(specs.find((x) => x.id === id), `${ENGINE_SHORT[t]}: brak ${id}`);
+    const specs = PARAM_SPECS[t], pages = specs.pages, rawIds = specs.filter((x) => !x.virtual).map((x) => x.id), shown = pages.flat();
+    assert.ok(pages.every((pg) => pg.length >= 1 && pg.length <= 6), `${ENGINE_SHORT[t]}: strona ma do sześciu pokręteł`);
+    assert.deepEqual([...shown].sort(), [...rawIds].sort(), `${ENGINE_SHORT[t]}: każdy parametr modułu na dokładnie jednej stronie`);
     assert.ok(ENGINE_TAB[t].length <= 5, 'nazwa na zakładce mieści się');
-    for (const sp of specs) assert.ok(sp.label.length <= 8 || sp.group === 'env', `${sp.id}: za długi podpis pokrętła`);
+    for (const sp of specs) assert.ok(sp.label.length <= 8 || sp.virtual, `${sp.id}: za długi podpis pokrętła`);
+    for (const id of ['fEnv', 'fDec', 'aAtk', 'aDec', 'aSus', 'aRel']) assert.ok(specs.find((x) => x.id === id && x.virtual), `${ENGINE_SHORT[t]}: brak wirtualnej obwiedni ${id}`);
   }
 });
