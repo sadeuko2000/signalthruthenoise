@@ -6,7 +6,7 @@ import { howlBundle } from './howl-bundle.mjs';
 const read = (p) => readFileSync(new URL(`../docs/${p}`, import.meta.url), 'utf8');
 const out = process.argv[2] ?? 'preview.html';
 
-const js = howlBundle(read) + '\n' + ['electro-model', 'generator', 'vocoder', 'extvoices', 'engines', 'drums', 'fx', 'knob', 'audio', 'sensors', 'app']
+const js = howlBundle(read) + '\n' + ['electro-model', 'generator', 'vocoder', 'extvoices', 'engines', 'drums', 'extfx', 'fx', 'knob', 'audio', 'sensors', 'app']
   .map((m) => read(`js/${m}.js`)
     .replace(/^import .*$/gm, '')
     .replace(/^export (async |const |function |class )/gm, '$1'))

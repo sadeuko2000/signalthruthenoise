@@ -5,14 +5,28 @@ import { mulberry32 } from '../docs/js/generator.js';
 
 const ALL = [['filtr', FILTER_STYLES], ['efekt', FX_STYLES]];
 
-test('4 style filtra i 4 style efektów, każdy z 8 parametrami o unikalnych id', () => {
+test('4 style filtra i 4 własne style efektów (8 parametrów), do tego efekty zewnętrzne (do 8 parametrów) o unikalnych id', () => {
+  assert.equal(FILTER_STYLES.length, 4);
+  assert.ok(FX_STYLES.length >= 4);
   for (const [kind, styles] of ALL) {
-    assert.equal(styles.length, 4, kind);
-    for (const st of styles) {
-      assert.equal(st.params.length, 8, `${kind} ${st.name}`);
-      assert.equal(new Set(st.params.map((p) => p.id)).size, 8, `${kind} ${st.name}: id się powtarzają`);
+    styles.forEach((st, k) => {
+      const own = k < 4, n = st.params.length;
+      if (own) assert.equal(n, 8, `${kind} ${st.name}`); else assert.ok(n >= 3 && n <= 8, `${kind} ${st.name}`);
+      assert.equal(new Set(st.params.map((p) => p.id)).size, n, `${kind} ${st.name}: id się powtarzają`);
       assert.equal(typeof st.build, 'function');
-    }
+    });
+  }
+});
+
+test('efekty zewnętrzne (HOWL): osiem stylów, makro wskazuje istniejące parametry, mix zaczyna od zera', () => {
+  const ext = FX_STYLES.slice(4);
+  assert.equal(ext.length, 8);
+  for (const st of ext) {
+    const ids = st.params.map((p) => p.id);
+    assert.ok(st.macro.r.length >= 1 && st.macro.a.length >= 1, `${st.name}: makro`);
+    for (const id of [...st.macro.r, ...st.macro.a]) assert.ok(ids.includes(id), `${st.name}: brak ${id}`);
+    if (ids.includes('mix')) assert.equal(mapValues(st, defaultsN(st)).mix, 0, st.name);
+    for (const p of st.params) assert.equal(typeof p.show(p.map(p.def)), 'string');
   }
 });
 
@@ -46,7 +60,7 @@ test('losowanie zostaje w granicach rand i różni się między ziarnami', () =>
 test('domyślne ustawienia efektów nie zmieniają dźwięku (mix = 0), filtry są prawie otwarte', () => {
   for (const st of FX_STYLES) {
     const m = mapValues(st, defaultsN(st));
-    assert.equal(m.mix, 0, st.name);
+    if (st.params.some((p) => p.id === 'mix')) assert.equal(m.mix, 0, st.name);
   }
   const f = mapValues(FILTER_STYLES[0], defaultsN(FILTER_STYLES[0]));
   assert.ok(f.cutoff > 3000);

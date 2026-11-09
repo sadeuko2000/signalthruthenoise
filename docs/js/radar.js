@@ -3,7 +3,7 @@
 import { generateBass, mutate, DEFAULTS, withAccent, withSlide } from './generator.js';
 import { Engine } from './audio.js';
 import { VOICE_NAMES, PARAM_SPECS, ENGINE_SHORT, ENGINE_TAB, probeEngines, clampToDisc, setGlideTime } from './engines.js';
-import { FILTER_STYLES, FX_STYLES, mapValues } from './fx.js';
+import { FILTER_STYLES, FX_STYLES, mapValues, defaultsN } from './fx.js';
 import { generateDrums, emptyDrums, DRUM_TRACKS, DRUM_KITS, DRUM_STYLES, DRUM_STEPS } from './drums.js';
 import { makeKnob, initKnobs } from './knob.js';
 import { TAU, DEG_MIN, DEG_MAX, R_OUT, degToR, rToDeg, angleOfStep, polar, stepFromAngle, sweepPos, echoAlpha, echoes, placeNote, clearNote, moveNote, resizeSteps, nFromR, rFromN, nFromTheta, thetaFromN, delayCopies, bandPass, rotateSteps, reverseSteps, invertSteps, clearSteps, doubleSteps, halveSteps } from './radargeo.js';
@@ -209,8 +209,9 @@ const MACRO = {
 let fxCtl = 0;                                                  // czym steruje ekran: 0 oba, 1 tylko filtr, 2 tylko efekt
 const CTL_LABEL = ['OBA', 'FILTR', 'EFEKT'];
 const driven = () => (fxCtl === 0 ? [0, 1] : fxCtl === 1 ? [0] : [1]);
-const macroOf = (j) => MACRO[Math.min(j, 1)][fxSecs[j].slot.style];         // drugi efekt (j = 2) ma te same makra co pierwszy
-const polarIds = (j, si) => [MACRO[Math.min(j, 1)][si].r[0], MACRO[Math.min(j, 1)][si].a[0]];     // parametry pokazywane kursorem
+const macroFor = (j, si) => fxSecs[j].styles[si].macro || MACRO[Math.min(j, 1)][si];   // style zewnętrzne (HOWL) niosą własne makro; drugi efekt (j = 2) ma te same makra co pierwszy
+const macroOf = (j) => macroFor(j, fxSecs[j].slot.style);
+const polarIds = (j, si) => { const m = macroFor(j, si); return [m.r[0], m.a[0]]; };     // parametry pokazywane kursorem
 const mixFromR = (rN) => 0.08 + 0.84 * rN;                              // mix efektu rośnie od środka ku brzegowi
 
 function drawFx(ts) {
@@ -257,6 +258,9 @@ function drawFx(ts) {
     } else if (X.si === 2) {                       // chorus: echa podwojone i lekko rozstrojone, wahające się z tempem LFO
       const off = X.nv.depth * 0.07 * Math.sin((ts / 1000) * TAU * Math.min(X.m.rate, 4) * 0.5), f = (0.2 + 0.8 * mix) * k;
       E.forEach((e) => { base(e, 0.55 * f * through(e), { da: off, raw: true, lw: 0.85 }); base(e, 0.4 * f * through(e), { da: -off * 1.3, raw: true, lw: 0.85 }); });
+    } else if (X.si >= 4) {                        // efekty zewnętrzne (HOWL): duchy echa rozsunięte w kącie, moc od miksu
+      const f = (0.2 + 0.8 * mix) * k, spread = 0.05 + 0.1 * (X.nv[macroOf(1).a[0]] ?? 0.5);
+      E.forEach((e) => [-2, -1, 1, 2].forEach((m) => base(e, (0.5 - 0.1 * Math.abs(m)) * f * through(e), { da: m * spread, raw: true, lw: 0.8 })));
     } else {                                       // dystorsja: echa spłaszczone do pierścienia obcięcia (od miękkiej do „fold”)
       const dr = X.nv.drive, rc = R * (R_OUT - 0.4 * dr), f = (0.25 + 0.75 * mix) * k;
       circle(cx, cy, rc, `rgba(${ACC},.6)`, dpr, [4 * dpr, 4 * dpr]);
@@ -493,7 +497,7 @@ function restore(sn) {
     const sec = fxSecs[j]; if (!sec) return;
     const slot = sec.slot;
     if (slot.style !== x.style) slot.setStyle(x.style);
-    slot.values = x.values.map((o) => ({ ...o })); slot.refresh(); slot.setBypass(x.bypass);
+    slot.values = slot.styles.map((st, k) => (x.values[k] ? { ...defaultsN(st), ...x.values[k] } : defaultsN(st))); slot.refresh();     // starsze zapisy mają mniej stylów: brakujące dostają wartości domyślne slot.setBypass(x.bypass);
     sec.sec.classList.toggle('off', x.bypass); sec.render();
   });
   el('bpm-v').textContent = engine.bpm;

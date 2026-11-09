@@ -4,6 +4,7 @@
 // Własne implementacje na natywnych węzłach Web Audio.
 
 import { satCurve } from './engines.js';
+import { buildExternalFx } from './extfx.js';
 
 const lin = (a, b) => (n) => a + (b - a) * n;
 const expm = (a, b) => (n) => a * Math.pow(b / a, n);
@@ -320,6 +321,9 @@ export const FX_STYLES = [
     MIX(0, [0.15, 0.5]), LEVEL(),
   ], build: buildDist },
 ];
+
+// Efekty zewnętrzne (HOWL) dołączane za czterema własnymi stylami.
+FX_STYLES.push(...buildExternalFx());
 
 // ---------- SLOT: jeden styl aktywny, parametry zapamiętane per styl ----------
 export const defaultsN = (style) => Object.fromEntries(style.params.map((sp) => [sp.id, sp.def]));

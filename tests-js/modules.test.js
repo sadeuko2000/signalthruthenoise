@@ -5,8 +5,8 @@ import { readFileSync } from 'node:fs';
 // Pakiety (scripts/build-preview.mjs, scripts/build-radar.mjs) skleja moduły w jeden skrypt. Zdublowana nazwa najwyższego poziomu
 // w dwóch modułach dałaby tam błąd składni, którego nie widać w wersji z modułami.
 const BUNDLES = {
-  app: ['electro-model', 'generator', 'vocoder', 'extvoices', 'engines', 'drums', 'fx', 'knob', 'audio', 'sensors', 'app'],
-  radar: ['electro-model', 'generator', 'vocoder', 'extvoices', 'engines', 'drums', 'fx', 'knob', 'audio', 'radargeo', 'radar'],
+  app: ['electro-model', 'generator', 'vocoder', 'extvoices', 'engines', 'drums', 'extfx', 'fx', 'knob', 'audio', 'sensors', 'app'],
+  radar: ['electro-model', 'generator', 'vocoder', 'extvoices', 'engines', 'drums', 'extfx', 'fx', 'knob', 'audio', 'radargeo', 'radar'],
 };
 
 for (const [bundle, MODULES] of Object.entries(BUNDLES)) {
