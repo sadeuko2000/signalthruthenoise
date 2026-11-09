@@ -1,0 +1,189 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>HOWL export test</title></head>
+<body style="font:13px monospace;background:#111;color:#ddd;padding:12px">
+<h3>HOWL Web Audio export - offline render tests</h3>
+<pre id="log">running...</pre>
+<script type="module">
+import { engines, effects, toRealValue, paramFromNormalized, randomEngineParams, randomEffectNormalized } from '../index.js';
+
+const SR = 48000;
+const lines = [];
+let failures = 0;
+const log = (s) => { lines.push(s); document.getElementById('log').textContent = lines.join('\n'); };
+const check = (ok, msg) => { if (!ok) { failures++; log('FAIL  ' + msg); } return ok; };
+const stats = (buf, a = 0, b = buf.length) => {
+  let peak = 0, sq = 0, bad = 0, n = 0;
+  for (let c = 0; c < buf.numberOfChannels; ++c) {
+    const d = buf.getChannelData(c);
+    for (let i = a; i < b; ++i) { const x = d[i]; if (!Number.isFinite(x)) ++bad; else { peak = Math.max(peak, Math.abs(x)); sq += x * x; ++n; } }
+  }
+  return { peak, rms: Math.sqrt(sq / Math.max(1, n)), bad };
+};
+const window_ = (buf, t0, t1) => stats(buf, Math.floor(t0 * SR), Math.floor(t1 * SR));
+const diff = (a, b) => { const x = a.getChannelData(0), y = b.getChannelData(0); let s = 0; for (let i = 0; i < x.length; ++i) s += (x[i] - y[i]) ** 2; return Math.sqrt(s / x.length); };
+
+async function renderEngine(eng, setup, seconds = 3, events) {
+  const ctx = new OfflineAudioContext(1, SR * seconds, SR);
+  const v = eng.create(ctx);
+  v.out.connect(ctx.destination);
+  if (eng.prepare) await eng.prepare(ctx);
+  if (v.ready) await v.ready;
+  if (setup) for (const [k, val] of Object.entries(setup)) v.setParam(k, val);
+  (events || ((voice) => {
+    voice.note(0.1, 110, 100, false, 0.4, false, false);
+    voice.note(0.8, 165, 100, true, 0.3, false, false);
+    voice.note(1.2, 220, 100, false, 0.3, true, false);   // legato slide into the previous note
+    voice.note(1.55, 110, 100, false, 0.2, false, true);   // held note, closed by silence()
+    voice.silence(2.2);
+  }))(v);
+  return ctx.startRendering();
+}
+
+async function renderEffect(fx, normalized, bpm, seconds = 3, source) {
+  const ctx = new OfflineAudioContext(2, SR * seconds, SR);
+  const inst = fx.create(ctx);
+  const osc = ctx.createOscillator();
+  osc.type = 'sawtooth';
+  osc.frequency.value = (source && source.freq) || 220;
+  const gate = ctx.createGain();
+  gate.gain.setValueAtTime(0, 0);
+  gate.gain.setValueAtTime(0.5, 0.05);
+  gate.gain.setValueAtTime(0, 0.3);
+  osc.connect(gate); gate.connect(inst.input); inst.output.connect(ctx.destination);
+  osc.start();
+  inst.apply(paramFromNormalized(fx, normalized), bpm, 0);
+  if (source && source.after) source.after(inst, ctx);
+  return { buffer: await ctx.startRendering(), inst };
+}
+
+try {
+  // ---- structure ------------------------------------------------------------------------------------
+  log('engines: ' + engines.map((e) => e.id).join(', '));
+  log('effects: ' + effects.map((e) => e.id).join(', '));
+  check(engines.length === 3 && effects.length === 9, 'expected 3 engines and 9 effects');
+  for (const e of engines) {
+    check(typeof e.id === 'string' && !/\s/.test(e.id) && typeof e.name === 'string' && typeof e.create === 'function', e.id + ' shape');
+    for (const p of e.params) {
+      check(['id', 'label', 'min', 'max', 'step', 'def', 'rand'].every((k) => k in p), e.id + '.' + p.id + ' fields');
+      check(p.def >= p.min && p.def <= p.max && p.rand[0] >= p.min && p.rand[1] <= p.max && p.rand[0] <= p.rand[1], e.id + '.' + p.id + ' def/rand inside min..max');
+    }
+  }
+  for (const f of effects) {
+    check(typeof f.id === 'string' && typeof f.name === 'string' && typeof f.create === 'function', f.id + ' shape');
+    for (const p of f.params) {
+      check(['id', 'label', 'def', 'rand', 'min', 'max', 'curve'].every((k) => k in p), f.id + '.' + p.id + ' fields');
+      check(p.def >= 0 && p.def <= 1 && p.rand[0] >= 0 && p.rand[1] <= 1 && p.rand[0] <= p.rand[1], f.id + '.' + p.id + ' def/rand normalized');
+      check(['lin', 'exp', 'choice'].includes(p.curve) && (p.curve !== 'choice' || Array.isArray(p.choices)), f.id + '.' + p.id + ' curve');
+      check(p.curve !== 'exp' || p.min > 0, f.id + '.' + p.id + ' exp needs min > 0');
+    }
+  }
+
+  // ---- engines --------------------------------------------------------------------------------------
+  for (const eng of engines) {
+    const buf = await renderEngine(eng);
+    const s = stats(buf);
+    const played = window_(buf, 0.15, 0.45), tail = window_(buf, 2.6, 3.0);
+    log(`${eng.id.padEnd(16)} peak ${s.peak.toFixed(3)}  rms(note) ${played.rms.toFixed(4)}  rms(after silence) ${tail.rms.toExponential(1)}  nonfinite ${s.bad}`);
+    check(s.bad === 0, eng.id + ' produced NaN/Infinity');
+    check(played.rms > 0.01, eng.id + ' is silent while a note plays');
+    check(s.peak < 4, eng.id + ' peak too high: ' + s.peak);
+    check(tail.rms < 0.002, eng.id + ' does not fall silent after silence()');
+    const legato = window_(buf, 1.25, 1.45);
+    check(legato.rms > 0.01, eng.id + ' legato/slide note is silent');
+    const held = window_(buf, 1.7, 2.1);
+    check(held.rms > 0.01, eng.id + ' held (hold=true) note does not sustain');
+
+    // every parameter at its extremes, and 12 random patches
+    for (const p of eng.params) {
+      for (const val of [p.min, p.max]) {
+        const b = await renderEngine(eng, { [p.id]: val }, 1.2, (v) => v.note(0.05, 110, 110, true, 0.4, false, false));
+        const st = stats(b);
+        if (!check(st.bad === 0 && st.peak < 12, `${eng.id}.${p.id}=${val} -> bad ${st.bad} peak ${st.peak.toFixed(2)}`)) break;
+      }
+    }
+    for (let i = 0; i < 12; ++i) {
+      const params = randomEngineParams(eng);
+      const b = await renderEngine(eng, params, 1.2, (v) => { v.note(0.05, 82, 110, true, 0.3, false, false); v.note(0.45, 123, 90, false, 0.3, true, false); });
+      const st = stats(b);
+      check(st.bad === 0 && st.peak < 12, `${eng.id} random patch ${i} -> bad ${st.bad} peak ${st.peak.toFixed(2)}`);
+    }
+  }
+
+  // MONO specifics: sync, ring and PWM change the sound; ring with a muted partner is silent
+  {
+    const mono = engines.find((e) => e.id === 'howl-mono');
+    const base = { waveA: 0, waveB: 0, octaveB: 1, fineB: 37, filterEnv: 0, cutoff: 18000, resonance: 0, drive: 0 };
+    const one = (extra) => renderEngine(mono, { ...base, ...extra }, 1, (v) => v.note(0.02, 110, 110, false, 0.8, false, false));
+    const plain = await one({}), synced = await one({ sync: 1 }), ringed = await one({ ring: 1 });
+    const pulse = await one({ waveA: 1, waveB: 1, pulseWidth: 0 }), narrow = await one({ waveA: 1, waveB: 1, pulseWidth: 1 });
+    const ringMuted = await one({ ring: 1, levelB: 0 });
+    log(`mono: |sync-plain| ${diff(plain, synced).toFixed(4)}  |ring-plain| ${diff(plain, ringed).toFixed(4)}  |pw1-pw0| ${diff(pulse, narrow).toFixed(4)}  ring+muted rms ${window_(ringMuted, 0.2, 0.8).rms.toExponential(1)}`);
+    check(diff(plain, synced) > 0.02, 'MONO sync does not change the waveform');
+    check(diff(plain, ringed) > 0.02, 'MONO ring mod does not change the waveform');
+    check(diff(pulse, narrow) > 0.02, 'MONO pulse width does not change the pulse wave');
+    check(window_(ringMuted, 0.2, 0.8).rms < 1e-4, 'MONO ring mod with a muted oscillator should be silent');
+    // PWM: LFO makes the output time-varying versus a static pulse width
+    const staticPw = await one({ waveA: 1, waveB: 1, levelB: 0, pulseWidth: 0.3, pwmDepth: 0 }), pwm = await one({ waveA: 1, waveB: 1, levelB: 0, pulseWidth: 0.3, pwmDepth: 0.8, pwmRate: 3 });
+    log(`mono: |pwm-static| ${diff(staticPw, pwm).toFixed(4)}`);
+    check(diff(staticPw, pwm) > 0.01, 'MONO PWM LFO does not change the sound');
+  }
+
+  // ---- effects --------------------------------------------------------------------------------------
+  for (const fx of effects) {
+    const norm = {};
+    const { buffer, inst } = await renderEffect(fx, norm, 120);
+    const s = stats(buffer);
+    const during = window_(buffer, 0.1, 0.3), after = window_(buffer, 1.0, 3.0);
+    log(`${fx.id.padEnd(22)} peak ${s.peak.toFixed(3)}  rms(input on) ${during.rms.toFixed(4)}  rms(after) ${after.rms.toExponential(2)}  nonfinite ${s.bad}`);
+    check(s.bad === 0, fx.id + ' produced NaN/Infinity');
+    check(s.peak < 8, fx.id + ' peak too high: ' + s.peak);
+    check(typeof inst.apply === 'function' && inst.input && inst.output, fx.id + ' instance shape');
+    if (fx.id !== 'howl-ducker') check(during.rms > 0.002, fx.id + ' is silent while the input plays');
+    // random normalized patches stay finite
+    for (let i = 0; i < 8; ++i) {
+      const r = await renderEffect(fx, randomEffectNormalized(fx), 90 + i * 10, 2);
+      const st = stats(r.buffer);
+      check(st.bad === 0 && st.peak < 16, `${fx.id} random patch ${i} -> bad ${st.bad} peak ${st.peak.toFixed(2)}`);
+    }
+    // extremes of every parameter
+    for (const p of fx.params) for (const n of [0, 1]) {
+      const r = await renderEffect(fx, { [p.id]: n }, 140, 1.5);
+      const st = stats(r.buffer);
+      check(st.bad === 0 && st.peak < 24, `${fx.id}.${p.id}=${n} -> bad ${st.bad} peak ${st.peak.toFixed(2)}`);
+    }
+  }
+
+  // effect specifics
+  {
+    const get = (id) => effects.find((e) => e.id === id);
+    const rv = await renderEffect(get('howl-reverb'), { size: 0.8, mix: 0.5 }, 120, 4);
+    const tail = window_(rv.buffer, 1.2, 3.0);
+    log(`reverb tail rms (1.2-3.0 s) ${tail.rms.toExponential(2)}`);
+    check(tail.rms > 1e-4, 'reverb has no tail');
+    const dl = await renderEffect(get('howl-delay'), { sync: 0, time: (200 - 10) / 1490, feedback: 0.4, mix: 0.6 }, 120, 2);
+    const echo = window_(dl.buffer, 0.27 + 0.05, 0.27 + 0.2), gap = window_(dl.buffer, 0.7, 0.75);
+    log(`delay echo window rms ${echo.rms.toFixed(4)}  quiet gap ${gap.rms.toExponential(2)}`);
+    check(echo.rms > 0.02, 'delay echo not found about 200 ms after the burst');
+    const synced = await renderEffect(get('howl-delay'), { sync: 4 / 8, feedback: 0.3, mix: 0.6 }, 120, 2);   // 1/4 note at 120 bpm = 0.5 s
+    check(window_(synced.buffer, 0.55 + 0.05, 0.55 + 0.2).rms > 0.02, 'tempo-synced delay (1/4 at 120 bpm) not found at 0.5 s');
+    const dk = await renderEffect(get('howl-ducker'), { depth: 1, release: 0.4 }, 120, 2, { after: (inst) => inst.duck(0.2, 1) });
+    log(`ducker: during dip rms ${window_(dk.buffer, 0.2, 0.22).rms.toExponential(2)}  at start ${window_(dk.buffer, 0.1, 0.19).rms.toFixed(4)}`);
+    check(window_(dk.buffer, 0.205, 0.22).rms < window_(dk.buffer, 0.1, 0.19).rms * 0.5, 'ducker does not dip');
+    const dist = get('howl-distortion');
+    const types = [];
+    for (let t = 0; t < 14; ++t) {
+      const r = await renderEffect(dist, { type: t / 13, drive: 0.8, mix: 1 }, 120, 1);
+      types.push(window_(r.buffer, 0.1, 0.3).rms);
+    }
+    log('distortion rms per type: ' + types.map((x) => x.toFixed(3)).join(' '));
+    check(types.every((x) => x > 0.001), 'a distortion type is silent');
+    check(new Set(types.map((x) => x.toFixed(3))).size >= 9, 'distortion types are not distinct enough');
+  }
+} catch (e) {
+  failures++;
+  log('EXCEPTION ' + (e && e.stack ? e.stack : e));
+}
+log(failures === 0 ? '\nALL CHECKS PASSED' : `\n${failures} CHECK(S) FAILED`);
+window.__failures = failures;
+window.__done = true;
+</script></body></html>

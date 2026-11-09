@@ -1,3 +1,5 @@
+import { buildExternal } from './extvoices.js';
+
 // Cztery monofoniczne silniki basu, które dostają te same nuty. Proporcje głośności
 // ustawia pad XY (miks dwuwymiarowy). Wszystko na natywnych węzłach Web Audio.
 // Własne implementacje inspirowane typami syntezy (analog 3xVCO, MS-20, FM 2-op, wavetable).
@@ -326,3 +328,15 @@ export class WavetableVoice extends Voice {
 
 export const VOICES = [ProphetVoice, MS20Voice, DXVoice, WavetableVoice];
 export const VOICE_NAMES = ['prophet', 'ms-20', 'dx', 'wavetable'];
+
+// Silniki zewnętrzne (HOWL) dołączane za czterema własnymi: ich specyfikacje i klasy głosów lądują w tych samych tablicach.
+// VOICE_NAMES zostaje listą czterech miejsc (slotów), a nie rodzajów silnika.
+const EXT = buildExternal(ENV_SPECS, bip);
+PARAM_SPECS.push(...EXT.specs);
+VOICES.push(...EXT.voices);
+export const ENGINE_SHORT = ['PROPHET', 'MS20', 'DX', 'WAVE', ...EXT.short];      // nazwy rodzajów silnika
+export const ENGINE_TAB = ['PRO', 'MS20', 'DX', 'WAVE', ...EXT.tab];              // krótkie nazwy na zakładkach
+// Sprawdza, które rodzaje silnika działają w tym środowisku (własne zawsze, zewnętrzne po próbie wczytania ich AudioWorklet).
+export async function probeEngines(ctx) {
+  return Promise.all(VOICES.map((V) => (V.probe ? V.probe(ctx) : true)));
+}

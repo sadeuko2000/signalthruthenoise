@@ -2,7 +2,7 @@
 // Przemiatająca linia = głowica odtwarzania (jedno okrążenie = jeden obieg wzoru), nuty = echa z poświatą.
 import { generateBass, mutate, DEFAULTS, withAccent, withSlide } from './generator.js';
 import { Engine } from './audio.js';
-import { VOICE_NAMES, PARAM_SPECS, clampToDisc, setGlideTime } from './engines.js';
+import { VOICE_NAMES, PARAM_SPECS, ENGINE_SHORT, ENGINE_TAB, probeEngines, clampToDisc, setGlideTime } from './engines.js';
 import { FILTER_STYLES, FX_STYLES, mapValues } from './fx.js';
 import { generateDrums, emptyDrums, DRUM_TRACKS, DRUM_KITS, DRUM_STYLES, DRUM_STEPS } from './drums.js';
 import { makeKnob, initKnobs } from './knob.js';
@@ -173,8 +173,10 @@ function drawSeq() {
 
 const PAD_R = 0.85;      // promień pada MIX (ułamek promienia radaru)
 const PAD_ANCHORS = [[-1, 1], [1, 1], [-1, -1], [1, -1]].map(([a, b]) => [a * Math.SQRT1_2, b * Math.SQRT1_2]);
-const SHORT = ['PROPHET', 'MS20', 'DX', 'WAVE'];                     // nazwy rodzajów silnika
-const TAB_SHORT = ['PRO', 'MS20', 'DX', 'WAVE'];                     // krótkie nazwy na zakładkach
+const SHORT = ENGINE_SHORT;                                          // nazwy rodzajów silnika (własne i zewnętrzne)
+const TAB_SHORT = ENGINE_TAB;                                        // krótkie nazwy na zakładkach
+let engineOk = ENGINE_SHORT.map(() => true);                          // które rodzaje silnika działają (uzupełniane po starcie dźwięku)
+const nextType = (t) => { let k = (t + 1) % SHORT.length; for (let n = 0; n < SHORT.length && !engineOk[k]; n++) k = (k + 1) % SHORT.length; return k; };
 const typeName = (i) => SHORT[engine.types[i]];                      // nazwa silnika w miejscu i (rodzaje mogą się powtarzać)
 function drawMix() {
   const G = geo(), S = sweepState(), { cx, cy, R, dpr } = G, Rp = R * PAD_R;
@@ -768,8 +770,8 @@ const SW = {
   route: ['ROUTING', () => false, () => { const k = PERMS.findIndex((p) => p.join() === engine.fx.order.join()); engine.fx.route(PERMS[(k + 1) % PERMS.length]); toast(routeText()); }],
   clear: ['CLEAR', () => false, actions.steps(clearSteps)], double: ['DOUBLE', () => false, actions.steps(doubleSteps)], half: ['HALF', () => false, actions.steps(halveSteps)],
   basem: ['BASE −', () => false, () => actions.base(-1)], basep: ['BASE +', () => false, () => actions.base(1)], keyn: ['KEY', () => false, () => { actions.key(1); toast(MODE_LABEL[state.mode]); }],
-  type1: ['TYPE 1', () => false, () => engine.setType(0, (engine.types[0] + 1) % SHORT.length)], type2: ['TYPE 2', () => false, () => engine.setType(1, (engine.types[1] + 1) % SHORT.length)],
-  type3: ['TYPE 3', () => false, () => engine.setType(2, (engine.types[2] + 1) % SHORT.length)], type4: ['TYPE 4', () => false, () => engine.setType(3, (engine.types[3] + 1) % SHORT.length)],
+  type1: ['TYPE 1', () => false, () => engine.setType(0, nextType(engine.types[0]))], type2: ['TYPE 2', () => false, () => engine.setType(1, nextType(engine.types[1]))],
+  type3: ['TYPE 3', () => false, () => engine.setType(2, nextType(engine.types[2]))], type4: ['TYPE 4', () => false, () => engine.setType(3, nextType(engine.types[3]))],
   dotmode: [() => state.mixMode.toUpperCase(), () => state.mixMode === 'solo', () => { state.mixMode = state.mixMode === 'solo' ? 'mute' : 'solo'; }],
   random: ['RANDOM', () => false, actions.random], mutate: ['MUTATE', () => false, actions.mut], warp: ['WARP', () => false, actions.warp],
   reverse: ['REVERSE', () => false, actions.steps(reverseSteps)], invert: ['INVERT', () => false, actions.steps(invertSteps)],
@@ -1168,7 +1170,7 @@ function renderPanel() {
     Kn('OCT', -2, 2, 1, engine.vOct[i], 0, (v) => { engine.vOct[i] = Math.round(v); });
     Kn('EQ LOW', -12, 12, 0.5, engine.vEq[i][0], 0, (v) => engine.setVoiceEq(i, 0, v));
     Kn('EQ HIGH', -12, 12, 0.5, engine.vEq[i][1], 0, (v) => engine.setVoiceEq(i, 1, v));
-    B({ kind: 'act', label: () => typeName(i), act: () => { engine.setType(i, (engine.types[i] + 1) % SHORT.length); renderSub(); renderPanel(); } });
+    B({ kind: 'act', label: () => typeName(i), act: () => { engine.setType(i, nextType(engine.types[i])); renderSub(); renderPanel(); } });
     B({ kind: 'tog', label: () => 'ON', on: () => !!engine.enabled[i], act: () => engine.setEnabled(i, !engine.enabled[i]) });
     B({ kind: 'tog', label: () => 'SOLO', on: () => engine.solo === i, act: () => engine.setSolo(engine.solo === i ? null : i) });
     Sp(); B({ kind: 'act', label: () => 'RANDOM', act: () => engine.randomizeVoice(i) });
@@ -1179,12 +1181,14 @@ function renderPanel() {
     // komórka MODEL po lewej (dotknięcie zmienia rodzaj silnika), obok osiem pokręteł w dwóch rzędach po cztery
     const mc = document.createElement('button'); mc.className = 'modelcell';
     mc.innerHTML = `<span class="cl">MODEL</span><b>${TAB_SHORT[t]}</b>`; mc.setAttribute('aria-label', 'Zmień rodzaj silnika');
-    mc.addEventListener('click', () => { engine.setType(i, (engine.types[i] + 1) % SHORT.length); renderSub(); renderPanel(); commitSoon(); });
+    mc.addEventListener('click', () => { engine.setType(i, nextType(engine.types[i])); renderSub(); renderPanel(); commitSoon(); });
     grid.appendChild(mc);
-    const own = PARAM_SPECS[t].filter((x) => x.group !== 'env').slice(0, 3);
     const add = (sp) => { const k = synKnob(labOf(sp), sp.min, sp.max, sp.step, pv[sp.id], sp.def, (v) => engine.setParam(i, sp.id, v)); synRefs[sp.id] = k; grid.appendChild(k); };
-    own.forEach(add); add(specOfType(t, 'fEnv'));
-    ['fDec', 'aDec', 'aRel'].forEach((id) => add(specOfType(t, id)));
+    if (PARAM_SPECS[t].main) PARAM_SPECS[t].main.forEach((id) => add(specOfType(t, id)));       // silniki zewnętrzne: własna lista siedmiu pokręteł
+    else {
+      PARAM_SPECS[t].filter((x) => x.group !== 'env').slice(0, 3).forEach(add); add(specOfType(t, 'fEnv'));
+      ['fDec', 'aDec', 'aRel'].forEach((id) => add(specOfType(t, id)));
+    }
     B({ kind: 'act', label: () => 'RANDOM', act: () => { const vals = engine.randomizeVoice(i); for (const [id, v] of Object.entries(vals)) if (synRefs[id]) synRefs[id].value = v; } });
   } else if (tab === 4) {
     // MSTR: master (głośność, kompresja, drive) i efekty na sumie: DJ filter, tape (TAPE + WOW), chorus oraz beat repeat jako pionowy suwak
@@ -1470,6 +1474,7 @@ window.addEventListener('keydown', (e) => {
 // ---------- start ----------
 el('go').addEventListener('click', async () => {
   await engine.start();
+  probeEngines(engine.ctx).then((ok) => { engineOk = ok; if (ok.includes(false)) toast('NIEKTÓRE SILNIKI HOWL NIEDOSTĘPNE'); });
   applyGlobals();
   setPad(padPos.x, padPos.y);
   buildFx();

@@ -100,3 +100,18 @@ test('bip: przesunięcie globalne -1..+1 względem wartości silnika', () => {
   assert.equal(bip(10, -0.5, 0, 40), 5);        // pół drogi do minimum
   assert.equal(bip(3, -1, 3, 300), 3);          // wartość na minimum zostaje na minimum
 });
+
+import { ENGINE_SHORT, ENGINE_TAB } from '../docs/js/engines.js';
+test('silniki zewnętrzne (HOWL) dołączone do tablic: nazwy, specyfikacje, lista siedmiu pokręteł', () => {
+  assert.equal(PARAM_SPECS.length, 7);
+  assert.equal(VOICES.length, 7);
+  assert.equal(ENGINE_SHORT.length, 7);
+  assert.equal(ENGINE_TAB.length, 7);
+  for (let t = 4; t < 7; t++) {
+    const specs = PARAM_SPECS[t];
+    assert.equal(specs.main.length, 7, `${ENGINE_SHORT[t]}: siedem pokręteł na zakładce silnika`);
+    for (const id of specs.main) assert.ok(specs.find((x) => x.id === id), `${ENGINE_SHORT[t]}: brak ${id}`);
+    assert.ok(ENGINE_TAB[t].length <= 5, 'nazwa na zakładce mieści się');
+    for (const sp of specs) assert.ok(sp.label.length <= 8 || sp.group === 'env', `${sp.id}: za długi podpis pokrętła`);
+  }
+});
