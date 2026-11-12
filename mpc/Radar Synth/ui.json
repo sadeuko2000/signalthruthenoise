@@ -1,0 +1,186 @@
+{
+  "kit": "lime",
+  "pages": [
+    {
+      "name": "FILTER",
+      "controls": [
+        {
+          "param": "Cutoff",
+          "widget": "knob"
+        },
+        {
+          "param": "Resonance",
+          "widget": "knob"
+        },
+        {
+          "param": "Env Amt",
+          "widget": "knob",
+          "polarity": "bipolar"
+        },
+        {
+          "param": "Drive",
+          "widget": "knob"
+        },
+        {
+          "param": "Filt Attack",
+          "widget": "fader"
+        },
+        {
+          "param": "Filt Decay",
+          "widget": "fader"
+        },
+        {
+          "param": "Filt Sustain",
+          "widget": "fader"
+        },
+        {
+          "param": "Filt Release",
+          "widget": "fader"
+        },
+        {
+          "param": "Key Track",
+          "widget": "knob"
+        },
+        "empty",
+        "empty",
+        "empty"
+      ]
+    },
+    {
+      "name": "AMP",
+      "controls": [
+        {
+          "param": "Amp Attack",
+          "widget": "fader"
+        },
+        {
+          "param": "Amp Decay",
+          "widget": "fader"
+        },
+        {
+          "param": "Amp Sustain",
+          "widget": "fader"
+        },
+        {
+          "param": "Amp Release",
+          "widget": "fader"
+        },
+        {
+          "param": "Volume",
+          "widget": "fader"
+        },
+        {
+          "param": "Velocity",
+          "widget": "knob"
+        },
+        "empty",
+        "empty"
+      ]
+    },
+    {
+      "name": "ENGINE",
+      "controls": [
+        {
+          "param": "Engine",
+          "widget": "switch"
+        },
+        {
+          "param": "Mode",
+          "widget": "switch"
+        },
+        {
+          "param": "Glide",
+          "widget": "knob"
+        },
+        {
+          "param": "Bend Range",
+          "widget": "knob"
+        },
+        {
+          "param": "Detune",
+          "widget": "knob",
+          "visibleWhen": {
+            "param": "Engine",
+            "choice": "Prophet"
+          }
+        },
+        {
+          "param": "Body",
+          "widget": "knob",
+          "visibleWhen": {
+            "param": "Engine",
+            "choice": "Prophet"
+          }
+        },
+        {
+          "param": "HP Freq",
+          "widget": "knob",
+          "visibleWhen": {
+            "param": "Engine",
+            "choice": "MS-20"
+          }
+        },
+        {
+          "param": "Wave Mix",
+          "widget": "knob",
+          "visibleWhen": {
+            "param": "Engine",
+            "choice": "MS-20"
+          }
+        },
+        {
+          "param": "FM Ratio",
+          "widget": "slider",
+          "overlay": "menu",
+          "visibleWhen": {
+            "param": "Engine",
+            "choice": "DX"
+          }
+        },
+        {
+          "param": "FM Index",
+          "widget": "knob",
+          "visibleWhen": {
+            "param": "Engine",
+            "choice": "DX"
+          }
+        },
+        {
+          "param": "Sub",
+          "widget": "knob",
+          "visibleWhen": {
+            "param": "Engine",
+            "choice": "DX"
+          }
+        },
+        "empty",
+        {
+          "param": "Vowel",
+          "widget": "knob",
+          "visibleWhen": {
+            "param": "Engine",
+            "choice": "Wavetable"
+          }
+        },
+        {
+          "param": "Morph",
+          "widget": "knob",
+          "visibleWhen": {
+            "param": "Engine",
+            "choice": "Wavetable"
+          }
+        },
+        {
+          "param": "Sweep",
+          "widget": "knob",
+          "polarity": "bipolar",
+          "visibleWhen": {
+            "param": "Engine",
+            "choice": "Wavetable"
+          }
+        },
+        "empty"
+      ]
+    }
+  ]
+}
