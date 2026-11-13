@@ -2,7 +2,52 @@
   "kit": "lime",
   "pages": [
     {
-      "name": "FILTER",
+      "name": "MIX",
+      "controls": [
+        {
+          "param": "Mix X",
+          "widget": "knob"
+        },
+        {
+          "param": "Mix Y",
+          "widget": "knob"
+        },
+        "empty",
+        "empty",
+        {
+          "param": "Volume",
+          "widget": "knob"
+        },
+        {
+          "param": "Mode",
+          "widget": "switch"
+        },
+        "empty",
+        "empty",
+        {
+          "param": "Glide",
+          "widget": "knob"
+        },
+        {
+          "param": "Bend Range",
+          "widget": "knob"
+        },
+        "empty",
+        "empty",
+        {
+          "param": "Velocity",
+          "widget": "knob"
+        },
+        {
+          "param": "Voices",
+          "widget": "knob"
+        },
+        "empty",
+        "empty"
+      ]
+    },
+    {
+      "name": "TONE",
       "controls": [
         {
           "param": "Cutoff",
@@ -38,18 +83,6 @@
           "widget": "fader"
         },
         {
-          "param": "Key Track",
-          "widget": "knob"
-        },
-        "empty",
-        "empty",
-        "empty"
-      ]
-    },
-    {
-      "name": "AMP",
-      "controls": [
-        {
           "param": "Amp Attack",
           "widget": "fader"
         },
@@ -66,119 +99,105 @@
           "widget": "fader"
         },
         {
-          "param": "Volume",
-          "widget": "fader"
-        },
-        {
-          "param": "Velocity",
+          "param": "Key Track",
           "widget": "knob"
         },
+        "empty",
         "empty",
         "empty"
       ]
     },
     {
-      "name": "ENGINE",
+      "name": "PRO/MS",
       "controls": [
         {
-          "param": "Engine",
-          "widget": "switch"
-        },
-        {
-          "param": "Mode",
-          "widget": "switch"
-        },
-        {
-          "param": "Glide",
+          "param": "Prophet Lvl",
           "widget": "knob"
         },
         {
-          "param": "Bend Range",
-          "widget": "knob"
+          "param": "Prophet Oct",
+          "widget": "knob",
+          "polarity": "bipolar"
         },
         {
           "param": "Detune",
-          "widget": "knob",
-          "visibleWhen": {
-            "param": "Engine",
-            "choice": "Prophet"
-          }
+          "widget": "knob"
         },
         {
           "param": "Body",
+          "widget": "knob"
+        },
+        {
+          "param": "MS-20 Lvl",
+          "widget": "knob"
+        },
+        {
+          "param": "MS-20 Oct",
           "widget": "knob",
-          "visibleWhen": {
-            "param": "Engine",
-            "choice": "Prophet"
-          }
+          "polarity": "bipolar"
         },
         {
           "param": "HP Freq",
-          "widget": "knob",
-          "visibleWhen": {
-            "param": "Engine",
-            "choice": "MS-20"
-          }
+          "widget": "knob"
         },
         {
           "param": "Wave Mix",
+          "widget": "knob"
+        }
+      ]
+    },
+    {
+      "name": "DX/WAVE",
+      "controls": [
+        {
+          "param": "DX Lvl",
+          "widget": "knob"
+        },
+        {
+          "param": "DX Oct",
           "widget": "knob",
-          "visibleWhen": {
-            "param": "Engine",
-            "choice": "MS-20"
-          }
+          "polarity": "bipolar"
         },
         {
           "param": "FM Ratio",
           "widget": "slider",
-          "overlay": "menu",
-          "visibleWhen": {
-            "param": "Engine",
-            "choice": "DX"
-          }
+          "overlay": "menu"
         },
         {
           "param": "FM Index",
-          "widget": "knob",
-          "visibleWhen": {
-            "param": "Engine",
-            "choice": "DX"
-          }
+          "widget": "knob"
         },
         {
           "param": "Sub",
-          "widget": "knob",
-          "visibleWhen": {
-            "param": "Engine",
-            "choice": "DX"
-          }
+          "widget": "knob"
         },
         "empty",
+        "empty",
+        "empty",
+        {
+          "param": "Wave Lvl",
+          "widget": "knob"
+        },
+        {
+          "param": "Wave Oct",
+          "widget": "knob",
+          "polarity": "bipolar"
+        },
         {
           "param": "Vowel",
-          "widget": "knob",
-          "visibleWhen": {
-            "param": "Engine",
-            "choice": "Wavetable"
-          }
+          "widget": "knob"
         },
         {
           "param": "Morph",
-          "widget": "knob",
-          "visibleWhen": {
-            "param": "Engine",
-            "choice": "Wavetable"
-          }
+          "widget": "knob"
         },
         {
           "param": "Sweep",
           "widget": "knob",
-          "polarity": "bipolar",
-          "visibleWhen": {
-            "param": "Engine",
-            "choice": "Wavetable"
-          }
+          "polarity": "bipolar"
         },
+        "empty",
+        "empty",
         "empty"
       ]
     }
